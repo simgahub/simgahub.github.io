@@ -1803,6 +1803,18 @@
                 // (FAVORITES has no init — pure localStorage reads)
 
                 buildFeed();
+
+                // ---- Deeplink: ?game=<id> (from Share button) ----
+                (function handleDeeplink() {
+                    const param = new URLSearchParams(window.location.search).get('game');
+                    if (!param) return;
+                    const target = document.querySelector(`.game-section[data-game-id="${CSS.escape(param)}"]`);
+                    if (target) {
+                        // Small delay lets scroll-snap settle before we jump
+                        setTimeout(() => target.scrollIntoView({ behavior: 'instant' }), 150);
+                    }
+                })();
+
                 setupMessageListener();
                 attachUIListeners();
                 // Start the global chat engine
