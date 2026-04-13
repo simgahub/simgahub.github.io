@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Orbital Drop</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #050510;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to UI elements specifically */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(10, 10, 25, 0.6) 0%, rgba(5, 5, 10, 0.95) 100%);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+        }
+
+        .screen.active {
+            display: flex;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 4rem;
+            text-transform: uppercase;
+            text-align: center;
+            background: linear-gradient(to bottom, #fff, #00d2ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.6));
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            color: #ff3366;
+            text-shadow: 0 0 10px rgba(255, 51, 102, 0.8);
+            margin-bottom: 10px;
+        }
+
+        .stats-text {
+            font-size: 1.5rem;
+            color: #aaddff;
+            margin-bottom: 30px;
+            text-shadow: 0 0 5px rgba(170, 221, 255, 0.5);
+        }
+
+        /* Buttons */
+        .btn {
+            background: rgba(0, 210, 255, 0.1);
+            border: 2px solid #00d2ff;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            margin: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2), inset 0 0 10px rgba(0, 210, 255, 0.1);
+            pointer-events: auto;
+        }
+
+        .btn:hover {
+            background: rgba(0, 210, 255, 0.3);
+            box-shadow: 0 0 25px rgba(0, 210, 255, 0.5), inset 0 0 15px rgba(0, 210, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+        }
+
+        .btn-shop {
+            border-color: #ff00ea;
+            box-shadow: 0 0 15px rgba(255, 0, 234, 0.2), inset 0 0 10px rgba(255, 0, 234, 0.1);
+        }
+
+        .btn-shop:hover {
+            background: rgba(255, 0, 234, 0.3);
+            box-shadow: 0 0 25px rgba(255, 0, 234, 0.5), inset 0 0 15px rgba(255, 0, 234, 0.3);
+        }
+
+        /* In-game HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .score-display {
+            color: #fff;
+            filter: drop-shadow(0 0 5px #00d2ff);
+        }
+
+        /* Shop UI */
+        .shop-container {
+            width: 90%;
+            max-width: 800px;
+            height: 70vh;
+            background: rgba(10, 10, 25, 0.8);
+            border: 2px solid #ff00ea;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 0, 234, 0.3);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            color: #ff00ea;
+            text-align: center;
+            text-shadow: 0 0 15px rgba(255, 0, 234, 0.8);
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 0, 234, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            width: 100%;
+            padding: 10px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00d2ff;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .shop-item h3 {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .item-preview {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-bottom: 15px;
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .item-desc {
+            font-size: 1rem;
+            color: #aaa;
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+
+        .buy-btn {
+            background: transparent;
+            border: 2px solid #ffcc00;
+            color: #ffcc00;
+            padding: 8px 20px;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .buy-btn:hover {
+            background: rgba(255, 204, 0, 0.2);
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+        }
+
+        .buy-btn.equipped {
+            border-color: #00d2ff;
+            color: #00d2ff;
+            background: rgba(0, 210, 255, 0.1);
+        }
+
+        .close-shop {
+            margin-top: 20px;
+            align-self: center;
+        }
+
+        /* Notifications */
+        #notification-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(10, 10, 25, 0.9);
+            border-left: 4px solid #00d2ff;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 4px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s ease-out, fadeOut 0.5s ease-in 2.5s forwards;
+        }
+
+        .toast.error { border-color: #ff3366; }
+        .toast.success { border-color: #39ff14; }
+        .toast.reward { border-color: #ffcc00; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* Controls hint */
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.3; }
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            background: #050510;
+            z-index: 1000;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(0, 210, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00d2ff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud" style="display: none;">
+        <div class="score-display">DISTANCE: <span id="hud-score">0</span></div>
+    </div>
+
+    <div id="notification-container"></div>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="spinner"></div>
+            <h2 style="margin-top: 20px; color: #00d2ff; text-shadow: 0 0 10px rgba(0,210,255,0.5);">SYNCING...</h2>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen">
+            <h1>Orbital Drop</h1>
+            <div class="stats-text">HIGH SCORE: <span id="menu-highscore">0</span></div>
+            <button class="btn" onclick="startGame()">Commence Drop</button>
+            <button class="btn btn-shop" onclick="showScreen('shop-screen')">Upgrades & Skins</button>
+            <div class="controls-hint">TAP / CLICK to BOOST<br>DRAG to MOVE</div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="game-over-screen" class="screen">
+            <h2>HULL BREACHED</h2>
+            <div class="stats-text" style="font-size: 2rem;">SCORE: <span id="go-score">0</span></div>
+            <div class="stats-text">HIGH SCORE: <span id="go-highscore">0</span></div>
+            <button class="btn" onclick="startGame()">Restart Drop</button>
+            <button class="btn btn-shop" onclick="showScreen('menu-screen')">Main Menu</button>
+        </div>
+
+        <!-- Shop -->
+        <div id="shop-screen" class="screen">
+            <div class="shop-container">
+                <div class="shop-header">ORBITAL STATION SHOP</div>
+                <div class="shop-grid" id="shop-grid">
+                    <!-- Populated by JS -->
+                </div>
+                <button class="btn close-shop" onclick="showScreen('menu-screen')">Return to Menu</button>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+/**
+ * ORBITAL DROP
+ * Core Game Engine & Platform Integration
+ */
+
+// --- CONSTANTS & CONFIG ---
+const GAME_ID = "orbital";
+let sbSpendRequests = {}; // Track pending purchases
+
+const SHOP_ITEMS = [
+    { id: 'skin_cyan', type: 'skin', name: 'Neon Core', color: '#00d2ff', price: 0, desc: 'Standard issue orb.' },
+    { id: 'skin_pink', type: 'skin', name: 'Plasma Pink', color: '#ff00ea', price: 15, desc: 'High-energy plasma casing.' },
+    { id: 'skin_green', type: 'skin', name: 'Toxic Glow', color: '#39ff14', price: 25, desc: 'Radiating pure green energy.' },
+    { id: 'skin_gold', type: 'skin', name: 'Solar Flare', color: '#ffaa00', price: 40, desc: 'Forged in the heart of a star.' },
+    { id: 'upg_shield', type: 'upgrade', name: 'Deflector Shield', color: '#4444ff', price: 50, desc: 'Absorbs 1 fatal impact per run.' }
+];
+
+// --- GAME STATE ---
+let saveData = {
+    highScore: 0,
+    unlockedSkins: ['skin_cyan'],
+    equippedSkin: 'skin_cyan',
+    hasShield: false
+};
+
+let gameState = 'loading'; // loading, menu, playing, gameover
+let canvas, ctx;
+let lastTime = 0;
+let score = 0;
+let distanceCounter = 0; // For SimgaBuck rewards
+let screenShake = 0;
+
+// Game Config
+const GRAVITY = 0.25;
+const BOOST = -6.5;
+const MAX_FALL_SPEED = 12;
+const OBSTACLE_BASE_SPEED = 4;
+let obstacleSpeed = OBSTACLE_BASE_SPEED;
+
+// Entities
+let player;
+let obstacles = [];
+let particles = [];
+let stars = [];
+
+// Input
+let targetX = 0;
+let isBoosting = false;
+
+// --- INITIALIZATION ---
+window.onload = () => {
+    initCanvas();
+    setupInputListeners();
+    loadGameData(); // Starts the platform load sequence
+    generateStars();
+    
+    // Fallback if load fails or takes too long (3 seconds)
+    setTimeout(() => {
+        if (gameState === 'loading') {
+            showToast("Offline Mode (Load Timeout)", "error");
+            showScreen('menu-screen');
+            updateShopUI();
+            requestAnimationFrame(gameLoop);
+        }
+    }, 3000);
+};
+
+function initCanvas() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d', { alpha: false });
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    targetX = canvas.width / 2;
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+// --- PLATFORM INTEGRATION ---
+
+function loadGameData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Listener for platform responses
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        // Load Response
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            if (data.data) {
+                saveData = { ...saveData, ...data.data };
+                document.getElementById('menu-highscore').innerText = saveData.highScore;
+            }
+            if (gameState === 'loading') {
+                showScreen('menu-screen');
+                updateShopUI();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Spend Response
+        if (data.type === "spendResponse") {
+            const req = sbSpendRequests[data.msgId];
+            if (req) {
+                if (data.success) {
+                    handleSuccessfulPurchase(req.itemId);
+                } else {
+                    showToast("Not enough SimgaBucks", "error");
+                }
+                delete sbSpendRequests[data.msgId];
+            }
+        }
+    });
+}
+
+function saveGameData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function rewardSimgaBucks(amount) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks!`, "reward");
+}
+
+function buyItem(itemId) {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (item.price === 0 || saveData.unlockedSkins.includes(itemId) || (item.type === 'upgrade' && saveData.hasShield)) {
+        // Already own it, just equip
+        if (item.type === 'skin') {
+            saveData.equippedSkin = itemId;
+            saveGameData();
+            updateShopUI();
+        }
+        return;
+    }
+
+    const msgId = Math.random().toString(36);
+    sbSpendRequests[msgId] = { itemId: itemId };
+
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: item.price,
+        msgId: msgId
+    }, "*");
+}
+
+function handleSuccessfulPurchase(itemId) {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (item.type === 'skin') {
+        saveData.unlockedSkins.push(itemId);
+        saveData.equippedSkin = itemId;
+        showToast(`Unlocked ${item.name}!`, "success");
+    } else if (item.type === 'upgrade' && item.id === 'upg_shield') {
+        saveData.hasShield = true;
+        showToast(`Shield Module Activated!`, "success");
+    }
+    saveGameData();
+    updateShopUI();
+}
+
+// --- UI MANAGEMENT ---
+
+function showScreen(screenId) {
+    // 1. Remove 'active' from all screens to hide them
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    
+    // 2. Add 'active' ONLY if the target element exists
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+        targetScreen.classList.add('active');
+    }
+    
+    // 3. Update game state
+    gameState = screenId === 'menu-screen' ? 'menu' : 
+                screenId === 'shop-screen' ? 'menu' : 
+                screenId === 'game-over-screen' ? 'gameover' : 'playing';
+
+    if (screenId === 'menu-screen') {
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('menu-highscore').innerText = saveData.highScore;
+    }
+}
+
+function showToast(msg, type = "normal") {
+    const container = document.getElementById('notification-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+        if(toast.parentElement) toast.remove();
+    }, 3000);
+}
+
+function updateShopUI() {
+    const grid = document.getElementById('shop-grid');
+    grid.innerHTML = '';
+
+    SHOP_ITEMS.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        
+        let isOwned = false;
+        let isEquipped = false;
+
+        if (item.type === 'skin') {
+            isOwned = saveData.unlockedSkins.includes(item.id);
+            isEquipped = saveData.equippedSkin === item.id;
+        } else if (item.id === 'upg_shield') {
+            isOwned = saveData.hasShield;
+            isEquipped = saveData.hasShield;
+        }
+
+        let btnText = `Buy (${item.price} SB)`;
+        let btnClass = 'buy-btn';
+
+        if (isEquipped) {
+            btnText = item.type === 'skin' ? 'EQUIPPED' : 'ACTIVE';
+            btnClass += ' equipped';
+        } else if (isOwned) {
+            btnText = 'EQUIP';
+        }
+
+        div.innerHTML = `
+            <div class="item-preview" style="background-color: ${item.color}; box-shadow: 0 0 20px ${item.color};"></div>
+            <h3>${item.name}</h3>
+            <p class="item-desc">${item.desc}</p>
+            <button class="${btnClass}" onclick="buyItem('${item.id}')">${btnText}</button>
+        `;
+        grid.appendChild(div);
+    });
+}
+
+// --- CORE GAME MECHANICS ---
+
+function startGame() {
+    score = 0;
+    distanceCounter = 0;
+    obstacleSpeed = OBSTACLE_BASE_SPEED;
+    obstacles = [];
+    particles = [];
+    screenShake = 0;
+
+    const skinColor = SHOP_ITEMS.find(i => i.id === saveData.equippedSkin).color;
+
+    player = {
+        x: canvas.width / 2,
+        y: canvas.height * 0.3,
+        targetY: canvas.height * 0.3, // Anchor point
+        vy: 0,
+        radius: 12,
+        color: skinColor,
+        trail: [],
+        shieldActive: saveData.hasShield,
+        dead: false
+    };
+
+    targetX = player.x;
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('hud-score').innerText = '0';
+    
+    // Safely hide menus and trigger 'playing' state
+    showScreen('playing-screen'); 
+
+    // Spawn initial obstacle
+    spawnObstacle(canvas.height + 200);
+}
+
+function gameOver() {
+    player.dead = true;
+    screenShake = 20;
+    createExplosion(player.x, player.y, player.color, 50);
+    
+    setTimeout(() => {
+        if (score > saveData.highScore) {
+            saveData.highScore = score;
+            saveGameData();
+            showToast("New High Score!", "success");
+        } else if (saveData.hasShield && !player.shieldActive) {
+            // Shield was used, save state
+            saveGameData(); 
+        }
+        
+        document.getElementById('go-score').innerText = score;
+        document.getElementById('go-highscore').innerText = saveData.highScore;
+        showScreen('game-over-screen');
+    }, 1500);
+}
+
+// --- INPUT HANDLING ---
+
+function setupInputListeners() {
+    const updateTarget = (e) => {
+        if (e.touches && e.touches.length > 0) {
+            targetX = e.touches[0].clientX;
+        } else {
+            targetX = e.clientX;
+        }
+    };
+
+    const triggerBoost = (e) => {
+        if (gameState !== 'playing' || player.dead) return;
+        updateTarget(e);
+        player.vy = BOOST;
+        createParticles(player.x, player.y + player.radius, player.color, 5, 0, 3); // Downward thrust
+    };
+
+    window.addEventListener('mousemove', updateTarget);
+    window.addEventListener('touchmove', updateTarget, { passive: false });
+    
+    window.addEventListener('mousedown', triggerBoost);
+    window.addEventListener('touchstart', (e) => {
+        if(e.target.tagName !== 'BUTTON') e.preventDefault(); // Prevent scrolling
+        triggerBoost(e);
+    }, { passive: false });
+}
+
+// --- GAME LOOP & UPDATES ---
+
+function gameLoop(timestamp) {
+    const dt = timestamp - lastTime;
+    lastTime = timestamp;
+
+    update();
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function update() {
+    updateStars();
+
+    if (gameState !== 'playing') return;
+
+    if (!player.dead) {
+        // Player Physics
+        player.vy += GRAVITY;
+        if (player.vy > MAX_FALL_SPEED) player.vy = MAX_FALL_SPEED;
+        
+        // Horizontal smooth follow
+        player.x += (targetX - player.x) * 0.15;
+        
+        // Vertical boundary limits
+        player.y += player.vy;
+        
+        // If player hits top, bounce slightly
+        if (player.y < player.radius) {
+            player.y = player.radius;
+            player.vy = 0;
+        }
+
+        // If player falls off bottom, game over
+        if (player.y > canvas.height + player.radius) {
+            gameOver();
+        }
+
+        // Update trail
+        player.trail.unshift({ x: player.x, y: player.y });
+        if (player.trail.length > 15) player.trail.pop();
+
+        // Screen shake decay
+        if (screenShake > 0) screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+
+        // Scoring & Speed Scaling
+        score += Math.floor(obstacleSpeed / 2);
+        document.getElementById('hud-score').innerText = score;
+        
+        // Economy: SimgaBucks milestones (e.g. roughly every 15s)
+        distanceCounter += obstacleSpeed;
+        if (distanceCounter >= 3000) { // Approx 10-15 seconds depending on speed
+            distanceCounter = 0;
+            rewardSimgaBucks(2); // Small steady drip
+        }
+
+        obstacleSpeed = OBSTACLE_BASE_SPEED + (score / 5000); // Gradual speed increase
+
+        updateObstacles();
+    }
+
+    updateParticles();
+}
+
+// --- ENTITY MANAGEMENT ---
+
+function spawnObstacle(yPos) {
+    const gapSize = Math.max(120, 250 - (score / 200)); // Gap shrinks over time
+    const gapX = Math.random() * (canvas.width - gapSize - 40) + 20;
+
+    // A neon barrier composed of two rects
+    obstacles.push({
+        y: yPos,
+        h: 20,
+        gapX: gapX,
+        gapSize: gapSize,
+        passed: false,
+        color: `hsl(${(score / 50) % 360}, 80%, 60%)`
+    });
+}
+
+function updateObstacles() {
+    // Generate new obstacles
+    const lastObs = obstacles[obstacles.length - 1];
+    if (!lastObs || lastObs.y < canvas.height - 350) { // Distance between obstacles
+        spawnObstacle(canvas.height + 50);
+    }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        obs.y -= obstacleSpeed; // Move UP to simulate falling down
+
+        // Collision logic
+        if (!player.dead) {
+            // Check if player is at the Y level of the obstacle
+            if (player.y + player.radius > obs.y && player.y - player.radius < obs.y + obs.h) {
+                // Check horizontal bounds (is player OUTSIDE the gap?)
+                if (player.x - player.radius < obs.gapX || player.x + player.radius > obs.gapX + obs.gapSize) {
+                    
+                    if (player.shieldActive) {
+                        player.shieldActive = false;
+                        saveData.hasShield = false; // Consume shield
+                        createExplosion(player.x, player.y, '#4444ff', 30);
+                        showToast("Shield Depleted!", "error");
+                        screenShake = 10;
+                        // Destroy the obstacle to prevent immediate double hit
+                        obstacles.splice(i, 1);
+                        continue;
+                    } else {
+                        gameOver();
+                    }
+                }
+            }
+        }
+
+        // Remove off-screen obstacles
+        if (obs.y + obs.h < -50) {
+            obstacles.splice(i, 1);
+        }
+    }
+}
+
+// --- PARTICLE SYSTEM ---
+
+function createParticles(x, y, color, count, speedX, speedY) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: speedX + (Math.random() - 0.5) * 4,
+            vy: speedY + (Math.random() - 0.5) * 4,
+            life: 1,
+            decay: 0.02 + Math.random() * 0.03,
+            color: color,
+            size: Math.random() * 4 + 1
+        });
+    }
+}
+
+function createExplosion(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 8 + 2;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.01 + Math.random() * 0.02,
+            color: color,
+            size: Math.random() * 5 + 2
+        });
+    }
+}
+
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+        
+        // In gameplay, particles should also drift up with the environment to feel grounded
+        if (gameState === 'playing') p.y -= obstacleSpeed * 0.5; 
+
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+}
+
+// --- BACKGROUND PARALLAX ---
+
+function generateStars() {
+    for (let i = 0; i < 150; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2,
+            speed: Math.random() * 2 + 0.5,
+            alpha: Math.random()
+        });
+    }
+}
+
+function updateStars() {
+    let speedMult = (gameState === 'playing') ? obstacleSpeed * 0.3 : 0.5;
+    stars.forEach(s => {
+        s.y -= s.speed * speedMult;
+        if (s.y < 0) {
+            s.y = canvas.height;
+            s.x = Math.random() * canvas.width;
+        }
+    });
+}
+
+// --- RENDERING ---
+
+function draw() {
+    // Clear & Background
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    
+    // Apply screen shake
+    if (screenShake > 0) {
+        ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+    }
+
+    // Draw Stars (Parallax)
+    ctx.fillStyle = '#ffffff';
+    stars.forEach(s => {
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    if (gameState === 'playing' || gameState === 'gameover') {
+        
+        // Draw Obstacles
+        obstacles.forEach(obs => {
+            // Neon Glow Setup
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = obs.color;
+            ctx.fillStyle = obs.color;
+
+            // Left segment
+            ctx.fillRect(0, obs.y, obs.gapX, obs.h);
+            // Right segment
+            ctx.fillRect(obs.gapX + obs.gapSize, obs.y, canvas.width - (obs.gapX + obs.gapSize), obs.h);
+            
+            // Bright core
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, obs.y + 5, obs.gapX, obs.h - 10);
+            ctx.fillRect(obs.gapX + obs.gapSize, obs.y + 5, canvas.width - (obs.gapX + obs.gapSize), obs.h - 10);
+        });
+
+        // Draw Particles
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Draw Player
+        if (!player.dead) {
+            // Trail
+            if (player.trail.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(player.trail[0].x, player.trail[0].y);
+                for (let i = 1; i < player.trail.length; i++) {
+                    ctx.lineTo(player.trail[i].x, player.trail[i].y);
+                }
+                ctx.strokeStyle = player.color;
+                ctx.lineWidth = player.radius;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.globalAlpha = 0.3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = player.color;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
+            // Orb Glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = player.color;
+            
+            // Shield aura
+            if (player.shieldActive) {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius + 8 + Math.sin(Date.now() / 100) * 2, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(68, 68, 255, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            // Orb Core
+            const gradient = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, player.radius);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.5, player.color);
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    ctx.restore();
+}
+
+</script>
+</body>
+</html>

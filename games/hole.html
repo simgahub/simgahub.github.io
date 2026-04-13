@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hole Hopper</title>
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --secondary: #ff007f;
+            --dark: #0a0a1a;
+            --panel: rgba(15, 15, 30, 0.85);
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--dark);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            touch-action: none; /* Prevent pinch zoom and scroll */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass to canvas when needed */
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .title {
+            font-size: 4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+        }
+
+        .btn {
+            background: var(--glass);
+            border: 2px solid var(--primary);
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3) inset, 0 0 20px rgba(0, 255, 204, 0.2);
+            backdrop-filter: blur(5px);
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            color: var(--dark);
+            box-shadow: 0 0 25px var(--primary);
+            transform: scale(1.05);
+        }
+
+        .btn.secondary {
+            border-color: var(--secondary);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) inset, 0 0 20px rgba(255, 0, 127, 0.2);
+        }
+
+        .btn.secondary:hover {
+            background: var(--secondary);
+            color: white;
+            box-shadow: 0 0 25px var(--secondary);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #hud.active {
+            opacity: 1;
+        }
+
+        .hud-stat {
+            background: var(--glass);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        #retry-indicator {
+            color: var(--secondary);
+            font-size: 1.2rem;
+            margin-top: 5px;
+            display: none;
+            text-shadow: 0 0 10px var(--secondary);
+        }
+
+        /* Shop Panel */
+        .shop-container {
+            background: var(--panel);
+            width: 90%;
+            max-width: 600px;
+            height: 80%;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .shop-header {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        .shop-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #aaa;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .shop-content {
+            flex: 1;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .shop-content.active {
+            display: block;
+        }
+
+        /* Scrollbar styles */
+        .shop-content::-webkit-scrollbar { width: 8px; }
+        .shop-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .shop-content::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .item-desc {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .buy-btn {
+            background: var(--primary);
+            color: var(--dark);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 15px;
+            min-width: 120px;
+            transition: transform 0.1s;
+        }
+
+        .buy-btn:active {
+            transform: scale(0.95);
+        }
+
+        .buy-btn.owned {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .buy-btn.equipped {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        /* Loading Overlay */
+        #loading-screen {
+            background: var(--dark);
+            z-index: 100;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 255, 204, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Floating notification */
+        .toast {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+            z-index: 50;
+            text-shadow: 0 0 5px var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="spinner"></div>
+            <div style="margin-top: 20px; font-weight: bold; letter-spacing: 2px;">SYNCING DIMENSIONS...</div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="main-menu" class="screen">
+            <div class="title">Hole Hopper</div>
+            <div class="subtitle">Find the true portal. Ascend the dimensions.</div>
+            <div style="margin-bottom: 20px; font-weight: bold;">High Score: <span id="menu-highscore">0</span></div>
+            <button class="btn" onclick="game.startGame()">Play Now</button>
+            <button class="btn secondary" onclick="ui.showScreen('shop-menu')">Shop / Upgrades</button>
+        </div>
+
+        <!-- Shop Menu -->
+        <div id="shop-menu" class="screen">
+            <div class="shop-container">
+                <div class="shop-header">
+                    <span>Dimensional Shop</span>
+                    <button class="close-btn" onclick="game.goToMenu()">&times;</button>
+                </div>
+                
+                <div class="shop-tabs">
+                    <div class="tab active" onclick="ui.switchTab('skins', this)">Skins</div>
+                    <div class="tab" onclick="ui.switchTab('upgrades', this)">Upgrades</div>
+                </div>
+
+                <!-- Skins Tab -->
+                <div id="tab-skins" class="shop-content active">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Upgrades Tab -->
+                <div id="tab-upgrades" class="shop-content">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over" class="screen">
+            <div class="title" style="color: var(--secondary); text-shadow: 0 0 20px var(--secondary);">Dimension Collapsed</div>
+            <div style="font-size: 2rem; margin: 20px 0;">Level Reached: <span id="go-level">1</span></div>
+            <div style="font-size: 1.5rem; margin-bottom: 40px;">High Score: <span id="go-highscore">0</span></div>
+            <button class="btn" onclick="game.startGame()">Hop Again</button>
+            <button class="btn secondary" onclick="game.goToMenu()">Main Menu</button>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-stat">
+                Level: <span id="hud-level">1</span>
+                <div id="retry-indicator">Shield Active</div>
+            </div>
+            <div class="hud-stat">Score: <span id="hud-score">0</span></div>
+        </div>
+
+        <div id="toast" class="toast"></div>
+
+    </div>
+
+<script>
+/**
+ * HOLE HOPPER - GAME LOGIC
+ */
+
+const GAME_ID = "hole";
+
+// --- Game State & Data ---
+let saveObject = {
+    highScore: 0,
+    skinsUnlocked: ['blue'],
+    equippedSkin: 'blue',
+    hintLevel: 0, // 0 to 3
+    retries: 0,   // consumable count
+    hasVfx: false
+};
+
+// --- Shop Definitions ---
+const SHOP_ITEMS = {
+    skins: [
+        { id: 'blue', name: 'Stellar Blue', desc: 'Default dimensional orb.', cost: 0 },
+        { id: 'fire', name: 'Solar Flare', desc: 'Leaves a fiery trail.', cost: 20 },
+        { id: 'void', name: 'Dark Matter', desc: 'Sucks in ambient light.', cost: 50 },
+        { id: 'neon', name: 'Cyber Neon', desc: 'High-tech matrix glow.', cost: 100 }
+    ],
+    upgrades: [
+        { id: 'retry', name: 'Temporal Anchor', desc: 'Retry current level if you fail. (Consumable)', cost: 5, isConsumable: true },
+        { id: 'hint1', name: 'Glow Hint I', desc: '15% chance true portal sparkles.', cost: 15, levelReq: 0 },
+        { id: 'hint2', name: 'Glow Hint II', desc: '30% chance true portal sparkles.', cost: 30, levelReq: 1 },
+        { id: 'hint3', name: 'Glow Hint III', desc: '50% chance true portal sparkles.', cost: 60, levelReq: 2 },
+        { id: 'vfx', name: 'Portal Overdrive', desc: 'Enhances portal visual effects permanently.', cost: 40 }
+    ]
+};
+
+// --- Communication & Platform API ---
+const API = {
+    loadMsgId: null,
+    pendingPurchase: null,
+
+    init() {
+        window.addEventListener("message", this.handleMessage.bind(this));
+        this.requestLoad();
+        
+        // Failsafe: if platform doesn't respond in 1s, start anyway
+        setTimeout(() => {
+            if(document.getElementById('loading-screen').classList.contains('active')){
+                ui.updateDataDisplays();
+                ui.buildShop();
+                game.goToMenu();
+            }
+        }, 1500);
+    },
+
+    handleMessage(event) {
+        const data = event.data;
+        if (!data) return;
+
+        // Handle Load Response
+        if (data.type === "loadResponse" && data.msgId === this.loadMsgId) {
+            if (data.data) {
+                // Merge loaded data with defaults
+                saveObject = { ...saveObject, ...data.data };
+                // Ensure arrays are proper if missing
+                if (!saveObject.skinsUnlocked) saveObject.skinsUnlocked = ['blue'];
+            }
+            ui.updateDataDisplays();
+            ui.buildShop();
+            game.goToMenu();
+        }
+
+        // Handle Spend Response
+        if (data.type === "spendResponse" && this.pendingPurchase && data.msgId === this.pendingPurchase.msgId) {
+            if (data.success) {
+                this.processPurchase(this.pendingPurchase.item);
+            } else {
+                ui.showToast("Not enough SimgaBucks!");
+            }
+            this.pendingPurchase = null;
+            ui.buildShop(); // Refresh UI buttons
+        }
+    },
+
+    requestLoad() {
+        this.loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: this.loadMsgId
+        }, "*");
+    },
+
+    save() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveObject
+        }, "*");
+    },
+
+    addCurrency(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        ui.showToast(`+${amount} SimgaBucks!`);
+    },
+
+    buyItem(itemId, category) {
+        if (this.pendingPurchase) return; // Prevent spam
+
+        const item = SHOP_ITEMS[category].find(i => i.id === itemId);
+        if (!item) return;
+
+        const msgId = Math.random().toString(36);
+        this.pendingPurchase = { msgId: msgId, item: item };
+
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: item.cost,
+            msgId: msgId
+        }, "*");
+    },
+
+    processPurchase(item) {
+        if (SHOP_ITEMS.skins.find(s => s.id === item.id)) {
+            if (!saveObject.skinsUnlocked.includes(item.id)) {
+                saveObject.skinsUnlocked.push(item.id);
+            }
+            saveObject.equippedSkin = item.id;
+        } else if (item.id === 'retry') {
+            saveObject.retries += 1;
+        } else if (item.id.startsWith('hint')) {
+            saveObject.hintLevel += 1;
+        } else if (item.id === 'vfx') {
+            saveObject.hasVfx = true;
+        }
+        this.save();
+        ui.updateDataDisplays();
+        ui.showToast("Purchase Successful!");
+    }
+};
+
+// --- UI Management ---
+const ui = {
+    showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if(screenId) {
+            document.getElementById(screenId).classList.add('active');
+        }
+    },
+
+    switchTab(tabId, element) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.shop-content').forEach(c => c.classList.remove('active'));
+        
+        if (element) element.classList.add('active');
+        document.getElementById(`tab-${tabId}`).classList.add('active');
+    },
+
+    updateDataDisplays() {
+        document.getElementById('menu-highscore').textContent = saveObject.highScore;
+        document.getElementById('go-highscore').textContent = saveObject.highScore;
+        
+        const retryInd = document.getElementById('retry-indicator');
+        if (saveObject.retries > 0 && game.state === 'playing') {
+            retryInd.style.display = 'block';
+            retryInd.textContent = `Shields: ${saveObject.retries}`;
+        } else {
+            retryInd.style.display = 'none';
+        }
+    },
+
+    buildShop() {
+        const skinsContainer = document.getElementById('tab-skins');
+        const upgradesContainer = document.getElementById('tab-upgrades');
+        
+        skinsContainer.innerHTML = '';
+        upgradesContainer.innerHTML = '';
+
+        // Build Skins
+        SHOP_ITEMS.skins.forEach(skin => {
+            const isUnlocked = saveObject.skinsUnlocked.includes(skin.id);
+            const isEquipped = saveObject.equippedSkin === skin.id;
+            
+            let btnClass = 'buy-btn';
+            let btnText = `Buy (${skin.cost} SB)`;
+            let onclick = `API.buyItem('${skin.id}', 'skins')`;
+
+            if (isEquipped) {
+                btnClass += ' equipped';
+                btnText = 'Equipped';
+                onclick = '';
+            } else if (isUnlocked) {
+                btnClass += ' owned';
+                btnText = 'Equip';
+                onclick = `ui.equipSkin('${skin.id}')`;
+            }
+
+            skinsContainer.innerHTML += `
+                <div class="shop-item">
+                    <div class="item-info">
+                        <div class="item-name" style="color: ${this.getSkinColor(skin.id)}">${skin.name}</div>
+                        <div class="item-desc">${skin.desc}</div>
+                    </div>
+                    <button class="${btnClass}" onclick="${onclick}">${btnText}</button>
+                </div>
+            `;
+        });
+
+        // Build Upgrades
+        SHOP_ITEMS.upgrades.forEach(upg => {
+            let isAvailable = true;
+            let isMaxed = false;
+            let btnClass = 'buy-btn';
+            let btnText = `Buy (${upg.cost} SB)`;
+            let onclick = `API.buyItem('${upg.id}', 'upgrades')`;
+
+            if (upg.id.startsWith('hint')) {
+                if (saveObject.hintLevel >= 3 || saveObject.hintLevel > upg.levelReq) {
+                    isMaxed = true;
+                } else if (saveObject.hintLevel < upg.levelReq) {
+                    isAvailable = false;
+                }
+            } else if (upg.id === 'vfx') {
+                if (saveObject.hasVfx) isMaxed = true;
+            }
+
+            if (isMaxed) {
+                btnClass += ' equipped';
+                btnText = 'Owned';
+                onclick = '';
+            }
+
+            if (isAvailable) {
+                upgradesContainer.innerHTML += `
+                    <div class="shop-item">
+                        <div class="item-info">
+                            <div class="item-name">${upg.name} ${upg.isConsumable ? `(Owned: ${saveObject.retries})` : ''}</div>
+                            <div class="item-desc">${upg.desc}</div>
+                        </div>
+                        <button class="${btnClass}" onclick="${onclick}">${btnText}</button>
+                    </div>
+                `;
+            }
+        });
+    },
+
+    equipSkin(id) {
+        saveObject.equippedSkin = id;
+        API.save();
+        this.buildShop();
+    },
+
+    getSkinColor(id) {
+        const colors = { 'blue': '#00ffcc', 'fire': '#ff5500', 'void': '#aa00ff', 'neon': '#ff00ff' };
+        return colors[id] || colors['blue'];
+    },
+
+    showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.opacity = '1';
+        t.style.top = '80px';
+        
+        setTimeout(() => {
+            t.style.opacity = '0';
+            t.style.top = '100px';
+        }, 2500);
+    }
+};
+
+// --- Rendering & Game Engine Engine ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize performance
+let width, height;
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Visual Engine Classes
+class Particle {
+    constructor(x, y, color, type = 'normal', vX = null, vY = null) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.type = type; // normal, glow, trail, star
+        
+        if (type === 'star') {
+            this.z = Math.random() * 100 + 1;
+            this.size = (Math.random() * 2 + 0.5) * (100/this.z);
+            this.alpha = Math.random() * 0.3 + 0.1; // Reduced opacity for less distraction
+        } else {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 1;
+            this.vx = vX !== null ? vX : Math.cos(angle) * speed;
+            this.vy = vY !== null ? vY : Math.sin(angle) * speed;
+            this.life = 1.0;
+            this.decay = Math.random() * 0.02 + 0.01;
+            this.size = Math.random() * 4 + 2;
+        }
+    }
+
+    update(dt) {
+        if (this.type === 'star') {
+            // Stars move down slightly based on game movement
+            this.y += game.parallaxSpeed * (100 / this.z) * dt;
+            if (this.y > height) {
+                this.y = 0;
+                this.x = Math.random() * width;
+            }
+        } else {
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+            this.life -= this.decay * dt;
+            
+            // Gravity or drag
+            if (this.type === 'spark') {
+                this.vy += 0.1 * dt; // gravity
+            } else {
+                this.vx *= 0.95;
+                this.vy *= 0.95;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0 && this.type !== 'star') return;
+        
+        ctx.save();
+        ctx.globalAlpha = this.type === 'star' ? this.alpha : this.life;
+        
+        if (this.type === 'trail') {
+            ctx.globalCompositeOperation = 'lighter';
+        }
+
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.type === 'star' ? this.size : this.size * this.life, 0, Math.PI * 2);
+        ctx.fill();
+        
+        if (this.type === 'glow' || this.type === 'spark') {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+}
+
+class Player {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.x = width / 2;
+        this.y = height - 100;
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.radius = 15;
+        this.state = 'idle'; // idle, jumping, falling
+        this.trail = [];
+    }
+
+    getColor() {
+        return ui.getSkinColor(saveObject.equippedSkin);
+    }
+
+    update(dt) {
+        // Trail generation
+        if (this.state !== 'idle' || Math.random() < 0.3) {
+            let offset = (Math.random() - 0.5) * 10;
+            vfx.addParticle(this.x + offset, this.y + offset, this.getColor(), 'trail', 0, 0);
+        }
+
+        if (this.state === 'jumping') {
+            // Lerp towards target
+            this.x += (this.targetX - this.x) * 0.1 * dt;
+            this.y += (this.targetY - this.y) * 0.1 * dt;
+
+            // Check collision with target portal
+            const dx = this.targetX - this.x;
+            const dy = this.targetY - this.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 10) {
+                game.onPortalReached();
+            }
+        } else if (this.state === 'falling') {
+            this.y += 15 * dt;
+            if (this.y > height + 50) {
+                game.onFallComplete();
+            }
+        } else {
+            // Idle bobbing
+            this.y = (height - 100) + Math.sin(Date.now() / 200) * 5;
+        }
+    }
+
+    draw(ctx) {
+        if(this.state === 'falling' && this.y > height) return;
+
+        const color = this.getColor();
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        ctx.globalCompositeOperation = 'lighter';
+        
+        // Outer glow
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 2.5);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Core
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Skin specific geometry
+        if (saveObject.equippedSkin === 'fire') {
+            ctx.fillStyle = '#ffaa00';
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius*1.5);
+            ctx.lineTo(this.radius*0.8, this.radius*0.5);
+            ctx.lineTo(-this.radius*0.8, this.radius*0.5);
+            ctx.fill();
+        } else if (saveObject.equippedSkin === 'void') {
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (saveObject.equippedSkin === 'neon') {
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-this.radius*0.7, -this.radius*0.7, this.radius*1.4, this.radius*1.4);
+        }
+
+        ctx.restore();
+    }
+}
+
+class Portal {
+    constructor(x, y, isCorrect) {
+        this.x = x;
+        this.y = y;
+        this.isCorrect = isCorrect;
+        this.radius = 40;
+        this.angle = 0;
+        this.scale = 0; // for spawn animation
+        this.targetScale = 1;
+        
+        // Hint logic
+        this.showHint = false;
+        if (this.isCorrect && saveObject.hintLevel > 0) {
+            let chance = 0;
+            if (saveObject.hintLevel === 1) chance = 0.15;
+            if (saveObject.hintLevel === 2) chance = 0.30;
+            if (saveObject.hintLevel >= 3) chance = 0.50;
+            if (Math.random() < chance) {
+                this.showHint = true;
+            }
+        }
+    }
+
+    update(dt) {
+        this.angle += 0.02 * dt;
+        this.scale += (this.targetScale - this.scale) * 0.1 * dt;
+
+        // Hint particles
+        if (this.showHint && Math.random() < 0.1) {
+            vfx.addParticle(
+                this.x + (Math.random()-0.5)*40, 
+                this.y + (Math.random()-0.5)*40, 
+                '#ffd700', 'spark', 0, -2
+            );
+        }
+
+        // Ambient portal particles
+        if (saveObject.hasVfx && Math.random() < 0.2) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * this.radius;
+            vfx.addParticle(
+                this.x + Math.cos(angle)*dist,
+                this.y + Math.sin(angle)*dist,
+                this.isCorrect && this.showHint ? '#ffd700' : '#8800ff',
+                'trail', 0, 0
+            );
+        }
+    }
+
+    draw(ctx) {
+        if (this.scale < 0.01) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(this.scale, this.scale);
+        ctx.rotate(this.angle);
+
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Outer swirling vortex
+        for(let i=0; i<3; i++) {
+            ctx.rotate((Math.PI * 2) / 3);
+            const grad = ctx.createLinearGradient(0, 0, this.radius, 0);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.5, saveObject.hasVfx ? '#aa00ff' : '#4400ff');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 1.2, this.radius * 0.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Inner dark core
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#050015';
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner rim light
+        ctx.strokeStyle = this.showHint ? '#ffd700' : '#00ffff';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+// VFX Manager
+const vfx = {
+    particles: [],
+    stars: [],
+    shakeAmount: 0,
+
+    init() {
+        for(let i=0; i<30; i++) { // Reduced star count
+            this.stars.push(new Particle(Math.random()*width, Math.random()*height, '#ffffff', 'star'));
+        }
+    },
+
+    addParticle(x, y, color, type='normal', vx=null, vy=null) {
+        this.particles.push(new Particle(x, y, color, type, vx, vy));
+    },
+
+    explosion(x, y, color, count=20) {
+        for(let i=0; i<count; i++) {
+            this.addParticle(x, y, color, 'glow');
+        }
+    },
+
+    shake(amount) {
+        this.shakeAmount = amount;
+    },
+
+    update(dt) {
+        if (this.shakeAmount > 0) {
+            this.shakeAmount *= 0.9;
+            if (this.shakeAmount < 0.5) this.shakeAmount = 0;
+        }
+
+        this.stars.forEach(s => s.update(dt));
+        
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            this.particles[i].update(dt);
+            if (this.particles[i].life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+    },
+
+    applyShake(ctx) {
+        if (this.shakeAmount > 0) {
+            const dx = (Math.random() - 0.5) * this.shakeAmount;
+            const dy = (Math.random() - 0.5) * this.shakeAmount;
+            ctx.translate(dx, dy);
+        }
+    },
+
+    drawBackground(ctx) {
+        // Deep space gradient (darker and cleaner)
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+        bgGrad.addColorStop(0, '#020108');
+        bgGrad.addColorStop(1, '#050315');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Stars
+        this.stars.forEach(s => s.draw(ctx));
+    }
+};
+
+// Main Game Controller
+const game = {
+    state: 'menu', // menu, playing, jumping, gameover
+    level: 1,
+    score: 0,
+    portals: [],
+    player: new Player(),
+    lastTime: 0,
+    parallaxSpeed: 0.5,
+    targetPortal: null,
+
+    init() {
+        vfx.init();
+        
+        // Input handling
+        canvas.addEventListener('pointerdown', (e) => {
+            if (this.state === 'playing') {
+                this.handleInput(e.clientX, e.clientY);
+            }
+        });
+
+        requestAnimationFrame(this.loop.bind(this));
+    },
+
+    goToMenu() {
+        this.state = 'menu';
+        this.player.reset();
+        this.portals = [];
+        this.parallaxSpeed = 0.5;
+        ui.showScreen('main-menu');
+    },
+
+    startGame() {
+        this.state = 'playing';
+        this.level = 1;
+        this.score = 0;
+        this.player.reset();
+        this.generateLevel();
+        
+        ui.showScreen(null);
+        document.getElementById('hud').classList.add('active');
+        this.updateHUD();
+        ui.updateDataDisplays();
+    },
+
+    generateLevel() {
+        this.portals = [];
+        this.player.state = 'idle';
+        this.player.x = width / 2;
+        this.player.y = height - 100;
+        this.parallaxSpeed = 0.5;
+
+        // Determine number of portals based on level
+        let count = 2;
+        if (this.level > 2) count = 3;
+        if (this.level > 5) count = 4;
+        if (this.level > 12) count = 5;
+
+        // Fit on mobile screens
+        const padding = width * 0.1;
+        const availableWidth = width - (padding * 2);
+        const spacing = availableWidth / (count - 1 || 1);
+        
+        const correctIndex = Math.floor(Math.random() * count);
+        const yPos = height * 0.25;
+
+        for (let i = 0; i < count; i++) {
+            let x;
+            if (count === 1) x = width / 2; // Failsafe
+            else x = padding + (i * spacing);
+            
+            const p = new Portal(x, yPos, i === correctIndex);
+            this.portals.push(p);
+        }
+    },
+
+    handleInput(tx, ty) {
+        // Find if a portal was tapped
+        for (let p of this.portals) {
+            const dx = tx - p.x;
+            const dy = ty - p.y;
+            // Generous hitbox for mobile
+            if (Math.sqrt(dx*dx + dy*dy) < p.radius * 2) {
+                this.jumpTo(p);
+                break;
+            }
+        }
+    },
+
+    jumpTo(portal) {
+        this.state = 'jumping';
+        this.player.state = 'jumping';
+        this.player.targetX = portal.x;
+        this.player.targetY = portal.y;
+        this.targetPortal = portal;
+        this.parallaxSpeed = 5.0; // Speed up stars
+    },
+
+    onPortalReached() {
+        if (this.targetPortal.isCorrect) {
+            // Success
+            this.level++;
+            this.score += 10 + (this.level * 2);
+            vfx.explosion(this.targetPortal.x, this.targetPortal.y, '#00ffff', 30);
+            
+            // Check Economy Rewards (The crucial part!)
+            this.checkRewards();
+
+            // Flash screen
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fillRect(0,0,width,height);
+
+            this.updateHUD();
+            this.generateLevel();
+            this.state = 'playing';
+        } else {
+            // Fail
+            vfx.shake(20);
+            vfx.explosion(this.targetPortal.x, this.targetPortal.y, '#ff0055', 40);
+            this.player.state = 'falling';
+        }
+    },
+
+    onFallComplete() {
+        if (saveObject.retries > 0) {
+            // Use retry
+            saveObject.retries--;
+            ui.showToast("Shield Activated!");
+            ui.updateDataDisplays();
+            API.save();
+            this.generateLevel();
+            this.state = 'playing';
+        } else {
+            this.gameOver();
+        }
+    },
+
+    checkRewards() {
+        // Ensure 1st reward is within first 20-30s. (Level 3 is reached very quickly)
+        if (this.level === 3) API.addCurrency(1);
+        else if (this.level === 6) API.addCurrency(2);
+        else if (this.level === 10) API.addCurrency(4);
+        else if (this.level === 15) API.addCurrency(5);
+        else if (this.level % 5 === 0 && this.level > 15) API.addCurrency(3); // Ongoing
+    },
+
+    gameOver() {
+        this.state = 'gameover';
+        document.getElementById('hud').classList.remove('active');
+        
+        if (this.score > saveObject.highScore) {
+            saveObject.highScore = this.score;
+            API.save();
+        }
+
+        document.getElementById('go-level').textContent = this.level;
+        ui.updateDataDisplays();
+        ui.showScreen('game-over');
+    },
+
+    updateHUD() {
+        document.getElementById('hud-level').textContent = this.level;
+        document.getElementById('hud-score').textContent = this.score;
+    },
+
+    update(dt) {
+        vfx.update(dt);
+        
+        if (this.state === 'playing' || this.state === 'jumping' || this.state === 'gameover') {
+            this.player.update(dt);
+            this.portals.forEach(p => p.update(dt));
+        }
+    },
+
+    draw() {
+        // Clear & Draw Background
+        vfx.drawBackground(ctx);
+
+        ctx.save();
+        vfx.applyShake(ctx);
+
+        // Draw entities
+        if (this.state === 'playing' || this.state === 'jumping') {
+            this.portals.forEach(p => p.draw(ctx));
+        }
+
+        // Particles under player
+        vfx.particles.forEach(p => p.draw(ctx));
+
+        // Player
+        if (this.state !== 'menu') {
+            this.player.draw(ctx);
+        }
+
+        ctx.restore();
+    },
+
+    loop(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        
+        // Calculate delta time (normalized to ~60fps)
+        let dt = (timestamp - this.lastTime) / 16.66;
+        if (dt > 3) dt = 3; // Prevent huge jumps if tab inactive
+        this.lastTime = timestamp;
+
+        this.update(dt);
+        this.draw();
+
+        requestAnimationFrame(this.loop.bind(this));
+    }
+};
+
+// Bootstrap
+window.onload = () => {
+    API.init();
+    game.init();
+};
+
+</script>
+</body>
+</html>

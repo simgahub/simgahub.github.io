@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thread Tangle</title>
+    <style>
+        :root {
+            --ui-bg: rgba(20, 20, 35, 0.85);
+            --ui-border: rgba(100, 150, 255, 0.4);
+            --ui-glow: 0 0 15px rgba(100, 150, 255, 0.3);
+            --text-main: #e0f0ff;
+            --btn-bg: linear-gradient(135deg, #2a4070, #182848);
+            --btn-hover: linear-gradient(135deg, #3a5590, #203560);
+            --accent: #4d94ff;
+            --danger: #ff4d4d;
+            --success: #4dff88;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d0d14;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none; /* Prevent scrolling on touch */
+        }
+
+        /* UI Overlays */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%);
+            transition: opacity 0.3s ease;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--ui-bg);
+            border: 1px solid var(--ui-border);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: var(--ui-glow), inset 0 0 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            animation: float 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-10px); }
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0 0 10px 0;
+            background: linear-gradient(to right, #fff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(77, 148, 255, 0.4);
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent);
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #b0c4de;
+        }
+
+        button {
+            background: var(--btn-bg);
+            color: white;
+            border: 1px solid var(--ui-border);
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(100, 150, 255, 0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #333;
+            color: #777;
+            border-color: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-element {
+            background: rgba(10, 10, 20, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        #tension-container {
+            width: 50%;
+            max-width: 300px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        #tension-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        #tension-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--success), var(--danger));
+            transition: width 0.2s linear;
+        }
+
+        .hud-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .hud-btn {
+            background: rgba(20, 30, 50, 0.7);
+            border: 1px solid var(--accent);
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 100px;
+        }
+        
+        .hud-btn:hover {
+            background: rgba(40, 60, 100, 0.8);
+            box-shadow: 0 0 10px rgba(77, 148, 255, 0.4);
+        }
+
+        .hud-btn span {
+            background: var(--accent);
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* Shop Grid */
+        .shop-category {
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .shop-category h3 {
+            border-bottom: 1px solid var(--ui-border);
+            padding-bottom: 5px;
+            color: var(--accent);
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .shop-item:hover {
+            transform: translateY(-3px);
+            background: rgba(20, 20, 30, 0.6);
+            border-color: var(--accent);
+        }
+
+        .shop-item.equipped {
+            border-color: var(--success);
+            box-shadow: 0 0 10px rgba(77, 255, 136, 0.3);
+        }
+
+        .item-preview {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 10px auto;
+            border-radius: 25px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .item-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .buy-btn {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            margin: 5px 0 0 0;
+            width: 100%;
+        }
+
+        /* Notifications */
+        #notification-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .notification {
+            background: rgba(20, 80, 40, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--success);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s ease-out, fadeOut 0.5s ease-in 2.5s forwards;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        .loading-spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD (Visible during gameplay) -->
+    <div id="hud" style="display: none;">
+        <div class="hud-element">
+            Level <span id="level-display">1</span>
+        </div>
+        <div id="tension-container" class="hud-element">
+            Knot Tightness
+            <div id="tension-bar-bg">
+                <div id="tension-bar"></div>
+            </div>
+        </div>
+        <div class="hud-buttons">
+            <button class="hud-btn" id="btn-undo">Undo <span id="undo-count">3</span></button>
+            <button class="hud-btn" id="btn-hint">Hint <span id="hint-count">3</span></button>
+            <button class="hud-btn" id="btn-menu-ingame" style="margin-top: 10px; background: rgba(100, 30, 30, 0.7); border-color: var(--danger);">Menu</button>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="screen-loading" class="screen active">
+        <div class="panel">
+            <h1>Thread Tangle</h1>
+            <div class="loading-spinner"></div>
+            <p>Loading save data...</p>
+        </div>
+    </div>
+
+    <!-- Main Menu Screen -->
+    <div id="screen-menu" class="screen">
+        <div class="panel">
+            <h1>Thread Tangle</h1>
+            <p>Untangle the threads before the knot tightens!</p>
+            <p>Highest Level: <span id="menu-highscore" style="color: var(--success); font-weight: bold;">1</span></p>
+            <br>
+            <button id="btn-play">Play Now</button>
+            <button id="btn-shop">Shop & Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="screen-shop" class="screen">
+        <div class="panel" style="width: 800px;">
+            <h2>SimgaBucks Shop</h2>
+            <p>Customize your experience and buy power-ups.</p>
+            
+            <div class="shop-category">
+                <h3>Thread Colors</h3>
+                <div class="shop-grid" id="shop-colors">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="shop-category">
+                <h3>Fabric Backgrounds</h3>
+                <div class="shop-grid" id="shop-bgs">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="shop-category">
+                <h3>Power-Ups</h3>
+                <div class="shop-grid" id="shop-powerups">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <br>
+            <button id="btn-shop-back">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Level Complete Screen -->
+    <div id="screen-win" class="screen">
+        <div class="panel">
+            <h1 style="color: var(--success);">Untangled!</h1>
+            <p>Level <span id="win-level">1</span> Complete</p>
+            <p style="color: #ffd700; font-weight: bold; margin: 15px 0;">+<span id="win-reward">1</span> SimgaBucks</p>
+            <button id="btn-next-level">Next Level</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="screen-lose" class="screen">
+        <div class="panel">
+            <h1 style="color: var(--danger);">Knot Tightened!</h1>
+            <p>You ran out of time.</p>
+            <p>You reached Level <span id="lose-level">1</span></p>
+            <button id="btn-retry">Try Again</button>
+            <button id="btn-lose-menu">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notification-container"></div>
+
+    <script>
+        /** =========================================================================
+         * CONSTANTS & GLOBAL STATE
+         * ========================================================================= */
+        const GAME_ID = "thread";
+        const PENDING_PURCHASES = {};
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let animationFrameId;
+        let lastTime = 0;
+        
+        // Game State Enum
+        const STATES = {
+            LOADING: 0,
+            MENU: 1,
+            PLAYING: 2,
+            SHOP: 3,
+            WIN: 4,
+            LOSE: 5
+        };
+        let currentState = STATES.LOADING;
+
+        // Save Data Object (Defaults)
+        let saveData = {
+            highScore: 1,
+            threadColor: 'blue',
+            bgColor: 'denim',
+            unlockedColors: ['blue'],
+            unlockedBgs: ['denim'],
+            hints: 3,
+            undos: 3
+        };
+
+        // Game Variables
+        let currentLevel = 1;
+        let nodes = [];
+        let edges = [];
+        let particles = [];
+        let dragNode = null;
+        let dragOffset = { x: 0, y: 0 };
+        let historyStack = []; // For Undo
+        let hintedNode = null;
+        let hintTimer = 0;
+        
+        // Tension / Timer
+        let tension = 0; // 0 to 100
+        let tensionRate = 1; // Amount per second
+        let timeLimit = 60; // Base time limit
+        
+        // Visual Variables
+        let bgCanvas = document.createElement('canvas');
+        let bgCtx = bgCanvas.getContext('2d');
+        let bgNeedsUpdate = true;
+        let shakeAmount = 0;
+        let viewOffsetX = 0;
+        let viewOffsetY = 0;
+
+        /** =========================================================================
+         * PLATFORM INTEGRATION (SimgaBucks & Save/Load)
+         * ========================================================================= */
+
+        // 1. Listen for Platform Messages
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            // Handle Load Response
+            if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+                if (data.data) {
+                    // Merge loaded data with defaults to ensure missing fields exist
+                    saveData = { ...saveData, ...data.data };
+                }
+                updateUIFromSave();
+                switchState(STATES.MENU);
+            }
+
+            // Handle Spend Response
+            if (data.type === "spendResponse") {
+                const purchase = PENDING_PURCHASES[data.msgId];
+                if (purchase) {
+                    if (data.success) {
+                        purchase.onSuccess();
+                        showNotification("Purchase Successful!");
+                        saveGame();
+                        renderShop(); // Refresh UI
+                    } else {
+                        if (purchase.onFail) purchase.onFail();
+                        showNotification("Not enough SimgaBucks!", true);
+                    }
+                    delete PENDING_PURCHASES[data.msgId];
+                }
+            }
+        });
+
+        // 2. Add Currency
+        function addSimgaBucks(amount) {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+        }
+
+        // 3. Spend Currency
+        function spendSimgaBucks(amount, onSuccess, onFail) {
+            const msgId = Math.random().toString(36).substring(2, 15);
+            PENDING_PURCHASES[msgId] = { onSuccess, onFail };
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: amount,
+                msgId: msgId
+            }, "*");
+        }
+
+        // 4. Save Game
+        function saveGame() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        // 5. Request Load
+        function loadGame() {
+            const loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+            
+            // Fallback in case testing locally without platform
+            setTimeout(() => {
+                if (currentState === STATES.LOADING) {
+                    console.log("Load timeout fallback (Local testing)");
+                    updateUIFromSave();
+                    switchState(STATES.MENU);
+                }
+            }, 1000);
+        }
+
+        function showNotification(text, isError = false) {
+            const container = document.getElementById('notification-container');
+            const notif = document.createElement('div');
+            notif.className = 'notification';
+            notif.textContent = text;
+            if (isError) {
+                notif.style.background = 'rgba(150, 30, 30, 0.9)';
+                notif.style.borderColor = 'var(--danger)';
+            }
+            container.appendChild(notif);
+            setTimeout(() => {
+                if(notif.parentNode) notif.parentNode.removeChild(notif);
+            }, 3000);
+        }
+
+        /** =========================================================================
+         * ECONOMY & SHOP DEFINITIONS
+         * ========================================================================= */
+         
+        const SHOP_ITEMS = {
+            colors: [
+                { id: 'blue', name: 'Azure Core', cost: 0, color: '#4d94ff' },
+                { id: 'pink', name: 'Neon Pink', cost: 15, color: '#ff4dff' },
+                { id: 'gold', name: 'Golden Wire', cost: 30, color: '#ffd700' },
+                { id: 'green', name: 'Plasma Green', cost: 50, color: '#4dff88' }
+            ],
+            bgs: [
+                { id: 'denim', name: 'Dark Denim', cost: 0, color: '#121220' },
+                { id: 'silk', name: 'Crimson Silk', cost: 25, color: '#2a0810' },
+                { id: 'nebula', name: 'Deep Nebula', cost: 50, color: '#0f1a2c' }
+            ],
+            powerups: [
+                { id: 'hint', name: 'Buy 3 Hints', cost: 5, action: () => { saveData.hints += 3; } },
+                { id: 'undo', name: 'Buy 3 Undos', cost: 5, action: () => { saveData.undos += 3; } }
+            ]
+        };
+
+        function getThreadColor() {
+            const item = SHOP_ITEMS.colors.find(c => c.id === saveData.threadColor);
+            return item ? item.color : '#4d94ff';
+        }
+
+        function getBgColor() {
+            const item = SHOP_ITEMS.bgs.find(b => b.id === saveData.bgColor);
+            return item ? item.color : '#121220';
+        }
+
+        /** =========================================================================
+         * MATH & GRAPH LOGIC
+         * ========================================================================= */
+
+        // Check if two line segments intersect (standard CCW approach)
+        function ccw(A, B, C) {
+            return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
+        }
+
+        function segmentsIntersect(A, B, C, D) {
+            // Segments sharing a point do not "intersect" for our puzzle purposes
+            if (A === C || A === D || B === C || B === D) return false;
+            return ccw(A, C, D) !== ccw(B, C, D) && ccw(A, B, C) !== ccw(A, B, D);
+        }
+
+        function calculateIntersections() {
+            let count = 0;
+            // Reset state
+            for(let e of edges) e.isIntersecting = false;
+            
+            for (let i = 0; i < edges.length; i++) {
+                for (let j = i + 1; j < edges.length; j++) {
+                    const e1 = edges[i];
+                    const e2 = edges[j];
+                    if (segmentsIntersect(e1.n1, e1.n2, e2.n1, e2.n2)) {
+                        e1.isIntersecting = true;
+                        e2.isIntersecting = true;
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // Generate a valid Planar Graph, then scramble nodes
+        function generateLevel(levelNum) {
+            nodes = [];
+            edges = [];
+            historyStack = [];
+            hintedNode = null;
+            dragNode = null;
+            
+            // Difficulty scaling
+            const numNodes = Math.min(4 + Math.floor(levelNum * 0.8), 20); 
+            // Level 1: 4 nodes, easy. 
+            // Level 5: ~8 nodes.
+            // Level 10: ~12 nodes.
+
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) * 0.35;
+
+            // 1. Place nodes in a circle (guarantees a planar embedding boundary)
+            for (let i = 0; i < numNodes; i++) {
+                const angle = (i / numNodes) * Math.PI * 2;
+                nodes.push({
+                    id: i,
+                    targetX: centerX + Math.cos(angle) * radius,
+                    targetY: centerY + Math.sin(angle) * radius,
+                    x: centerX, // Start at center for intro animation
+                    y: centerY,
+                    vx: 0,
+                    vy: 0,
+                    radius: 12
+                });
+            }
+
+            // 2. Create outer boundary edges
+            for (let i = 0; i < numNodes; i++) {
+                edges.push({
+                    n1: nodes[i],
+                    n2: nodes[(i + 1) % numNodes],
+                    isIntersecting: false,
+                    wasIntersecting: false
+                });
+            }
+
+            // 3. Add random internal non-intersecting chords to increase complexity
+            let extraEdges = Math.floor(numNodes * 0.5);
+            let attempts = 0;
+            while (extraEdges > 0 && attempts < 100) {
+                attempts++;
+                let i = Math.floor(Math.random() * numNodes);
+                let j = Math.floor(Math.random() * numNodes);
+                
+                // Avoid adjacent nodes and self-loops
+                if (i === j || Math.abs(i - j) <= 1 || Math.abs(i - j) === numNodes - 1) continue;
+                
+                // Check if this chord intersects existing edges in the circular layout
+                let p1 = {x: nodes[i].targetX, y: nodes[i].targetY};
+                let p2 = {x: nodes[j].targetX, y: nodes[j].targetY};
+                
+                let valid = true;
+                for (let e of edges) {
+                    let ep1 = {x: e.n1.targetX, y: e.n1.targetY};
+                    let ep2 = {x: e.n2.targetX, y: e.n2.targetY};
+                    if (segmentsIntersect(p1, p2, ep1, ep2)) {
+                        valid = false;
+                        break;
+                    }
+                }
+
+                // Check if edge already exists
+                if (valid) {
+                    const exists = edges.some(e => (e.n1.id === i && e.n2.id === j) || (e.n1.id === j && e.n2.id === i));
+                    if (!exists) {
+                        edges.push({
+                            n1: nodes[i],
+                            n2: nodes[j],
+                            isIntersecting: false,
+                            wasIntersecting: false
+                        });
+                        extraEdges--;
+                    }
+                }
+            }
+
+            // 4. Scramble targets (The Tangle!)
+            // We assign random positions within the safe bounds.
+            const padding = 50;
+            for (let n of nodes) {
+                n.targetX = padding + Math.random() * (width - padding * 2);
+                n.targetY = padding + Math.random() * (height - padding * 2);
+            }
+
+            // Game mechanics setup
+            timeLimit = 40 + (levelNum * 10);
+            tensionRate = 100 / timeLimit; 
+            tension = 0;
+            bgNeedsUpdate = true;
+            
+            updateHUD();
+        }
+
+        /** =========================================================================
+         * VISUALS & EFFECTS
+         * ========================================================================= */
+
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.9;
+                p.vy *= 0.9;
+                p.life -= 0.03;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles() {
+            for (let p of particles) {
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function updateBackground() {
+            if (!bgNeedsUpdate || width === 0) return;
+            
+            bgCanvas.width = width;
+            bgCanvas.height = height;
+            
+            const bgColor = getBgColor();
+            
+            // Base Color
+            bgCtx.fillStyle = bgColor;
+            bgCtx.fillRect(0, 0, width, height);
+            
+            // Fabric texture effect
+            bgCtx.lineWidth = 1;
+            bgCtx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            
+            // Vertical threads
+            for(let x = 0; x < width; x += 4) {
+                bgCtx.beginPath();
+                bgCtx.moveTo(x, 0);
+                bgCtx.lineTo(x + (Math.random()*2-1), height);
+                bgCtx.stroke();
+            }
+            // Horizontal threads
+            for(let y = 0; y < height; y += 4) {
+                bgCtx.beginPath();
+                bgCtx.moveTo(0, y);
+                bgCtx.lineTo(width, y + (Math.random()*2-1));
+                bgCtx.stroke();
+            }
+            
+            // Vignette
+            const grad = bgCtx.createRadialGradient(width/2, height/2, height*0.3, width/2, height/2, height);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+            bgCtx.fillStyle = grad;
+            bgCtx.fillRect(0, 0, width, height);
+
+            bgNeedsUpdate = false;
+        }
+
+        function drawGame() {
+            // 1. Draw Background
+            if(shakeAmount > 0) {
+                viewOffsetX = (Math.random() - 0.5) * shakeAmount;
+                viewOffsetY = (Math.random() - 0.5) * shakeAmount;
+                shakeAmount *= 0.9;
+                if(shakeAmount < 0.5) shakeAmount = 0;
+            } else {
+                viewOffsetX = 0;
+                viewOffsetY = 0;
+            }
+
+            ctx.save();
+            ctx.translate(viewOffsetX, viewOffsetY);
+
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            if (currentState !== STATES.PLAYING && currentState !== STATES.WIN && currentState !== STATES.LOSE) {
+                ctx.restore();
+                return;
+            }
+
+            const threadColor = getThreadColor();
+
+            // 2. Draw Edges (Threads)
+            // Draw regular edges first
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            edges.forEach(e => {
+                ctx.beginPath();
+                ctx.moveTo(e.n1.x, e.n1.y);
+                ctx.lineTo(e.n2.x, e.n2.y);
+                
+                if (e.isIntersecting) {
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = 'rgba(255, 50, 50, 0.8)'; // Red tension
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(255, 0, 0, 0.5)';
+                } else {
+                    ctx.lineWidth = 5;
+                    ctx.strokeStyle = threadColor;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = threadColor;
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset
+            });
+
+            // 3. Draw Nodes (Pins)
+            nodes.forEach(n => {
+                // Glow if dragged or hinted
+                if (n === dragNode || n === hintedNode) {
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, n.radius + 8, 0, Math.PI * 2);
+                    ctx.fillStyle = (n === hintedNode && Date.now() % 500 < 250) ? '#ffea00' : 'rgba(255, 255, 255, 0.3)';
+                    ctx.fill();
+                }
+
+                // Pin base (shadow)
+                ctx.beginPath();
+                ctx.arc(n.x + 2, n.y + 3, n.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fill();
+
+                // Pin head (metallic gradient)
+                const grad = ctx.createRadialGradient(n.x - n.radius*0.3, n.y - n.radius*0.3, n.radius*0.1, n.x, n.y, n.radius);
+                if (n === dragNode) {
+                    grad.addColorStop(0, '#ffffff');
+                    grad.addColorStop(1, threadColor);
+                } else {
+                    grad.addColorStop(0, '#e0e0e0');
+                    grad.addColorStop(1, '#666666');
+                }
+
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#222';
+                ctx.stroke();
+            });
+
+            drawParticles();
+            ctx.restore();
+        }
+
+        /** =========================================================================
+         * GAME LOOP & STATE MANAGEMENT
+         * ========================================================================= */
+
+        function switchState(newState) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('hud').style.display = 'none';
+
+            currentState = newState;
+
+            if (newState === STATES.MENU) {
+                document.getElementById('screen-menu').classList.add('active');
+                document.getElementById('menu-highscore').textContent = saveData.highScore;
+            } else if (newState === STATES.PLAYING) {
+                document.getElementById('hud').style.display = 'flex';
+                updateHUD();
+            } else if (newState === STATES.SHOP) {
+                renderShop();
+                document.getElementById('screen-shop').classList.add('active');
+            } else if (newState === STATES.WIN) {
+                document.getElementById('screen-win').classList.add('active');
+            } else if (newState === STATES.LOSE) {
+                document.getElementById('screen-lose').classList.add('active');
+            }
+        }
+
+        function saveHistory() {
+            const snapshot = nodes.map(n => ({ id: n.id, x: n.targetX, y: n.targetY }));
+            historyStack.push(snapshot);
+            if (historyStack.length > 20) historyStack.shift(); // Limit history
+        }
+
+        function updateHUD() {
+            document.getElementById('level-display').textContent = currentLevel;
+            document.getElementById('tension-bar').style.width = Math.min(100, tension) + '%';
+            document.getElementById('undo-count').textContent = saveData.undos;
+            document.getElementById('hint-count').textContent = saveData.hints;
+
+            const undoBtn = document.getElementById('btn-undo');
+            undoBtn.style.opacity = saveData.undos > 0 ? '1' : '0.5';
+            const hintBtn = document.getElementById('btn-hint');
+            hintBtn.style.opacity = saveData.hints > 0 ? '1' : '0.5';
+        }
+
+        function calculateReward(level) {
+            // Guidelines: 1st SB within 20-30s (Level 1 clear).
+            // 5-15 SB for a short play session.
+            if (level === 1) return 1;
+            if (level === 2) return 2;
+            if (level % 5 === 0) return 5; // Boss level milestone
+            return Math.floor(Math.random() * 2) + 2; // 2 or 3
+        }
+
+        function checkWinCondition() {
+            const isectCount = calculateIntersections();
+            
+            // Check for untangle particle events
+            edges.forEach(e => {
+                if (e.wasIntersecting && !e.isIntersecting) {
+                    createParticles( (e.n1.x + e.n2.x)/2, (e.n1.y + e.n2.y)/2, getThreadColor(), 10 );
+                }
+                e.wasIntersecting = e.isIntersecting;
+            });
+
+            if (isectCount === 0 && tension > 0) {
+                // Game Won
+                setTimeout(() => {
+                    if(currentState !== STATES.PLAYING) return;
+                    
+                    createParticles(width/2, height/2, getThreadColor(), 50);
+                    shakeAmount = 10;
+                    
+                    const reward = calculateReward(currentLevel);
+                    document.getElementById('win-level').textContent = currentLevel;
+                    document.getElementById('win-reward').textContent = reward;
+                    
+                    addSimgaBucks(reward);
+                    
+                    if (currentLevel > saveData.highScore) {
+                        saveData.highScore = currentLevel;
+                    }
+                    saveGame();
+                    
+                    switchState(STATES.WIN);
+                }, 500); // Small delay for satisfaction
+            }
+        }
+
+        function updateGame(dt) {
+            if (currentState !== STATES.PLAYING) return;
+
+            // Interpolate nodes to target positions for smooth intro/movement
+            nodes.forEach(n => {
+                n.x += (n.targetX - n.x) * 0.2;
+                n.y += (n.targetY - n.y) * 0.2;
+            });
+
+            // Increase tension
+            tension += tensionRate * dt;
+            updateHUD();
+
+            // Check game over
+            if (tension >= 100) {
+                document.getElementById('lose-level').textContent = currentLevel;
+                shakeAmount = 15;
+                switchState(STATES.LOSE);
+            }
+
+            // Clear hint after a few seconds
+            if (hintedNode && hintTimer > 0) {
+                hintTimer -= dt;
+                if (hintTimer <= 0) hintedNode = null;
+            }
+        }
+
+        function loop(timestamp) {
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // Handle Resize & Canvas Prep
+            if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+                bgNeedsUpdate = true;
+            }
+
+            updateBackground();
+            ctx.clearRect(0, 0, width, height);
+
+            updateParticles();
+            
+            if (currentState === STATES.PLAYING) {
+                updateGame(Math.min(dt, 0.1)); // Cap dt to prevent huge jumps
+                calculateIntersections(); // Need to recalculate for rendering
+            }
+
+            drawGame();
+
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        /** =========================================================================
+         * INPUT HANDLING
+         * ========================================================================= */
+
+        function getPointerPos(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerDown(e) {
+            if (currentState !== STATES.PLAYING) return;
+            const pos = getPointerPos(e);
+
+            // Find clicked node (reverse order to pick top-most if overlapping)
+            for (let i = nodes.length - 1; i >= 0; i--) {
+                const n = nodes[i];
+                const dx = pos.x - n.x;
+                const dy = pos.y - n.y;
+                if (dx * dx + dy * dy <= (n.radius + 15) * (n.radius + 15)) { // lenient hitbox
+                    dragNode = n;
+                    dragOffset.x = n.x - pos.x;
+                    dragOffset.y = n.y - pos.y;
+                    saveHistory();
+                    
+                    // Clear hint if we touch the hinted node
+                    if (hintedNode === n) hintedNode = null;
+                    break;
+                }
+            }
+        }
+
+        function onPointerMove(e) {
+            if (currentState !== STATES.PLAYING || !dragNode) return;
+            e.preventDefault(); // Prevent scrolling
+            const pos = getPointerPos(e);
+            
+            // Constrain to canvas
+            let newX = pos.x + dragOffset.x;
+            let newY = pos.y + dragOffset.y;
+            
+            const padding = dragNode.radius;
+            dragNode.targetX = Math.max(padding, Math.min(width - padding, newX));
+            dragNode.targetY = Math.max(padding, Math.min(height - padding, newY));
+        }
+
+        function onPointerUp(e) {
+            if (dragNode) {
+                dragNode = null;
+                checkWinCondition();
+            }
+        }
+
+        canvas.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove); // window to allow dragging outside
+        window.addEventListener('mouseup', onPointerUp);
+
+        canvas.addEventListener('touchstart', onPointerDown, {passive: false});
+        window.addEventListener('touchmove', onPointerMove, {passive: false});
+        window.addEventListener('touchend', onPointerUp);
+
+        /** =========================================================================
+         * UI EVENTS & LOGIC
+         * ========================================================================= */
+
+        // Menu Buttons
+        document.getElementById('btn-play').addEventListener('click', () => {
+            currentLevel = 1;
+            generateLevel(currentLevel);
+            switchState(STATES.PLAYING);
+        });
+
+        document.getElementById('btn-shop').addEventListener('click', () => {
+            switchState(STATES.SHOP);
+        });
+
+        document.getElementById('btn-shop-back').addEventListener('click', () => {
+            switchState(STATES.MENU);
+        });
+
+        // Win/Lose Buttons
+        document.getElementById('btn-next-level').addEventListener('click', () => {
+            currentLevel++;
+            generateLevel(currentLevel);
+            switchState(STATES.PLAYING);
+        });
+
+        document.getElementById('btn-retry').addEventListener('click', () => {
+            currentLevel = 1;
+            generateLevel(currentLevel);
+            switchState(STATES.PLAYING);
+        });
+
+        document.getElementById('btn-lose-menu').addEventListener('click', () => {
+            switchState(STATES.MENU);
+        });
+
+        // In-Game HUD Buttons
+        document.getElementById('btn-menu-ingame').addEventListener('click', () => {
+            switchState(STATES.MENU);
+        });
+
+        document.getElementById('btn-undo').addEventListener('click', () => {
+            if (currentState !== STATES.PLAYING || saveData.undos <= 0 || historyStack.length === 0) return;
+            
+            saveData.undos--;
+            updateHUD();
+            saveGame();
+            
+            const prev = historyStack.pop();
+            prev.forEach(p => {
+                const node = nodes.find(n => n.id === p.id);
+                if (node) {
+                    node.targetX = p.x;
+                    node.targetY = p.y;
+                }
+            });
+            checkWinCondition();
+        });
+
+        document.getElementById('btn-hint').addEventListener('click', () => {
+            if (currentState !== STATES.PLAYING || saveData.hints <= 0) return;
+            
+            // Find a node that is part of an intersection
+            let found = false;
+            for (let e of edges) {
+                if (e.isIntersecting) {
+                    hintedNode = e.n1; // Highlight first node of first intersection found
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
+                saveData.hints--;
+                hintTimer = 3.0; // 3 seconds
+                updateHUD();
+                saveGame();
+            } else {
+                showNotification("No intersections to hint!");
+            }
+        });
+
+        /** =========================================================================
+         * SHOP UI GENERATION
+         * ========================================================================= */
+        
+        function updateUIFromSave() {
+            // Ensure arrays exist
+            if(!saveData.unlockedColors) saveData.unlockedColors = ['blue'];
+            if(!saveData.unlockedBgs) saveData.unlockedBgs = ['denim'];
+        }
+
+        function createShopItem(item, type) {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            // Check ownership/equipped state
+            let isOwned = false;
+            let isEquipped = false;
+
+            if (type === 'colors') {
+                isOwned = saveData.unlockedColors.includes(item.id);
+                isEquipped = (saveData.threadColor === item.id);
+            } else if (type === 'bgs') {
+                isOwned = saveData.unlockedBgs.includes(item.id);
+                isEquipped = (saveData.bgColor === item.id);
+            } else if (type === 'powerups') {
+                // Powerups are consumables, always show price
+                isOwned = false; 
+            }
+
+            if (isEquipped) div.classList.add('equipped');
+
+            // Preview Visual
+            const preview = document.createElement('div');
+            preview.className = 'item-preview';
+            if (type === 'colors') {
+                preview.style.background = '#222';
+                preview.style.borderColor = item.color;
+                preview.style.boxShadow = `0 0 10px ${item.color}`;
+            } else if (type === 'bgs') {
+                preview.style.background = item.color;
+                // Add a little texture line
+                preview.style.backgroundImage = 'linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent)';
+                preview.style.backgroundSize = '10px 10px';
+            } else {
+                // Powerup icon (Emoji)
+                preview.style.background = 'transparent';
+                preview.style.border = 'none';
+                preview.style.boxShadow = 'none';
+                preview.style.fontSize = '30px';
+                preview.style.lineHeight = '50px';
+                preview.textContent = item.id === 'hint' ? '💡' : '↩️';
+            }
+            div.appendChild(preview);
+
+            const title = document.createElement('div');
+            title.className = 'item-title';
+            title.textContent = item.name;
+            div.appendChild(title);
+
+            const btn = document.createElement('button');
+            btn.className = 'buy-btn';
+            
+            if (isEquipped) {
+                btn.textContent = 'Equipped';
+                btn.disabled = true;
+            } else if (isOwned && type !== 'powerups') {
+                btn.textContent = 'Equip';
+                btn.style.background = '#4CAF50';
+                btn.onclick = () => {
+                    if (type === 'colors') saveData.threadColor = item.id;
+                    if (type === 'bgs') saveData.bgColor = item.id;
+                    bgNeedsUpdate = true;
+                    saveGame();
+                    renderShop();
+                };
+            } else {
+                btn.textContent = `${item.cost} SB`;
+                btn.onclick = () => {
+                    btn.textContent = '...';
+                    btn.disabled = true;
+                    spendSimgaBucks(item.cost, () => {
+                        // Success
+                        if (type === 'colors') {
+                            saveData.unlockedColors.push(item.id);
+                            saveData.threadColor = item.id;
+                        } else if (type === 'bgs') {
+                            saveData.unlockedBgs.push(item.id);
+                            saveData.bgColor = item.id;
+                        } else if (type === 'powerups') {
+                            item.action();
+                        }
+                        bgNeedsUpdate = true;
+                        // Rendering is handled by the platform response callback
+                    }, () => {
+                        // Fail
+                        btn.textContent = `${item.cost} SB`;
+                        btn.disabled = false;
+                    });
+                };
+            }
+            div.appendChild(btn);
+
+            return div;
+        }
+
+        function renderShop() {
+            const colorsGrid = document.getElementById('shop-colors');
+            const bgsGrid = document.getElementById('shop-bgs');
+            const powerupsGrid = document.getElementById('shop-powerups');
+            
+            colorsGrid.innerHTML = '';
+            bgsGrid.innerHTML = '';
+            powerupsGrid.innerHTML = '';
+
+            SHOP_ITEMS.colors.forEach(item => colorsGrid.appendChild(createShopItem(item, 'colors')));
+            SHOP_ITEMS.bgs.forEach(item => bgsGrid.appendChild(createShopItem(item, 'bgs')));
+            SHOP_ITEMS.powerups.forEach(item => powerupsGrid.appendChild(createShopItem(item, 'powerups')));
+        }
+
+        /** =========================================================================
+         * INITIALIZATION
+         * ========================================================================= */
+        
+        window.onload = () => {
+            // Start Load Flow
+            loadGame();
+            
+            // Start rendering loop
+            lastTime = performance.now();
+            animationFrameId = requestAnimationFrame(loop);
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Potion Catcher</title>
+    <style>
+        /* CSS resets and base styles */
+        :root {
+            --bg-dark: #0a0510;
+            --primary: #9d4edd;
+            --secondary: #ff9e00;
+            --text-light: #f8f9fa;
+            --danger: #ff0a54;
+            --success: #06d6a0;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-light);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 5, 16, 0.85);
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            pointer-events: none;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+            text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+            background: linear-gradient(to bottom, #fff, #d8b4fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.5;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #7b2cbf, #5a189a);
+            color: white;
+            border: 2px solid #9d4edd;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(157, 78, 221, 0.5);
+            transition: all 0.2s;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: auto;
+        }
+
+        .btn:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 0 25px rgba(157, 78, 221, 0.8);
+            background: linear-gradient(135deg, #9d4edd, #7b2cbf);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn:disabled {
+            background: #444;
+            border-color: #666;
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* In-game HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #hud.active {
+            opacity: 1;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(157, 78, 221, 0.4);
+            padding: 10px 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-score {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .hud-lives {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .life-heart {
+            width: 20px;
+            height: 20px;
+            background: var(--danger);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--danger);
+            transition: all 0.3s;
+        }
+
+        .life-heart.empty {
+            background: #333;
+            box-shadow: none;
+        }
+
+        .hud-wave {
+            font-size: 1.2rem;
+            color: var(--secondary);
+            text-align: right;
+            margin-bottom: 5px;
+        }
+        
+        .hud-shield {
+            font-size: 0.9rem;
+            color: var(--success);
+            text-align: right;
+            display: none;
+            text-shadow: 0 0 5px var(--success);
+        }
+
+        /* Shop UI */
+        #shop-content {
+            width: 90%;
+            max-width: 800px;
+            max-height: 80%;
+            background: rgba(20, 10, 30, 0.95);
+            border: 2px solid var(--primary);
+            border-radius: 20px;
+            padding: 30px;
+            overflow-y: auto;
+            box-shadow: 0 0 40px rgba(157, 78, 221, 0.4);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, background 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .shop-item h3 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            font-size: 1.2rem;
+        }
+
+        .shop-item p {
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+
+        .shop-item .price {
+            font-weight: bold;
+            color: var(--secondary);
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px var(--secondary);
+        }
+
+        .shop-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .shop-btn:hover:not(:disabled) {
+            background: #b05cff;
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        .shop-btn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        .shop-btn.equipped {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .close-shop {
+            align-self: center;
+            margin-top: 20px;
+        }
+
+        /* Message Toast */
+        #toast {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(10, 5, 16, 0.9);
+            border: 1px solid var(--primary);
+            padding: 15px 30px;
+            border-radius: 30px;
+            color: #fff;
+            font-weight: bold;
+            z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 20px rgba(157, 78, 221, 0.5);
+            pointer-events: none;
+        }
+
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Floating text animation */
+        .floating-text {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+            z-index: 6;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-panel">
+                <div class="hud-score" id="scoreDisplay">0</div>
+                <div class="hud-lives" id="livesDisplay">
+                    <div class="life-heart"></div>
+                    <div class="life-heart"></div>
+                    <div class="life-heart"></div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <div class="hud-wave" id="waveDisplay">Wave 1</div>
+                <div class="hud-shield" id="shieldDisplay">Shield Active</div>
+            </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loadingScreen" class="screen active">
+            <h1>Connecting...</h1>
+            <div class="loader"></div>
+            <p>Syncing magical archives...</p>
+        </div>
+
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="screen">
+            <h1>Potion Catcher</h1>
+            <p id="highScoreText">High Score: 0</p>
+            <button class="btn" id="playBtn">Play Game</button>
+            <button class="btn" id="shopBtn">Magic Shop</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shopScreen" class="screen">
+            <div id="shop-content">
+                <h2>Magic Shop</h2>
+                <p>Enhance your potion-catching abilities!</p>
+                <div class="shop-grid" id="shopGrid">
+                    <!-- Items generated via JS -->
+                </div>
+                <button class="btn close-shop" id="closeShopBtn">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen">
+            <h1>Game Over</h1>
+            <h2 id="finalScoreDisplay">Score: 0</h2>
+            <p id="waveReachedDisplay">Reached Wave: 1</p>
+            <button class="btn" id="restartBtn">Play Again</button>
+            <button class="btn" id="menuBtn">Main Menu</button>
+        </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Message</div>
+
+    <script>
+        /**
+         * POTION CATCHER 
+         * A beautiful, lightweight vanilla JS game communicating with the parent platform.
+         */
+
+        // ==========================================
+        // CONSTANTS & GAME SETUP
+        // ==========================================
+        const GAME_ID = "potion";
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Game States
+        const STATE = { LOADING: 0, MENU: 1, PLAYING: 2, SHOP: 3, GAMEOVER: 4 };
+        let currentState = STATE.LOADING;
+
+        // Platform communication vars
+        let loadMsgId = "";
+        let pendingPurchases = {};
+
+        // Canvas scaling
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // ==========================================
+        // DATA & SAVE SYSTEM
+        // ==========================================
+        const DEFAULT_SAVE = {
+            highScore: 0,
+            skinsUnlocked: ['iron'],
+            currentSkin: 'iron',
+            glowUnlocked: false,
+            immunityUnlocked: false,
+            magnetLevel: 0
+        };
+
+        let saveData = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+
+        // Safeguard in case external save data structure is ever corrupted/missing fields
+        function ensureSafeData() {
+            if (!saveData || typeof saveData !== 'object') {
+                saveData = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+            }
+            if (!Array.isArray(saveData.skinsUnlocked)) saveData.skinsUnlocked = ['iron'];
+            if (!saveData.currentSkin) saveData.currentSkin = 'iron';
+            if (typeof saveData.glowUnlocked !== 'boolean') saveData.glowUnlocked = false;
+            if (typeof saveData.immunityUnlocked !== 'boolean') saveData.immunityUnlocked = false;
+            if (typeof saveData.magnetLevel !== 'number') saveData.magnetLevel = 0;
+            if (typeof saveData.highScore !== 'number') saveData.highScore = 0;
+        }
+
+        function saveGame() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function requestLoad() {
+            loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+
+            // Fallback if platform doesn't respond in 1.5 seconds (e.g. testing locally)
+            setTimeout(() => {
+                if (currentState === STATE.LOADING) {
+                    console.log("Load timeout, using default save.");
+                    showMenu();
+                }
+            }, 1500);
+        }
+
+        function showToast(msg, color = "var(--primary)") {
+            const toast = document.getElementById("toast");
+            toast.textContent = msg;
+            toast.style.borderColor = color;
+            toast.style.boxShadow = `0 0 20px ${color}`;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 2500);
+        }
+
+        // Parent communication listener
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    let parsedData = data.data;
+                    // Catch stringified JSON if passed down incorrectly
+                    if (typeof parsedData === 'string') {
+                        try { parsedData = JSON.parse(parsedData); } catch(e) {}
+                    }
+                    saveData = { ...DEFAULT_SAVE, ...parsedData };
+                }
+                ensureSafeData();
+                if (currentState === STATE.LOADING) showMenu();
+            }
+
+            if (data.type === "spendResponse") {
+                const itemKey = pendingPurchases[data.msgId];
+                if (itemKey) {
+                    if (data.success) {
+                        applyPurchase(itemKey);
+                        showToast("Purchase Successful!", "var(--success)");
+                        saveGame();
+                        renderShop(); // Refresh buttons
+                    } else {
+                        showToast("Not enough SimgaBucks!", "var(--danger)");
+                        renderShop(); // Re-enable buttons
+                    }
+                    delete pendingPurchases[data.msgId];
+                }
+            }
+        });
+
+        // Economy wrappers
+        function giveSimgaBucks(amount) {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+            
+            // Visual floating text for currency
+            createFloatingText(`+${amount} SimgaBucks!`, width/2, height/4, '#ff9e00');
+        }
+
+        function requestPurchase(cost, itemKey) {
+            const msgId = Math.random().toString(36).substring(2);
+            pendingPurchases[msgId] = itemKey;
+            
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: msgId
+            }, "*");
+        }
+
+        // ==========================================
+        // SHOP DEFINITIONS
+        // ==========================================
+        const SHOP_ITEMS = [
+            { id: 'gold_skin', type: 'skin', name: 'Gold Cauldron', desc: 'A shiny golden catcher.', price: 10 },
+            { id: 'crystal_skin', type: 'skin', name: 'Crystal Cauldron', desc: 'Forged from magical ice.', price: 25 },
+            { id: 'glow_fx', type: 'upgrade', name: 'Potion Trails', desc: 'Potions leave beautiful magical trails.', price: 15 },
+            { id: 'magnet_1', type: 'upgrade', name: 'Weak Magnet', desc: 'Slightly pulls falling potions towards you.', price: 20 },
+            { id: 'magnet_2', type: 'upgrade', name: 'Strong Magnet', desc: 'Strongly pulls falling potions.', price: 40 },
+            { id: 'immunity', type: 'upgrade', name: 'Curse Ward', desc: 'Block the first cursed potion each run.', price: 30 }
+        ];
+
+        const CAULDRON_COLORS = {
+            'iron': { base: '#4a4e69', rim: '#22223b', glow: '#9a8c98' },
+            'gold_skin': { base: '#fb8500', rim: '#ffb703', glow: '#ffea00' },
+            'crystal_skin': { base: '#00b4d8', rim: '#90e0ef', glow: '#caf0f8' }
+        };
+
+        function renderShop() {
+            const grid = document.getElementById("shopGrid");
+            grid.innerHTML = "";
+
+            SHOP_ITEMS.forEach(item => {
+                const el = document.createElement("div");
+                el.className = "shop-item";
+                
+                let isUnlocked = false;
+                let isEquipped = false;
+
+                if (item.type === 'skin') {
+                    isUnlocked = saveData.skinsUnlocked.includes(item.id);
+                    isEquipped = saveData.currentSkin === item.id;
+                } else if (item.id === 'glow_fx') {
+                    isUnlocked = saveData.glowUnlocked;
+                    isEquipped = isUnlocked;
+                } else if (item.id === 'immunity') {
+                    isUnlocked = saveData.immunityUnlocked;
+                    isEquipped = isUnlocked;
+                } else if (item.id.startsWith('magnet')) {
+                    const level = parseInt(item.id.split('_')[1]);
+                    isUnlocked = saveData.magnetLevel >= level;
+                    isEquipped = isUnlocked;
+                }
+
+                let btnHtml = '';
+                if (isEquipped && item.type === 'skin') {
+                    btnHtml = `<button class="shop-btn equipped" disabled>Equipped</button>`;
+                } else if (isEquipped && item.type === 'upgrade') {
+                    btnHtml = `<button class="shop-btn equipped" disabled>Owned</button>`;
+                } else if (isUnlocked && item.type === 'skin') {
+                    btnHtml = `<button class="shop-btn equip-btn" data-id="${item.id}">Equip</button>`;
+                } else {
+                    // Previous magnet check for progressive upgrades
+                    if (item.id === 'magnet_2' && saveData.magnetLevel < 1) {
+                        btnHtml = `<button class="shop-btn" disabled>Buy Lvl 1 First</button>`;
+                    } else {
+                        btnHtml = `<button class="shop-btn buy-btn" data-id="${item.id}" data-price="${item.price}">Buy</button>`;
+                    }
+                }
+
+                el.innerHTML = `
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                    <div class="price">${isUnlocked ? '---' : item.price + ' SB'}</div>
+                    ${btnHtml}
+                `;
+                grid.appendChild(el);
+            });
+
+            // Bind events
+            document.querySelectorAll(".buy-btn").forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const btnEl = e.target;
+                    btnEl.disabled = true;
+                    btnEl.textContent = "Buying...";
+                    requestPurchase(parseInt(btnEl.dataset.price), btnEl.dataset.id);
+                });
+            });
+
+            document.querySelectorAll(".equip-btn").forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    saveData.currentSkin = e.target.dataset.id;
+                    saveGame();
+                    renderShop();
+                });
+            });
+        }
+
+        function applyPurchase(itemKey) {
+            if (itemKey.endsWith('_skin')) {
+                saveData.skinsUnlocked.push(itemKey);
+                saveData.currentSkin = itemKey;
+            } else if (itemKey === 'glow_fx') {
+                saveData.glowUnlocked = true;
+            } else if (itemKey === 'immunity') {
+                saveData.immunityUnlocked = true;
+            } else if (itemKey === 'magnet_1') {
+                saveData.magnetLevel = 1;
+            } else if (itemKey === 'magnet_2') {
+                saveData.magnetLevel = 2;
+            }
+        }
+
+        // ==========================================
+        // GAME ENTITIES & LOGIC
+        // ==========================================
+        
+        let gameTime = 0;
+        let lastTime = 0;
+        let animationFrame;
+        
+        // Game State Vars
+        let score = 0;
+        let lives = 3;
+        let wave = 1;
+        let potionsCaughtInWave = 0;
+        let totalPotionsCaught = 0;
+        
+        let potions = [];
+        let particles = [];
+        let backgroundMotes = [];
+        
+        let targetPlayerX = width / 2;
+        let screenShake = 0;
+        let hasShield = false;
+
+        const POTION_TYPES = {
+            GOOD: { color: '#e01e37', glow: '#ff4d6d', radius: 15, points: 10, isBad: false },
+            MANA: { color: '#0077b6', glow: '#00b4d8', radius: 15, points: 15, isBad: false },
+            GOLD: { color: '#ffb703', glow: '#ffea00', radius: 18, points: 50, isBad: false, sbReward: 1 },
+            CURSE: { color: '#38b000', glow: '#70e000', radius: 16, points: 0, isBad: true }
+        };
+
+        const player = {
+            x: width / 2,
+            y: height - 80,
+            width: 100,
+            height: 60,
+            speed: 0.15 // lerp speed
+        };
+
+        function initGame() {
+            score = 0;
+            lives = 3;
+            wave = 1;
+            potionsCaughtInWave = 0;
+            totalPotionsCaught = 0;
+            potions = [];
+            particles = [];
+            screenShake = 0;
+            
+            player.x = width / 2;
+            targetPlayerX = width / 2;
+            player.y = height - 80;
+            
+            hasShield = saveData.immunityUnlocked;
+            
+            updateHUD();
+            document.getElementById("shieldDisplay").style.display = hasShield ? "block" : "none";
+
+            // Init Background
+            backgroundMotes = [];
+            for(let i=0; i<40; i++) {
+                backgroundMotes.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 3 + 1,
+                    speed: Math.random() * 0.5 + 0.1,
+                    angle: Math.random() * Math.PI * 2,
+                    spin: (Math.random() - 0.5) * 0.02
+                });
+            }
+
+            lastTime = performance.now();
+            currentState = STATE.PLAYING;
+            gameLoop(lastTime);
+        }
+
+        // Inputs
+        function updatePlayerTarget(e) {
+            if (currentState !== STATE.PLAYING) return;
+            let clientX;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            targetPlayerX = clientX;
+        }
+
+        window.addEventListener('mousemove', updatePlayerTarget);
+        window.addEventListener('touchmove', updatePlayerTarget, {passive: true});
+        window.addEventListener('touchstart', updatePlayerTarget, {passive: true});
+
+        // Spawn Logic
+        let nextSpawnTime = 0;
+        function handleSpawning(timestamp) {
+            if (timestamp > nextSpawnTime) {
+                // Wave difficulty modifiers
+                let spawnInterval = Math.max(400, 1500 - (wave * 150)); // Gets faster
+                let dropSpeed = 2 + (wave * 0.4); // Gets faster
+                
+                // Determine Potion Type
+                let rand = Math.random();
+                let pType = POTION_TYPES.GOOD;
+                
+                let curseChance = 0.1 + (wave * 0.05);
+                let goldChance = 0.02; // 2% chance for golden potion
+                let manaChance = 0.2;
+
+                if (rand < curseChance && wave > 1) { // No curses on wave 1
+                    pType = POTION_TYPES.CURSE;
+                } else if (rand < curseChance + goldChance) {
+                    pType = POTION_TYPES.GOLD;
+                } else if (rand < curseChance + goldChance + manaChance) {
+                    pType = POTION_TYPES.MANA;
+                }
+
+                // Spawn position
+                let xPos = Math.random() * (width - 60) + 30;
+
+                potions.push({
+                    x: xPos,
+                    y: -30,
+                    vy: dropSpeed,
+                    type: pType,
+                    wobble: Math.random() * Math.PI * 2,
+                    active: true
+                });
+
+                nextSpawnTime = timestamp + spawnInterval + (Math.random() * 500);
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 1.0,
+                    decay: Math.random() * 0.02 + 0.02,
+                    color: color,
+                    size: Math.random() * 6 + 2
+                });
+            }
+        }
+
+        function updateLogic(dt, timestamp) {
+            // Screen shake decay
+            if (screenShake > 0) {
+                screenShake -= dt * 0.5;
+                if (screenShake < 0) screenShake = 0;
+            }
+
+            // Lerp Player
+            player.x += (targetPlayerX - player.x) * player.speed;
+            // Bounds check
+            if (player.x < player.width/2) player.x = player.width/2;
+            if (player.x > width - player.width/2) player.x = width - player.width/2;
+
+            // Update Potions
+            for (let i = potions.length - 1; i >= 0; i--) {
+                let p = potions[i];
+                if (!p.active) continue;
+
+                // Magnet logic
+                if (saveData.magnetLevel > 0 && !p.type.isBad) {
+                    let distY = player.y - p.y;
+                    let distX = player.x - p.x;
+                    let dist = Math.sqrt(distX*distX + distY*distY);
+                    
+                    let magnetRange = saveData.magnetLevel === 1 ? 150 : 300;
+                    let magnetForce = saveData.magnetLevel === 1 ? 0.03 : 0.06;
+
+                    if (dist < magnetRange && distY > 0) {
+                        p.x += distX * magnetForce;
+                    }
+                }
+
+                // Falling
+                p.y += p.vy * (dt / 16);
+                p.wobble += 0.05 * (dt / 16);
+                
+                // Trail FX
+                if (saveData.glowUnlocked && Math.random() < 0.3) {
+                    particles.push({
+                        x: p.x + (Math.sin(p.wobble) * 5),
+                        y: p.y - p.type.radius,
+                        vx: 0,
+                        vy: -p.vy * 0.5,
+                        life: 1.0,
+                        decay: 0.05,
+                        color: p.type.glow,
+                        size: 3
+                    });
+                }
+
+                // Collision with Player
+                let hitDistY = Math.abs((player.y - 20) - p.y);
+                let hitDistX = Math.abs(player.x - p.x);
+
+                if (hitDistY < 20 && hitDistX < player.width/2 - 5) {
+                    // Caught!
+                    p.active = false;
+                    createExplosion(p.x, p.y, p.type.color);
+
+                    if (p.type.isBad) {
+                        if (hasShield) {
+                            hasShield = false;
+                            document.getElementById("shieldDisplay").style.display = "none";
+                            showToast("Curse Blocked!", "var(--success)");
+                            createExplosion(player.x, player.y, "#fff"); // Shield break effect
+                        } else {
+                            lives--;
+                            screenShake = 15;
+                            createExplosion(player.x, player.y, p.type.color);
+                            updateHUD();
+                            if (lives <= 0) endGame();
+                        }
+                    } else {
+                        score += p.type.points;
+                        potionsCaughtInWave++;
+                        totalPotionsCaught++;
+                        
+                        // Economy Reward: Rare drops
+                        if (p.type.sbReward) {
+                            giveSimgaBucks(p.type.sbReward);
+                        }
+
+                        // Check Wave completion
+                        if (potionsCaughtInWave >= 15 + (wave * 5)) {
+                            wave++;
+                            potionsCaughtInWave = 0;
+                            // Economy Reward: Wave cleared (Short term steady reward)
+                            giveSimgaBucks(2 + Math.floor(wave/3)); // Scaled reward
+                            showToast(`Wave ${wave}! Speed increased!`, "var(--primary)");
+                        }
+                        
+                        // Economy Reward: Early quick reward
+                        if (totalPotionsCaught === 10 && wave === 1) {
+                             giveSimgaBucks(1); // Meets "first reward in 20-30 seconds"
+                        }
+
+                        updateHUD();
+                    }
+                }
+                
+                // Missed Potion
+                else if (p.y > height + 20) {
+                    p.active = false;
+                    if (!p.type.isBad) {
+                        lives--;
+                        screenShake = 5; // Light shake for missing
+                        updateHUD();
+                        if (lives <= 0) endGame();
+                    }
+                }
+            }
+
+            // Cleanup inactive potions
+            potions = potions.filter(p => p.active);
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let part = particles[i];
+                part.x += part.vx * (dt / 16);
+                part.y += part.vy * (dt / 16);
+                part.life -= part.decay * (dt / 16);
+                if (part.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update Background Motes
+            backgroundMotes.forEach(m => {
+                m.y -= m.speed * (dt / 16);
+                m.angle += m.spin * (dt / 16);
+                if (m.y < -10) {
+                    m.y = height + 10;
+                    m.x = Math.random() * width;
+                }
+            });
+        }
+
+        // ==========================================
+        // RENDERING
+        // ==========================================
+
+        function drawBackground() {
+            // Deep gradient
+            const grad = ctx.createRadialGradient(width/2, height, 100, width/2, height/2, height);
+            grad.addColorStop(0, '#1a0b2e');
+            grad.addColorStop(1, '#0a0510');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw Motes
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            backgroundMotes.forEach(m => {
+                ctx.fillStyle = `rgba(157, 78, 221, ${0.1 + (Math.sin(m.angle)*0.1)})`;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y + Math.sin(m.angle)*10, m.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        function drawCauldron(x, y, w, h, skinKey) {
+            const colors = CAULDRON_COLORS[skinKey] || CAULDRON_COLORS['iron'];
+            
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = colors.glow;
+
+            // Back inner rim
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.ellipse(0, -h/2, w/2, h/6, 0, Math.PI, Math.PI*2);
+            ctx.fill();
+
+            // Bubbling liquid inside
+            ctx.fillStyle = '#b100e8';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#e0aaff';
+            ctx.beginPath();
+            let liquidY = -h/2 + 2;
+            ctx.ellipse(0, liquidY, w/2 * 0.9, h/6 * 0.8, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Draw some bubbles based on time
+            ctx.fillStyle = '#e0aaff';
+            ctx.globalAlpha = 0.6;
+            for(let i=0; i<3; i++) {
+                let bx = Math.sin(gameTime * 0.002 + i) * (w/3);
+                let by = liquidY + Math.cos(gameTime * 0.003 + i) * 5;
+                let br = 3 + Math.sin(gameTime*0.005 + i*2)*2;
+                if (br > 0) {
+                    ctx.beginPath();
+                    ctx.arc(bx, by, br, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Main Body
+            ctx.fillStyle = colors.base;
+            ctx.shadowBlur = 0; // Remove shadow for main body crispness
+            ctx.beginPath();
+            ctx.moveTo(-w/2, -h/2);
+            // Curves for cauldron pot
+            ctx.bezierCurveTo(-w*0.7, 0, -w*0.6, h/2, 0, h/2);
+            ctx.bezierCurveTo(w*0.6, h/2, w*0.7, 0, w/2, -h/2);
+            ctx.fill();
+
+            // Front rim
+            ctx.fillStyle = colors.rim;
+            ctx.beginPath();
+            ctx.ellipse(0, -h/2, w/2, h/6, 0, 0, Math.PI);
+            ctx.fill();
+            
+            // Shield Aura
+            if (hasShield) {
+                ctx.globalCompositeOperation = 'screen';
+                ctx.strokeStyle = 'rgba(6, 214, 160, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#06d6a0';
+                ctx.beginPath();
+                ctx.arc(0, 0, w*0.8, 0, Math.PI*2);
+                ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            ctx.restore();
+        }
+
+        function drawPotion(p) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            
+            let sway = Math.sin(p.wobble) * 5;
+            ctx.translate(sway, 0);
+
+            // Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = p.type.glow;
+
+            if (p.type.isBad) {
+                // Jagged/Skullish shape for curse
+                ctx.fillStyle = p.type.color;
+                ctx.beginPath();
+                ctx.moveTo(-10, -15);
+                ctx.lineTo(10, -15);
+                ctx.lineTo(15, -5);
+                ctx.lineTo(12, 10);
+                ctx.lineTo(5, 15);
+                ctx.lineTo(-5, 15);
+                ctx.lineTo(-12, 10);
+                ctx.lineTo(-15, -5);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Evil eyes
+                ctx.fillStyle = '#000';
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(-5, -2, 3, 0, Math.PI*2);
+                ctx.arc(5, -2, 3, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                // Flask shape
+                // Liquid
+                ctx.fillStyle = p.type.color;
+                ctx.beginPath();
+                ctx.arc(0, 5, p.type.radius, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Glass highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(-p.type.radius*0.3, 2, p.type.radius*0.3, 0, Math.PI*2);
+                ctx.fill();
+
+                // Neck
+                ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+                ctx.fillRect(-4, -p.type.radius-8, 8, 10);
+                
+                // Cork
+                ctx.fillStyle = '#8b5a2b';
+                ctx.fillRect(-5, -p.type.radius-12, 10, 4);
+            }
+
+            ctx.restore();
+        }
+
+        function drawParticles() {
+            ctx.globalCompositeOperation = 'screen';
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function renderGame() {
+            drawBackground();
+
+            ctx.save();
+            if (screenShake > 0) {
+                let dx = (Math.random() - 0.5) * screenShake;
+                let dy = (Math.random() - 0.5) * screenShake;
+                ctx.translate(dx, dy);
+            }
+
+            drawParticles();
+            potions.forEach(drawPotion);
+            drawCauldron(player.x, player.y, player.width, player.height, saveData.currentSkin);
+
+            ctx.restore();
+        }
+
+        // Main Loop
+        function gameLoop(timestamp) {
+            let dt = timestamp - lastTime;
+            lastTime = timestamp;
+            gameTime = timestamp;
+
+            if (currentState === STATE.PLAYING) {
+                handleSpawning(timestamp);
+                updateLogic(dt, timestamp);
+                renderGame();
+                animationFrame = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // ==========================================
+        // UI & STATE MANAGEMENT
+        // ==========================================
+
+        function updateHUD() {
+            document.getElementById("scoreDisplay").innerText = score;
+            document.getElementById("waveDisplay").innerText = "Wave " + wave;
+            
+            const hearts = document.querySelectorAll(".life-heart");
+            hearts.forEach((h, i) => {
+                if (i < lives) {
+                    h.classList.remove("empty");
+                } else {
+                    h.classList.add("empty");
+                }
+            });
+        }
+
+        function createFloatingText(text, x, y, color) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.color = color;
+            document.getElementById('ui-layer').appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function setScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if (screenId) {
+                document.getElementById(screenId).classList.add('active');
+            }
+            document.getElementById('hud').classList.remove('active');
+        }
+
+        function showMenu() {
+            currentState = STATE.MENU;
+            setScreen('menuScreen');
+            document.getElementById("highScoreText").innerText = "High Score: " + saveData.highScore;
+            
+            // Draw a nice background just for the menu
+            renderGameBackgroundOnly();
+        }
+
+        function showShop() {
+            try {
+                ensureSafeData(); // Ensure data is clean before mapping items
+                currentState = STATE.SHOP;
+                setScreen('shopScreen');
+                renderShop();
+            } catch (e) {
+                console.error("Shop rendering error:", e);
+                showToast("Error opening shop", "var(--danger)");
+            }
+        }
+
+        function startGame() {
+            setScreen(null);
+            document.getElementById('hud').classList.add('active');
+            initGame();
+        }
+
+        function endGame() {
+            currentState = STATE.GAMEOVER;
+            cancelAnimationFrame(animationFrame);
+            
+            if (score > saveData.highScore) {
+                saveData.highScore = score;
+            }
+            saveGame();
+
+            setScreen('gameOverScreen');
+            document.getElementById("finalScoreDisplay").innerText = "Score: " + score;
+            document.getElementById("waveReachedDisplay").innerText = "Reached Wave: " + wave;
+        }
+
+        function renderGameBackgroundOnly() {
+            drawBackground();
+            drawCauldron(width/2, height - 80, player.width, player.height, saveData.currentSkin);
+            if (currentState === STATE.MENU || currentState === STATE.SHOP) {
+                requestAnimationFrame(renderGameBackgroundOnly);
+            }
+        }
+
+        // DOM Events
+        document.getElementById("playBtn").addEventListener("click", startGame);
+        document.getElementById("shopBtn").addEventListener("click", showShop);
+        document.getElementById("closeShopBtn").addEventListener("click", showMenu);
+        document.getElementById("restartBtn").addEventListener("click", startGame);
+        document.getElementById("menuBtn").addEventListener("click", showMenu);
+
+        // Start init sequence
+        window.onload = () => {
+            drawBackground(); // Initial draw
+            requestLoad(); // Ask platform for data
+        };
+
+    </script>
+</body>
+</html>

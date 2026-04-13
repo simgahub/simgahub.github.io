@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Paper Sort</title>
+    <style>
+        :root {
+            --primary: #4ade80;
+            --danger: #f87171;
+            --info: #60a5fa;
+            --bg-overlay: rgba(15, 23, 42, 0.75);
+            --glass-bg: rgba(30, 41, 59, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            touch-action: none; /* Prevent browser scrolling on touch */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas by default */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            pointer-events: auto; /* Re-enable clicks for UI elements */
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 90%;
+            width: 450px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+        }
+
+        h2 { font-size: 1.8rem; margin-bottom: 15px; }
+        
+        p { color: #cbd5e1; line-height: 1.5; font-size: 1.1rem; }
+
+        .btn {
+            background: linear-gradient(to bottom, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6), inset 0 1px 1px rgba(255,255,255,0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            display: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .hud-box {
+            background: rgba(0,0,0,0.4);
+            padding: 10px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(4px);
+        }
+
+        .lives { color: var(--danger); }
+        .score { color: var(--primary); }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .shop-grid::-webkit-scrollbar { width: 6px; }
+        .shop-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+
+        .shop-item:hover { background: rgba(0, 0, 0, 0.5); }
+        
+        .shop-item-title { font-weight: bold; font-size: 1.1rem; }
+        .shop-item-desc { font-size: 0.85rem; color: #94a3b8; flex-grow: 1; }
+        
+        .buy-btn {
+            background: #eab308;
+            color: #000;
+            border: none;
+            padding: 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(234, 179, 8, 0.3);
+            transition: transform 0.1s;
+        }
+        .buy-btn:active { transform: scale(0.95); }
+        .buy-btn:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Notifications */
+        #notification {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #eab308, #ca8a04);
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #notification.show { top: 30px; }
+
+        /* Loading */
+        #loading {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5rem;
+            z-index: 999;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="loading">Loading Data...</div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <div>
+                <h1>Paper Sort</h1>
+                <p>Drag falling papers to matching colored trays. Don't let them stack up!</p>
+            </div>
+            <button class="btn" onclick="startGame()">Play Now</button>
+            <button class="btn btn-secondary" onclick="showScreen('screen-shop')">Upgrades & Shop</button>
+            <p id="menu-highscore" style="font-size: 0.9rem; color: #64748b; margin-top: 10px;">High Score: 0</p>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen" style="width: 600px;">
+            <h2>Simga Shop</h2>
+            <div class="shop-grid" id="shop-container">
+                <!-- Shop items injected here via JS -->
+            </div>
+            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="showScreen('screen-menu')">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="screen-gameover" class="screen">
+            <h2 style="color: var(--danger);">Shift Over!</h2>
+            <h1 id="final-score">0</h1>
+            <p id="new-best-text" style="color: var(--primary); display: none; font-weight: bold;">New Best!</p>
+            <p id="session-earnings" style="color: #eab308; margin-bottom: 10px;">Earned: 0 SimgaBucks</p>
+            <button class="btn" onclick="startGame()">Play Again</button>
+            <button class="btn btn-secondary" onclick="showScreen('screen-menu')">Main Menu</button>
+        </div>
+
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-box">Score: <span id="hud-score" class="score">0</span></div>
+        <div class="hud-box">Strikes: <span id="hud-lives" class="lives">0/3</span></div>
+    </div>
+
+    <div id="notification">+1 SimgaBuck!</div>
+
+    <script>
+        /**
+         * PAPER SORT - Platform API Integration & Game Logic
+         */
+
+        const GAME_ID = "paper";
+        
+        // Types
+        const TYPES = [
+            { id: 0, color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.6)' },  // Urgent (Red)
+            { id: 1, color: '#3b82f6', glow: 'rgba(59, 130, 246, 0.6)' },  // Normal (Blue)
+            { id: 2, color: '#10b981', glow: 'rgba(16, 185, 129, 0.6)' }   // Archive (Green)
+        ];
+
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize
+        let cw, ch;
+
+        // Platform & Save Data
+        let saveData = {
+            highScore: 0,
+            upgrades: { speed: 0, auto: 0 },
+            unlockedDeskSkins: ['classic'],
+            activeDeskSkin: 'classic',
+            unlockedPaperSkins: ['classic'],
+            activePaperSkin: 'classic'
+        };
+
+        // Game State Variables
+        let state = 'INIT'; // INIT, MENU, PLAYING, SHOP, GAMEOVER
+        let score = 0;
+        let lives = 3;
+        let strikes = 0;
+        let papersSorted = 0; // Total ever sorted this session (for economy)
+        let papersSortedThisRound = 0; // For difficulty scaling
+        let lastTime = 0;
+        let sessionSimgaBucks = 0;
+
+        // Entities
+        let papers = [];
+        let particles = [];
+        let floatingTexts = [];
+        let dustParticles = [];
+        let trays = [];
+
+        // Input & Dragging
+        let pointer = { x: 0, y: 0, isDown: false };
+        let draggedPaper = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // Economy configuration
+        const ECONOMY = {
+            papersPerReward: 7, // Every 7 papers = 1 SB
+            waveBonus: 2, // Bonus SB for passing 30 papers
+            waveThreshold: 30
+        };
+
+        const SHOP_ITEMS = [
+            { id: 'speed_1', type: 'upgrade', category: 'speed', level: 1, name: 'Better Coffee', desc: 'Slows paper fall speed slightly.', cost: 10 },
+            { id: 'speed_2', type: 'upgrade', category: 'speed', level: 2, name: 'Time Dilation', desc: 'Papers fall noticeably slower.', cost: 30 },
+            { id: 'auto_1', type: 'upgrade', category: 'auto', level: 1, name: 'Intern (Level 1)', desc: '10% chance a paper auto-sorts itself.', cost: 15 },
+            { id: 'auto_2', type: 'upgrade', category: 'auto', level: 2, name: 'Intern (Level 2)', desc: '25% chance a paper auto-sorts itself.', cost: 40 },
+            { id: 'skin_desk_neon', type: 'skin', category: 'desk', name: 'Neon Grid Desk', desc: 'A futuristic desk skin.', cost: 50 },
+            { id: 'skin_paper_blueprint', type: 'skin', category: 'paper', name: 'Blueprint Papers', desc: 'Changes papers to architectural blueprints.', cost: 50 }
+        ];
+
+        let pendingPurchase = null;
+
+        // ==========================================
+        // PLATFORM COMMUNICATION
+        // ==========================================
+
+        function saveProgress() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function loadProgress() {
+            const loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+            
+            // Timeout fallback if running locally without parent
+            setTimeout(() => {
+                if(state === 'INIT') {
+                    finishLoading();
+                }
+            }, 1000);
+
+            return loadMsgId;
+        }
+
+        function addSimgaBucks(amount, reason = "") {
+            sessionSimgaBucks += amount;
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount,
+                reason: reason
+            }, "*");
+            showNotification(`+${amount} SimgaBucks!`);
+        }
+
+        function requestPurchase(itemId, cost) {
+            pendingPurchase = itemId;
+            const msgId = Math.random().toString(36);
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: msgId
+            }, "*");
+            
+            // Update UI to show processing...
+            renderShop(); 
+        }
+
+        const expectedLoadMsgId = loadProgress();
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if(!data) return;
+
+            // Handle Load Response
+            if (data.type === "loadResponse" && data.msgId === expectedLoadMsgId) {
+                if (data.data) {
+                    // Merge saved data with defaults
+                    saveData = { ...saveData, ...data.data };
+                    // Ensure objects inside exist
+                    if(!saveData.upgrades) saveData.upgrades = { speed: 0, auto: 0 };
+                    if(!saveData.unlockedDeskSkins) saveData.unlockedDeskSkins = ['classic'];
+                    if(!saveData.unlockedPaperSkins) saveData.unlockedPaperSkins = ['classic'];
+                }
+                finishLoading();
+            }
+
+            // Handle Purchase Response
+            if (data.type === "spendResponse") {
+                if (data.success && pendingPurchase) {
+                    applyPurchase(pendingPurchase);
+                } else {
+                    alert("Not enough SimgaBucks or purchase failed.");
+                }
+                pendingPurchase = null;
+                renderShop();
+                saveProgress();
+            }
+        });
+
+        function finishLoading() {
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                showScreen('screen-menu');
+                initCanvas();
+                state = 'MENU';
+                requestAnimationFrame(gameLoop);
+            }, 500);
+            document.getElementById('menu-highscore').innerText = `High Score: ${saveData.highScore}`;
+        }
+
+        // ==========================================
+        // UI & SHOP MANAGEMENT
+        // ==========================================
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if(id) document.getElementById(id).classList.add('active');
+            
+            if(id === 'screen-shop') renderShop();
+        }
+
+        function showNotification(msg) {
+            const notif = document.getElementById('notification');
+            notif.innerText = msg;
+            notif.classList.add('show');
+            setTimeout(() => notif.classList.remove('show'), 2000);
+        }
+
+        function renderShop() {
+            const container = document.getElementById('shop-container');
+            container.innerHTML = '';
+
+            SHOP_ITEMS.forEach(item => {
+                let isOwned = false;
+                let isEquipped = false;
+                let canAfford = true; // Visual state only, actual check is on platform
+                
+                if (item.type === 'upgrade') {
+                    isOwned = saveData.upgrades[item.category] >= item.level;
+                } else if (item.type === 'skin') {
+                    if (item.category === 'desk') {
+                        isOwned = saveData.unlockedDeskSkins.includes(item.id);
+                        isEquipped = saveData.activeDeskSkin === item.id;
+                    } else {
+                        isOwned = saveData.unlockedPaperSkins.includes(item.id);
+                        isEquipped = saveData.activePaperSkin === item.id;
+                    }
+                }
+
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                
+                let btnHtml = '';
+                if (pendingPurchase === item.id) {
+                    btnHtml = `<button class="buy-btn" disabled>Processing...</button>`;
+                } else if (isOwned) {
+                    if (item.type === 'skin') {
+                        if (isEquipped) {
+                            btnHtml = `<button class="buy-btn" disabled style="background:#22c55e; color:white;">Equipped</button>`;
+                        } else {
+                            btnHtml = `<button class="buy-btn" onclick="equipSkin('${item.category}', '${item.id}')">Equip</button>`;
+                        }
+                    } else {
+                        btnHtml = `<button class="buy-btn" disabled style="background:#475569; color:white;">Owned</button>`;
+                    }
+                } else {
+                    btnHtml = `<button class="buy-btn" onclick="requestPurchase('${item.id}', ${item.cost})">Buy - ${item.cost} SB</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="shop-item-title">${item.name}</div>
+                    <div class="shop-item-desc">${item.desc}</div>
+                    ${btnHtml}
+                `;
+                container.appendChild(div);
+            });
+            
+            // Add classic skins equip buttons if not equipped
+            if (saveData.activeDeskSkin !== 'classic') {
+               container.innerHTML += `<div class="shop-item"><div class="shop-item-title">Classic Wood Desk</div><div class="shop-item-desc">Default skin</div><button class="buy-btn" onclick="equipSkin('desk', 'classic')">Equip</button></div>`; 
+            }
+            if (saveData.activePaperSkin !== 'classic') {
+               container.innerHTML += `<div class="shop-item"><div class="shop-item-title">Classic Paper</div><div class="shop-item-desc">Default skin</div><button class="buy-btn" onclick="equipSkin('paper', 'classic')">Equip</button></div>`; 
+            }
+        }
+
+        function applyPurchase(itemId) {
+            const item = SHOP_ITEMS.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (item.type === 'upgrade') {
+                saveData.upgrades[item.category] = Math.max(saveData.upgrades[item.category], item.level);
+            } else if (item.type === 'skin') {
+                if (item.category === 'desk') {
+                    saveData.unlockedDeskSkins.push(item.id);
+                    saveData.activeDeskSkin = item.id;
+                } else {
+                    saveData.unlockedPaperSkins.push(item.id);
+                    saveData.activePaperSkin = item.id;
+                }
+            }
+            createFloatingText(cw/2, ch/2, "Purchase Successful!", "#22c55e");
+        }
+
+        function equipSkin(category, id) {
+            if (category === 'desk') saveData.activeDeskSkin = id;
+            if (category === 'paper') saveData.activePaperSkin = id;
+            saveProgress();
+            renderShop();
+        }
+
+        // ==========================================
+        // CORE GAME ENGINE
+        // ==========================================
+
+        function initCanvas() {
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Input Events
+            canvas.addEventListener('mousedown', onPointerDown);
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+            
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scrolling
+                const touch = e.touches[0];
+                onPointerDown({ clientX: touch.clientX, clientY: touch.clientY });
+            }, {passive: false});
+            
+            window.addEventListener('touchmove', (e) => {
+                const touch = e.touches[0];
+                onPointerMove({ clientX: touch.clientX, clientY: touch.clientY });
+            }, {passive: false});
+            
+            window.addEventListener('touchend', onPointerUp);
+
+            initDust();
+        }
+
+        function resizeCanvas() {
+            cw = window.innerWidth;
+            ch = window.innerHeight;
+            canvas.width = cw;
+            canvas.height = ch;
+            updateTrays();
+        }
+
+        function updateTrays() {
+            trays = [];
+            const trayW = Math.min(cw * 0.25, 200);
+            const trayH = 120;
+            const spacing = (cw - (trayW * 3)) / 4;
+            
+            for(let i=0; i<3; i++) {
+                trays.push({
+                    x: spacing + (i * (trayW + spacing)),
+                    y: ch - trayH - 20,
+                    w: trayW,
+                    h: trayH,
+                    type: i,
+                    color: TYPES[i].color,
+                    glow: TYPES[i].glow,
+                    highlight: 0 // For animation
+                });
+            }
+        }
+
+        // --- CLASSES ---
+
+        class Paper {
+            constructor() {
+                this.w = 100;
+                this.h = 140;
+                this.x = Math.random() * (cw - this.w - 40) + 20;
+                this.y = -this.h;
+                this.typeId = Math.floor(Math.random() * TYPES.length);
+                this.type = TYPES[this.typeId];
+                this.rotation = (Math.random() - 0.5) * 0.2;
+                
+                // Difficulty & Upgrades calculation
+                let speedMultiplier = 1 + (papersSortedThisRound * 0.02);
+                let baseFallSpeed = 100; // pixels per second
+                
+                // Apply speed upgrade reduction
+                if (saveData.upgrades.speed === 1) speedMultiplier *= 0.85;
+                if (saveData.upgrades.speed === 2) speedMultiplier *= 0.70;
+
+                this.vy = baseFallSpeed * speedMultiplier;
+                
+                this.isDragged = false;
+                this.isAutoSorting = false;
+                this.autoTargetX = 0;
+                this.autoTargetY = 0;
+
+                // Check Auto-sort upgrade
+                let autoChance = 0;
+                if (saveData.upgrades.auto === 1) autoChance = 0.10;
+                if (saveData.upgrades.auto === 2) autoChance = 0.25;
+
+                if (Math.random() < autoChance) {
+                    this.isAutoSorting = true;
+                    const targetTray = trays.find(t => t.type === this.typeId);
+                    if(targetTray) {
+                        this.autoTargetX = targetTray.x + targetTray.w/2 - this.w/2;
+                        this.autoTargetY = targetTray.y + targetTray.h/2 - this.h/2;
+                        createFloatingText(this.x + this.w/2, this.y + this.h, "AUTO-SORT!", "#eab308");
+                    } else {
+                        this.isAutoSorting = false;
+                    }
+                }
+            }
+
+            update(dt) {
+                if (this.isDragged) return;
+
+                if (this.isAutoSorting) {
+                    // Move towards target tray smoothly
+                    const dx = this.autoTargetX - this.x;
+                    const dy = this.autoTargetY - this.y;
+                    this.x += dx * 5 * dt;
+                    this.y += dy * 5 * dt;
+                    
+                    // If close enough, snap and sort
+                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                        processSort(this, trays.find(t => t.type === this.typeId));
+                    }
+                    return;
+                }
+
+                this.y += this.vy * dt;
+                
+                // Gentle swaying
+                this.x += Math.sin(Date.now() / 1000 + this.typeId) * 10 * dt;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x + this.w/2, this.y + this.h/2);
+                ctx.rotate(this.rotation);
+                
+                // Lift effect
+                let scale = this.isDragged ? 1.15 : 1;
+                ctx.scale(scale, scale);
+                
+                ctx.translate(-this.w/2, -this.h/2);
+
+                // Shadow
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = this.isDragged ? 25 : 10;
+                ctx.shadowOffsetY = this.isDragged ? 15 : 5;
+
+                // Base Paper
+                let bgPrimary = '#ffffff';
+                let bgSecondary = '#f1f5f9';
+                let lineColor = '#e2e8f0';
+
+                if (saveData.activePaperSkin === 'skin_paper_blueprint') {
+                    bgPrimary = '#1e3a8a';
+                    bgSecondary = '#1e40af';
+                    lineColor = '#60a5fa';
+                }
+
+                ctx.fillStyle = bgPrimary;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.w - 20, 0); // Fold start
+                ctx.lineTo(this.w, 20); // Fold end
+                ctx.lineTo(this.w, this.h);
+                ctx.lineTo(0, this.h);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw Fold
+                ctx.shadowColor = 'transparent'; // No shadow for inner details
+                ctx.fillStyle = bgSecondary;
+                ctx.beginPath();
+                ctx.moveTo(this.w - 20, 0);
+                ctx.lineTo(this.w - 20, 20);
+                ctx.lineTo(this.w, 20);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw Text Lines
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 2;
+                for(let i=40; i<this.h - 20; i+=15) {
+                    ctx.beginPath();
+                    ctx.moveTo(15, i);
+                    ctx.lineTo(this.w - 15, i);
+                    ctx.stroke();
+                }
+
+                // Draw Colored Stamp / Indicator
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = this.type.color;
+                ctx.beginPath();
+                ctx.arc(this.w/2, this.h/2 - 10, 20, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.fillStyle = this.type.color;
+                ctx.font = "bold 20px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(this.typeId === 0 ? "!" : (this.typeId === 1 ? "-" : "V"), this.w/2, this.h/2 - 10);
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 400;
+                this.vy = (Math.random() - 0.5) * 400;
+                this.life = 1.0;
+                this.decay = Math.random() * 1.5 + 0.5;
+                this.color = color;
+                this.size = Math.random() * 6 + 3;
+                this.rot = Math.random() * Math.PI * 2;
+                this.vrot = (Math.random() - 0.5) * 10;
+            }
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.vy += 600 * dt; // gravity
+                this.rot += this.vrot * dt;
+                this.life -= this.decay * dt;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life;
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        class FloatingText {
+            constructor(x, y, text, color) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.life = 1.0;
+                this.vy = -50;
+            }
+            update(dt) {
+                this.y += this.vy * dt;
+                this.life -= dt * 0.8;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.font = "bold 24px sans-serif";
+                ctx.textAlign = "center";
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 4;
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // Atmospheric Background Dust
+        function initDust() {
+            dustParticles = [];
+            for(let i=0; i<30; i++) {
+                dustParticles.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    r: Math.random() * 2 + 1,
+                    vy: Math.random() * -10 - 5,
+                    vx: (Math.random() - 0.5) * 10,
+                    alpha: Math.random() * 0.5
+                });
+            }
+        }
+
+        function updateAndDrawDust(ctx, dt) {
+            ctx.fillStyle = 'white';
+            dustParticles.forEach(p => {
+                p.y += p.vy * dt;
+                p.x += p.vx * dt;
+                if (p.y < -10) {
+                    p.y = ch + 10;
+                    p.x = Math.random() * cw;
+                }
+                ctx.globalAlpha = p.alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        // ==========================================
+        // GAMEPLAY LOGIC
+        // ==========================================
+
+        let paperSpawnTimer = 0;
+        let shakeTime = 0;
+
+        function startGame() {
+            state = 'PLAYING';
+            score = 0;
+            strikes = 0;
+            papersSortedThisRound = 0;
+            sessionSimgaBucks = 0;
+            papers = [];
+            particles = [];
+            floatingTexts = [];
+            paperSpawnTimer = 0;
+            
+            showScreen(null); // Hide UI
+            document.getElementById('hud').style.display = 'flex';
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-score').innerText = score;
+            document.getElementById('hud-lives').innerText = `${strikes}/3`;
+        }
+
+        function spawnExplosion(x, y, color) {
+            for(let i=0; i<15; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function createFloatingText(x, y, text, color) {
+            floatingTexts.push(new FloatingText(x, y, text, color));
+        }
+
+        function triggerShake() {
+            shakeTime = 0.3; // seconds
+        }
+
+        function checkEconomy(justSorted = false) {
+            if (justSorted) {
+                papersSorted++;
+                // Small action reward
+                if (papersSorted % ECONOMY.papersPerReward === 0) {
+                    addSimgaBucks(1, "Consistent Sorting");
+                    createFloatingText(cw/2, ch/2 - 100, "+1 SimgaBuck!", "#eab308");
+                }
+                
+                // Wave reward
+                if (papersSortedThisRound > 0 && papersSortedThisRound % ECONOMY.waveThreshold === 0) {
+                    addSimgaBucks(ECONOMY.waveBonus, "Wave Clear");
+                    createFloatingText(cw/2, ch/2 - 150, "WAVE CLEARED! +2 SB", "#eab308");
+                }
+            }
+        }
+
+        function processSort(paper, tray) {
+            // Remove paper
+            papers = papers.filter(p => p !== paper);
+            
+            if (tray && tray.type === paper.typeId) {
+                // SUCCESS
+                score += 10;
+                papersSortedThisRound++;
+                tray.highlight = 1.0;
+                spawnExplosion(paper.x + paper.w/2, paper.y + paper.h/2, paper.type.color);
+                createFloatingText(paper.x + paper.w/2, paper.y, "+10", "#4ade80");
+                updateHUD();
+                checkEconomy(true);
+            } else {
+                // FAILURE (Wrong tray or dropped)
+                strikes++;
+                triggerShake();
+                createFloatingText(paper.x + paper.w/2, paper.y, "MISS!", "#f87171");
+                updateHUD();
+                
+                if (tray) tray.highlight = 0.5; // Flash wrong tray faintly
+
+                if (strikes >= 3) {
+                    gameOver();
+                }
+            }
+        }
+
+        function gameOver() {
+            state = 'GAMEOVER';
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('session-earnings').innerText = `Earned: ${sessionSimgaBucks} SimgaBucks`;
+            
+            let newBest = false;
+            if (score > saveData.highScore) {
+                saveData.highScore = score;
+                newBest = true;
+                document.getElementById('menu-highscore').innerText = `High Score: ${saveData.highScore}`;
+            }
+            
+            document.getElementById('new-best-text').style.display = newBest ? 'block' : 'none';
+            
+            saveProgress();
+            setTimeout(() => showScreen('screen-gameover'), 500); // Slight delay
+        }
+
+        // --- INPUT HANDLING ---
+
+        function onPointerDown(e) {
+            if (state !== 'PLAYING') return;
+            pointer.x = e.clientX;
+            pointer.y = e.clientY;
+            pointer.isDown = true;
+
+            // Find clicked paper (iterate backwards for top-most)
+            for (let i = papers.length - 1; i >= 0; i--) {
+                const p = papers[i];
+                if (!p.isAutoSorting && 
+                    pointer.x >= p.x && pointer.x <= p.x + p.w &&
+                    pointer.y >= p.y && pointer.y <= p.y + p.h) {
+                    
+                    draggedPaper = p;
+                    draggedPaper.isDragged = true;
+                    dragOffsetX = pointer.x - p.x;
+                    dragOffsetY = pointer.y - p.y;
+                    
+                    // Move to end of array so it renders on top
+                    papers.splice(i, 1);
+                    papers.push(draggedPaper);
+                    break;
+                }
+            }
+        }
+
+        function onPointerMove(e) {
+            pointer.x = e.clientX;
+            pointer.y = e.clientY;
+
+            if (draggedPaper && pointer.isDown) {
+                draggedPaper.x = pointer.x - dragOffsetX;
+                draggedPaper.y = pointer.y - dragOffsetY;
+            }
+        }
+
+        function onPointerUp(e) {
+            pointer.isDown = false;
+            if (draggedPaper) {
+                draggedPaper.isDragged = false;
+                
+                // Check if dropped in a tray
+                let droppedInTray = null;
+                const pCenterY = draggedPaper.y + draggedPaper.h/2;
+                const pCenterX = draggedPaper.x + draggedPaper.w/2;
+
+                for (let tray of trays) {
+                    // Generous bounding box for dropping
+                    if (pCenterX > tray.x - 20 && pCenterX < tray.x + tray.w + 20 &&
+                        pCenterY > tray.y - 50 && pCenterY < tray.y + tray.h + 50) {
+                        droppedInTray = tray;
+                        break;
+                    }
+                }
+
+                if (droppedInTray) {
+                    processSort(draggedPaper, droppedInTray);
+                }
+
+                draggedPaper = null;
+            }
+        }
+
+        // ==========================================
+        // RENDER LOOP
+        // ==========================================
+
+        function drawBackground(ctx) {
+            // Desk rendering
+            if (saveData.activeDeskSkin === 'skin_desk_neon') {
+                // Cyber Neon Desk
+                ctx.fillStyle = '#020617'; // Very dark blue
+                ctx.fillRect(0, 0, cw, ch);
+                
+                // Grid
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 1;
+                for(let i=0; i<cw; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, ch); ctx.stroke(); }
+                for(let i=0; i<ch; i+=50) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(cw, i); ctx.stroke(); }
+                
+                // Neon glow at top
+                let grad = ctx.createLinearGradient(0,0,0,300);
+                grad.addColorStop(0, 'rgba(56, 189, 248, 0.15)');
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0,0,cw,300);
+
+            } else {
+                // Classic Wood Desk
+                ctx.fillStyle = '#1e140d'; // Base dark
+                ctx.fillRect(0, 0, cw, ch);
+                
+                // Desk gradient / Light cone
+                let grad = ctx.createRadialGradient(cw/2, -100, 100, cw/2, 0, ch);
+                grad.addColorStop(0, '#5a3d2b'); // Warmer light at top
+                grad.addColorStop(1, '#1e140d'); // Dark at edges
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, cw, ch);
+            }
+        }
+
+        function drawTrays(ctx, dt) {
+            trays.forEach(tray => {
+                // Base
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.beginPath();
+                ctx.roundRect(tray.x, tray.y, tray.w, tray.h, 15);
+                ctx.fill();
+
+                // Inner slot
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.beginPath();
+                ctx.roundRect(tray.x + 10, tray.y + 10, tray.w - 20, tray.h - 20, 8);
+                ctx.fill();
+
+                // Colored Rim Glow
+                ctx.shadowColor = tray.color;
+                ctx.shadowBlur = 15;
+                ctx.strokeStyle = tray.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.roundRect(tray.x, tray.y, tray.w, tray.h, 15);
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset
+
+                // Highlight Animation
+                if (tray.highlight > 0) {
+                    ctx.fillStyle = tray.color;
+                    ctx.globalAlpha = tray.highlight * 0.4;
+                    ctx.beginPath();
+                    ctx.roundRect(tray.x, tray.y, tray.w, tray.h, 15);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    tray.highlight -= dt * 2; // fade out
+                }
+                
+                // Label
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.font = "bold 16px sans-serif";
+                ctx.textAlign = "center";
+                let label = tray.type === 0 ? "URGENT" : (tray.type === 1 ? "NORMAL" : "ARCHIVE");
+                ctx.fillText(label, tray.x + tray.w/2, tray.y + tray.h/2 + 6);
+            });
+        }
+
+        function gameLoop(timestamp) {
+            requestAnimationFrame(gameLoop);
+
+            if (!lastTime) lastTime = timestamp;
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            // Cap DT to prevent weird physics on lag
+            if (dt > 0.1) dt = 0.1;
+
+            ctx.clearRect(0, 0, cw, ch);
+
+            // Shake Effect Setup
+            ctx.save();
+            if (shakeTime > 0) {
+                const sx = (Math.random() - 0.5) * 15;
+                const sy = (Math.random() - 0.5) * 15;
+                ctx.translate(sx, sy);
+                shakeTime -= dt;
+            }
+
+            // 1. Render Background
+            drawBackground(ctx);
+            updateAndDrawDust(ctx, dt);
+
+            // 2. Render Trays
+            drawTrays(ctx, dt);
+
+            if (state === 'PLAYING') {
+                // Spawning logic
+                // Spawn interval decreases as sorted count increases
+                let spawnInterval = Math.max(0.6, 2.0 - (papersSortedThisRound * 0.02)); 
+                paperSpawnTimer += dt;
+                
+                if (paperSpawnTimer >= spawnInterval) {
+                    papers.push(new Paper());
+                    paperSpawnTimer = 0;
+                }
+
+                // Update & Render Papers
+                for (let i = papers.length - 1; i >= 0; i--) {
+                    let p = papers[i];
+                    p.update(dt);
+                    p.draw(ctx);
+
+                    // Check bounds (Missed paper)
+                    if (!p.isDragged && p.y > ch) {
+                        processSort(p, null); // process as failure
+                    }
+                }
+            } else if (state === 'MENU' || state === 'SHOP' || state === 'GAMEOVER') {
+                // Idle menu papers for visual flair
+                if (Math.random() < 0.02) {
+                    papers.push(new Paper());
+                }
+                for (let i = papers.length - 1; i >= 0; i--) {
+                    let p = papers[i];
+                    p.update(dt);
+                    p.draw(ctx);
+                    if (p.y > ch) {
+                        papers.splice(i, 1);
+                    }
+                }
+            }
+
+            // Update & Render Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.update(dt);
+                p.draw(ctx);
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Update & Render Floating Texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.update(dt);
+                ft.draw(ctx);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            ctx.restore(); // Restore shake transform
+        }
+
+    </script>
+</body>
+</html>

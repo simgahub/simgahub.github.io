@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gear Defense</title>
+    <style>
+        :root {
+            --primary: #00f0ff;
+            --secondary: #ff003c;
+            --bg-dark: #0a0a14;
+            --panel-bg: rgba(15, 15, 30, 0.85);
+            --text-main: #e0eaff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-dark);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(10,10,20,0.4) 0%, rgba(5,5,10,0.9) 100%);
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+        }
+
+        h2 {
+            margin: 0 0 20px 0;
+            font-size: 1.5rem;
+            color: #aaa;
+            font-weight: 400;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #005f73, #0a9396);
+            border: 2px solid #94d2bd;
+            color: #fff;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(10, 147, 150, 0.5);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            background: linear-gradient(45deg, #0a9396, #94d2bd);
+            box-shadow: 0 0 25px rgba(148, 210, 189, 0.8);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-shop { background: linear-gradient(45deg, #6a040f, #9d0208); border-color: #dc2f02; box-shadow: 0 0 15px rgba(220, 47, 2, 0.5); }
+        .btn-shop:hover { background: linear-gradient(45deg, #9d0208, #dc2f02); box-shadow: 0 0 25px rgba(220, 47, 2, 0.8); }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .shop-item.owned {
+            border-color: #52b788;
+        }
+
+        .shop-item h3 { margin: 0 0 10px 0; font-size: 1.1rem; }
+        .shop-item p { margin: 0 0 15px 0; font-size: 0.9rem; color: #aaa; text-align: center;}
+        .cost { font-weight: bold; color: #ffd166; margin-bottom: 10px; }
+
+        .btn-buy {
+            background: transparent; border: 1px solid #ffd166; color: #ffd166;
+            padding: 8px 20px; border-radius: 20px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-buy:hover { background: #ffd166; color: #000; }
+        .btn-buy.equipped { background: #52b788; border-color: #52b788; color: #000; cursor: default; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            padding: 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .hud-stats {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .hud-val { color: var(--primary); }
+
+        #slowmo-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(0, 240, 255, 0.2);
+            border: 2px solid var(--primary);
+            color: #fff;
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+            text-align: center;
+            line-height: 1.2;
+        }
+        #slowmo-btn.ready { background: rgba(0, 240, 255, 0.6); animation: pulse 2s infinite; }
+        #slowmo-btn:active { transform: scale(0.9); }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(0, 240, 255, 0.9); }
+            100% { box-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+        }
+
+        .loading-text {
+            color: #aaa;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="hud">
+        <div class="hud-stats">
+            <div>SCORE: <span id="score-val" class="hud-val">0</span></div>
+            <div>WAVE: <span id="wave-val" class="hud-val">1</span></div>
+        </div>
+        <div class="hud-stats">
+            <div>LIVES: <span id="lives-val" style="color: var(--secondary);">3</span></div>
+        </div>
+        <div id="slowmo-btn">SLOW<br>MO</div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="overlay active">
+        <div class="panel">
+            <h1>Gear Defense</h1>
+            <h2>Rotate. Deflect. Survive.</h2>
+            <div id="loading-indicator" class="loading-text">Connecting to platform...</div>
+            <button id="btn-start" class="btn" style="display:none;">Play Game</button>
+            <button id="btn-open-shop" class="btn btn-shop" style="display:none;">Shop / Upgrades</button>
+            <p style="margin-top: 20px; color: #888;">Move mouse or touch and drag to rotate your shield.<br>Deflect incoming gears to survive.</p>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="shop-menu" class="overlay">
+        <div class="panel" style="width: 900px;">
+            <h2>SimgaBucks Shop</h2>
+            <div class="shop-grid" id="shop-container">
+                <!-- Injected via JS -->
+            </div>
+            <button id="btn-close-shop" class="btn" style="margin-top: 30px;">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="game-over-menu" class="overlay">
+        <div class="panel">
+            <h1 style="color: var(--secondary); text-shadow: 0 0 20px var(--secondary);">SYSTEM FAILURE</h1>
+            <h2>Wave Reached: <span id="go-wave" class="hud-val"></span></h2>
+            <h2>Final Score: <span id="go-score" class="hud-val"></span></h2>
+            <h3 style="color: #ffd166; margin-bottom: 20px;">High Score: <span id="go-highscore"></span></h3>
+            <button id="btn-restart" class="btn">Play Again</button>
+            <button id="btn-go-shop" class="btn btn-shop">Upgrades</button>
+        </div>
+    </div>
+
+    <script>
+        /** --- SYSTEM & PLATFORM INTEGRATION --- **/
+        const GAME_ID = "gear";
+        
+        let saveData = {
+            highScore: 0,
+            skins: {},
+            upgrades: {},
+            currentSkin: 'default'
+        };
+
+        const SHOP_ITEMS = {
+            'skin_gold': { cost: 15, name: 'Gold Core', desc: 'Shiny golden center gear.', type: 'skin' },
+            'skin_neon': { cost: 20, name: 'Neon Core', desc: 'Bright glowing cyan center.', type: 'skin' },
+            'upg_wider': { cost: 25, name: 'Wider Shield', desc: 'Increases deflection arc by 25%.', type: 'upgrade' },
+            'upg_reflect': { cost: 30, name: 'Reflective Shield', desc: 'Deflected gears bounce back to destroy others.', type: 'upgrade' },
+            'upg_slowmo': { cost: 25, name: 'Time Warp', desc: 'Adds a button to slow time temporarily.', type: 'upgrade' },
+            'upg_sparks': { cost: 15, name: 'Rainbow Sparks', desc: 'Enemies explode into colorful sparks.', type: 'upgrade' }
+        };
+
+        let pendingPurchase = null;
+        let dataLoaded = false;
+
+        // Platform Messaging
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    saveData = Object.assign(saveData, data.data);
+                    saveData.skins = saveData.skins || {};
+                    saveData.upgrades = saveData.upgrades || {};
+                }
+                dataLoaded = true;
+                document.getElementById('loading-indicator').style.display = 'none';
+                document.getElementById('btn-start').style.display = 'inline-block';
+                document.getElementById('btn-open-shop').style.display = 'inline-block';
+                renderShop();
+            }
+
+            if (data.type === "spendResponse") {
+                if (data.success && pendingPurchase) {
+                    const item = pendingPurchase.itemKey;
+                    const itemData = SHOP_ITEMS[item];
+                    
+                    if (itemData.type === 'skin') {
+                        saveData.skins[item] = true;
+                        saveData.currentSkin = item;
+                    } else {
+                        saveData.upgrades[item] = true;
+                    }
+                    
+                    saveGameData();
+                    renderShop();
+                    createFloatingText(window.innerWidth/2, window.innerHeight/2, "PURCHASED!", "#52b788");
+                } else {
+                    // Fail
+                    alert("Not enough SimgaBucks or transaction failed.");
+                }
+                pendingPurchase = null;
+            }
+        });
+
+        // Request initial data
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+
+        // Add Bucks Helper
+        function rewardBucks(amount, reason = "") {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+            // Visual feedback
+            createFloatingText(player.x, player.y - 60, `+${amount} SB!`, "#ffd166");
+        }
+
+        // Save Data Helper
+        function saveGameData() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        /** --- ENGINE & GAME LOGIC --- **/
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize
+        
+        // State
+        const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2 };
+        let currentState = STATE.MENU;
+        
+        let cx, cy;
+        let lastTime = 0;
+        let screenShake = 0;
+        
+        // Game variables
+        let score = 0;
+        let wave = 1;
+        let lives = 3;
+        let waveTimer = 0;
+        let sessionKills = 0;
+        let waveKills = 0;
+
+        let mouseAngle = 0;
+        
+        // Entities
+        let player = { x: 0, y: 0, radius: 40, rotation: 0 };
+        let enemies = [];
+        let particles = [];
+        let floatingTexts = [];
+
+        // Abilities
+        let slowMoActive = false;
+        let slowMoTimer = 0;
+        let slowMoCooldown = 0;
+
+        // Colors
+        const COLORS = {
+            default: ['#4a4e69', '#9a8c98', '#00f0ff'],
+            skin_gold: ['#d4af37', '#ffd700', '#fff8dc'],
+            skin_neon: ['#000', '#00f0ff', '#fff']
+        };
+
+        // Inputs
+        window.addEventListener('mousemove', (e) => {
+            if(currentState === STATE.PLAYING) {
+                mouseAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+            }
+        });
+        
+        window.addEventListener('touchmove', (e) => {
+            if(currentState === STATE.PLAYING && e.touches.length > 0) {
+                mouseAngle = Math.atan2(e.touches[0].clientY - cy, e.touches[0].clientX - cx);
+            }
+        }, {passive: true});
+
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            cx = window.innerWidth / 2;
+            cy = window.innerHeight / 2;
+            player.x = cx;
+            player.y = cy;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        /** --- GRAPHICS UTILS --- **/
+        function drawGear(x, y, radius, teeth, rotation, colorArr, isEnemy = false, isReflected = false) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            
+            ctx.beginPath();
+            const innerRadius = radius * 0.75;
+            for (let i = 0; i < teeth * 2; i++) {
+                const angle = (i * Math.PI) / teeth;
+                const r = (i % 2 === 0) ? radius : innerRadius;
+                if (i === 0) ctx.moveTo(r * Math.cos(angle), r * Math.sin(angle));
+                else ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
+            }
+            ctx.closePath();
+            
+            let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+            grad.addColorStop(0, colorArr[0]);
+            grad.addColorStop(1, colorArr[1]);
+            
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = isEnemy ? (isReflected ? 20 : 10) : 20;
+            ctx.shadowColor = isReflected ? '#00f0ff' : (isEnemy ? '#ff003c' : colorArr[2]);
+            ctx.fill();
+            
+            ctx.strokeStyle = colorArr[2];
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner cutout
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.35, 0, Math.PI * 2);
+            ctx.fillStyle = isEnemy ? (isReflected ? '#00f0ff' : '#220000') : '#111';
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function drawShield(x, y, angle, radius) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            const isWider = saveData.upgrades['upg_wider'];
+            const arcWidth = isWider ? Math.PI * 0.8 : Math.PI * 0.55;
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, radius + 20, angle - arcWidth/2, angle + arcWidth/2);
+            ctx.strokeStyle = saveData.upgrades['upg_reflect'] ? '#ffd166' : '#00f0ff';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = ctx.strokeStyle;
+            ctx.stroke();
+
+            // Secondary faint inner shield
+            ctx.beginPath();
+            ctx.arc(0, 0, radius + 12, angle - arcWidth/2 + 0.2, angle + arcWidth/2 - 0.2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function createParticles(x, y, amount, baseColor, isRainbow = false) {
+            for(let i=0; i<amount; i++) {
+                let color = baseColor;
+                if(isRainbow) {
+                    const hue = Math.random() * 360;
+                    color = `hsl(${hue}, 100%, 60%)`;
+                }
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 5;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    decay: 0.02 + Math.random() * 0.03,
+                    color: color,
+                    size: 2 + Math.random() * 3
+                });
+            }
+        }
+
+        function createFloatingText(x, y, text, color) {
+            floatingTexts.push({
+                x: x, y: y,
+                text: text,
+                color: color,
+                life: 1.0,
+                vy: -1 - Math.random()
+            });
+        }
+
+        /** --- CORE GAMEPLAY --- **/
+        function spawnEnemy() {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.max(window.innerWidth, window.innerHeight) / 2 + 50;
+            const x = cx + Math.cos(angle) * dist;
+            const y = cy + Math.sin(angle) * dist;
+            
+            // Scaling difficulty based on wave
+            const speedMod = 1 + (wave * 0.1);
+            const size = 15 + Math.random() * 20;
+            const hp = size > 30 ? 2 : 1;
+
+            // Target slightly off center sometimes to make it look organic
+            const targetX = cx + (Math.random() * 40 - 20);
+            const targetY = cy + (Math.random() * 40 - 20);
+            const moveAngle = Math.atan2(targetY - y, targetX - x);
+
+            enemies.push({
+                x, y,
+                vx: Math.cos(moveAngle) * (1.5 + Math.random()) * speedMod,
+                vy: Math.sin(moveAngle) * (1.5 + Math.random()) * speedMod,
+                radius: size,
+                rotation: 0,
+                rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.05),
+                hp: hp,
+                reflected: false
+            });
+        }
+
+        function startGame() {
+            document.getElementById('main-menu').classList.remove('active');
+            document.getElementById('game-over-menu').classList.remove('active');
+            document.getElementById('hud').style.display = 'flex';
+            
+            score = 0;
+            wave = 1;
+            lives = 3;
+            waveTimer = 0;
+            sessionKills = 0;
+            waveKills = 0;
+            enemies = [];
+            particles = [];
+            floatingTexts = [];
+            
+            slowMoActive = false;
+            slowMoTimer = 0;
+            slowMoCooldown = 0;
+
+            if(saveData.upgrades['upg_slowmo']) {
+                document.getElementById('slowmo-btn').style.display = 'flex';
+                document.getElementById('slowmo-btn').classList.add('ready');
+            } else {
+                document.getElementById('slowmo-btn').style.display = 'none';
+            }
+
+            updateHUD();
+            currentState = STATE.PLAYING;
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            currentState = STATE.GAMEOVER;
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('game-over-menu').classList.add('active');
+            
+            if(score > saveData.highScore) {
+                saveData.highScore = score;
+                saveGameData();
+            }
+
+            document.getElementById('go-wave').innerText = wave;
+            document.getElementById('go-score').innerText = score;
+            document.getElementById('go-highscore').innerText = saveData.highScore;
+        }
+
+        function updateHUD() {
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('wave-val').innerText = wave;
+            document.getElementById('lives-val').innerText = lives;
+        }
+
+        function normalizeAngle(angle) {
+            while (angle <= -Math.PI) angle += Math.PI * 2;
+            while (angle > Math.PI) angle -= Math.PI * 2;
+            return angle;
+        }
+
+        function activateSlowMo() {
+            if(slowMoCooldown <= 0 && saveData.upgrades['upg_slowmo']) {
+                slowMoActive = true;
+                slowMoTimer = 3.0; // 3 seconds of slow mo
+                slowMoCooldown = 15.0;
+                document.getElementById('slowmo-btn').classList.remove('ready');
+                document.getElementById('slowmo-btn').style.opacity = '0.5';
+                createFloatingText(cx, cy - 80, "TIME WARP!", "#00f0ff");
+            }
+        }
+
+        document.getElementById('slowmo-btn').addEventListener('click', activateSlowMo);
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'Space' && currentState === STATE.PLAYING) activateSlowMo();
+        });
+
+        function update(dt) {
+            if(currentState !== STATE.PLAYING) return;
+
+            const timeScale = slowMoActive ? 0.3 : 1.0;
+            const actualDt = dt * timeScale;
+
+            // Abilities updates
+            if(slowMoActive) {
+                slowMoTimer -= dt;
+                if(slowMoTimer <= 0) slowMoActive = false;
+            }
+            if(slowMoCooldown > 0) {
+                slowMoCooldown -= dt;
+                const btn = document.getElementById('slowmo-btn');
+                btn.innerText = Math.ceil(slowMoCooldown);
+                if(slowMoCooldown <= 0) {
+                    btn.innerText = "SLOW\nMO";
+                    btn.style.opacity = '1';
+                    btn.classList.add('ready');
+                }
+            }
+
+            // Player rotation
+            player.rotation += 0.02 * actualDt * 60;
+
+            // Wave logic
+            waveTimer += dt;
+            if(waveTimer > 30) {
+                wave++;
+                waveTimer = 0;
+                rewardBucks(3, "Wave Clear");
+                createFloatingText(cx, cy - 100, "WAVE " + wave, "#ff003c");
+                updateHUD();
+            }
+
+            // Spawning
+            const spawnRate = Math.max(0.2, 1.5 - (wave * 0.1));
+            if(Math.random() < (actualDt / spawnRate)) {
+                spawnEnemy();
+            }
+
+            // Shield logic
+            const isWider = saveData.upgrades['upg_wider'];
+            const shieldArc = isWider ? Math.PI * 0.8 : Math.PI * 0.55;
+
+            // Update Enemies
+            for(let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                e.x += e.vx * actualDt * 60;
+                e.y += e.vy * actualDt * 60;
+                e.rotation += e.rotSpeed * actualDt * 60;
+
+                const dx = e.x - cx;
+                const dy = e.y - cy;
+                const dist = Math.hypot(dx, dy);
+
+                // Reflected enemy logic
+                if(e.reflected) {
+                    // Check collision with other enemies
+                    for(let j = enemies.length - 1; j >= 0; j--) {
+                        if(i === j || enemies[j].reflected) continue;
+                        let e2 = enemies[j];
+                        let dist2 = Math.hypot(e.x - e2.x, e.y - e2.y);
+                        if(dist2 < e.radius + e2.radius) {
+                            // Destroy both
+                            createParticles(e2.x, e2.y, 15, '#ff003c', saveData.upgrades['upg_sparks']);
+                            createFloatingText(e2.x, e2.y, "+20", "#fff");
+                            score += 20;
+                            enemies.splice(Math.max(i, j), 1);
+                            enemies.splice(Math.min(i, j), 1);
+                            
+                            sessionKills += 2;
+                            if(sessionKills % 10 === 0) rewardBucks(1, "10 Kills");
+                            break;
+                        }
+                    }
+                    
+                    // Remove if out of bounds
+                    if(dist > Math.max(window.innerWidth, window.innerHeight)) {
+                        enemies.splice(i, 1);
+                    }
+                    continue;
+                }
+
+                // Collision with player
+                if(dist < player.radius + e.radius + 15) {
+                    // Check angle to see if shield hits
+                    const angleToEnemy = Math.atan2(dy, dx);
+                    const angleDiff = Math.abs(normalizeAngle(angleToEnemy - mouseAngle));
+
+                    if(angleDiff <= shieldArc / 2) {
+                        // Blocked / Deflected
+                        screenShake = 5;
+                        createParticles(e.x, e.y, 10, '#00f0ff', saveData.upgrades['upg_sparks']);
+                        
+                        if(saveData.upgrades['upg_reflect']) {
+                            e.reflected = true;
+                            e.vx = -e.vx * 2;
+                            e.vy = -e.vy * 2;
+                            createFloatingText(e.x, e.y, "REFLECT!", "#ffd166");
+                        } else {
+                            enemies.splice(i, 1);
+                            score += 10;
+                            sessionKills++;
+                            createFloatingText(e.x, e.y, "+10", "#fff");
+                            
+                            if(sessionKills % 10 === 0) rewardBucks(1, "10 Kills");
+                        }
+                        updateHUD();
+                    } else {
+                        // Damage!
+                        screenShake = 20;
+                        createParticles(player.x, player.y, 30, '#ff003c');
+                        enemies.splice(i, 1);
+                        lives--;
+                        updateHUD();
+                        createFloatingText(player.x, player.y, "-1 LIFE", "#ff003c");
+
+                        if(lives <= 0) {
+                            gameOver();
+                        }
+                    }
+                }
+            }
+
+            // Update Particles
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx * actualDt * 60;
+                p.y += p.vy * actualDt * 60;
+                p.life -= p.decay * actualDt * 60;
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Update Text
+            for(let i = floatingTexts.length - 1; i >= 0; i--) {
+                let t = floatingTexts[i];
+                t.y += t.vy * actualDt * 60;
+                t.life -= 1.5 * dt;
+                if(t.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            if(screenShake > 0) {
+                screenShake -= 30 * dt;
+                if(screenShake < 0) screenShake = 0;
+            }
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            const size = 50;
+            
+            // Slow moving background grid
+            const offsetX = (performance.now() * 0.01) % size;
+            const offsetY = (performance.now() * 0.01) % size;
+
+            ctx.beginPath();
+            for(let x = -size + offsetX; x < canvas.width / window.devicePixelRatio; x += size) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height / window.devicePixelRatio);
+            }
+            for(let y = -size + offsetY; y < canvas.height / window.devicePixelRatio; y += size) {
+                ctx.moveTo(0, y); ctx.lineTo(canvas.width / window.devicePixelRatio, y);
+            }
+            ctx.stroke();
+        }
+
+        function draw() {
+            // Background
+            ctx.fillStyle = 'rgba(10, 10, 20, 0.4)'; // Trail effect
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+            ctx.save();
+            if(screenShake > 0) {
+                ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+            }
+
+            drawGrid();
+
+            // Background huge decorative gear
+            drawGear(cx, cy, Math.max(window.innerWidth, window.innerHeight)*0.6, 24, player.rotation*0.2, ['#111', '#1a1a24', '#050510']);
+
+            // Enemies
+            enemies.forEach(e => {
+                const color = e.reflected ? ['#005f73', '#0a9396', '#94d2bd'] : ['#5a0010', '#8a0020', '#ff003c'];
+                drawGear(e.x, e.y, e.radius, 8, e.rotation, color, true, e.reflected);
+            });
+
+            // Player
+            const skinColor = COLORS[saveData.currentSkin] || COLORS['default'];
+            drawGear(player.x, player.y, player.radius, 12, player.rotation, skinColor);
+
+            // Shield
+            drawShield(player.x, player.y, mouseAngle, player.radius);
+
+            // Particles
+            ctx.globalCompositeOperation = 'lighter';
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.max(0.1, p.size * p.life), 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+            ctx.globalCompositeOperation = 'source-over';
+
+            // Text
+            ctx.font = 'bold 20px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            floatingTexts.forEach(t => {
+                ctx.fillStyle = t.color;
+                ctx.globalAlpha = Math.max(0, t.life);
+                // Shadow for text
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 4;
+                ctx.fillText(t.text, t.x, t.y);
+            });
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
+
+            // Slow Mo Overlay Effect
+            if(slowMoActive) {
+                ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
+                ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+                ctx.lineWidth = 10;
+                ctx.strokeRect(0, 0, window.innerWidth, window.innerHeight);
+            }
+
+            ctx.restore();
+        }
+
+        function gameLoop(timestamp) {
+            let dt = (timestamp - lastTime) / 1000;
+            if(dt > 0.1) dt = 0.1; // Cap dt for lag spikes
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            if(currentState === STATE.PLAYING) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        /** --- UI & SHOP LOGIC --- **/
+        
+        function renderShop() {
+            const container = document.getElementById('shop-container');
+            container.innerHTML = '';
+
+            for (const [key, item] of Object.entries(SHOP_ITEMS)) {
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                
+                let isOwned = false;
+                let isEquipped = false;
+
+                if (item.type === 'skin') {
+                    isOwned = saveData.skins[key];
+                    isEquipped = saveData.currentSkin === key;
+                } else {
+                    isOwned = saveData.upgrades[key];
+                }
+
+                if (isOwned) div.classList.add('owned');
+
+                let btnHtml = '';
+                if (!isOwned) {
+                    btnHtml = `<button class="btn-buy" onclick="buyItem('${key}', ${item.cost})">Buy (${item.cost} SB)</button>`;
+                } else if (item.type === 'skin' && !isEquipped) {
+                    btnHtml = `<button class="btn-buy" onclick="equipSkin('${key}')">Equip</button>`;
+                } else if (item.type === 'skin' && isEquipped) {
+                    btnHtml = `<button class="btn-buy equipped">Equipped</button>`;
+                } else {
+                    btnHtml = `<button class="btn-buy equipped">Active</button>`;
+                }
+
+                div.innerHTML = `
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                    ${!isOwned ? `<div class="cost">${item.cost} SimgaBucks</div>` : '<div class="cost" style="color:#52b788">Owned</div>'}
+                    ${btnHtml}
+                `;
+                container.appendChild(div);
+            }
+            
+            // Default skin equip option if another is active
+            if(saveData.currentSkin !== 'default') {
+                const defDiv = document.createElement('div');
+                defDiv.className = 'shop-item owned';
+                defDiv.innerHTML = `
+                    <h3>Default Core</h3>
+                    <p>Standard issue gear.</p>
+                    <div class="cost" style="color:#52b788">Owned</div>
+                    <button class="btn-buy" onclick="equipSkin('default')">Equip</button>
+                `;
+                container.appendChild(defDiv);
+            }
+        }
+
+        window.buyItem = function(key, cost) {
+            if (pendingPurchase) return; // Wait for current transaction
+            
+            const msgId = Math.random().toString(36).substring(2);
+            pendingPurchase = { msgId: msgId, itemKey: key };
+
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: msgId
+            }, "*");
+        };
+
+        window.equipSkin = function(key) {
+            saveData.currentSkin = key;
+            saveGameData();
+            renderShop();
+        };
+
+        // Event Listeners for Menus
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        
+        document.getElementById('btn-open-shop').addEventListener('click', () => {
+            document.getElementById('main-menu').classList.remove('active');
+            document.getElementById('shop-menu').classList.add('active');
+        });
+        
+        document.getElementById('btn-go-shop').addEventListener('click', () => {
+            document.getElementById('game-over-menu').classList.remove('active');
+            document.getElementById('shop-menu').classList.add('active');
+        });
+
+        document.getElementById('btn-close-shop').addEventListener('click', () => {
+            document.getElementById('shop-menu').classList.remove('active');
+            if(currentState === STATE.GAMEOVER) {
+                document.getElementById('game-over-menu').classList.add('active');
+            } else {
+                document.getElementById('main-menu').classList.add('active');
+            }
+        });
+
+        // Initialize background draw loop for menus
+        function menuLoop() {
+            if(currentState !== STATE.PLAYING) {
+                player.rotation += 0.005;
+                draw();
+            }
+            requestAnimationFrame(menuLoop);
+        }
+        requestAnimationFrame(menuLoop);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ice Drift</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        :root {
+            --primary: #2980b9;
+            --secondary: #e74c3c;
+            --bg-light: #e0f2f1;
+            --ice-bg: #f4f9f9;
+            --panel-bg: rgba(255, 255, 255, 0.9);
+            --text-dark: #2c3e50;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, transparent 10%, rgba(200, 230, 240, 0.8) 100%);
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Typography & UI Elements */
+        h1 {
+            font-size: 4rem;
+            margin: 0 0 10px 0;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 2px 2px 0px #fff;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 0 0 20px 0;
+            color: var(--primary);
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #555;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding: 15px 40px;
+            margin: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover {
+            background: #3498db;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-secondary {
+            background: #ecf0f1;
+            color: var(--text-dark);
+            border: 2px solid #bdc3c7;
+        }
+
+        .btn-secondary:hover {
+            background: #fff;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .score-box {
+            background: var(--panel-bg);
+            border: 2px solid #bdc3c7;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            backdrop-filter: blur(5px);
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .score-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .multiplier {
+            font-size: 2.5rem;
+            color: var(--secondary);
+            font-weight: 900;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.1s;
+            transform: scale(1);
+            text-shadow: 1px 1px 0px #fff;
+        }
+
+        .multiplier.active {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* Touch Controls */
+        #touch-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 20px;
+            pointer-events: none;
+        }
+
+        .touch-joystick {
+            display: flex;
+            gap: 15px;
+        }
+
+        .touch-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(0, 0, 0, 0.15);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            color: rgba(0, 0, 0, 0.7);
+            font-size: 1.8rem;
+            backdrop-filter: blur(5px);
+        }
+
+        .touch-btn:active {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Shop Layout */
+        .shop-container {
+            display: flex;
+            flex-direction: column;
+            width: 90%;
+            max-width: 800px;
+            height: 85%;
+            background: var(--panel-bg);
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+
+        .shop-category {
+            margin-bottom: 30px;
+        }
+
+        .shop-category h3 {
+            color: var(--text-dark);
+            margin-bottom: 15px;
+            font-weight: 900;
+        }
+
+        .shop-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .shop-item {
+            background: #fff;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .shop-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .shop-item.owned {
+            border-color: #2ecc71;
+            background: #f0fdf4;
+        }
+
+        .shop-item.equipped {
+            border-color: #f1c40f;
+            background: #fffdeb;
+        }
+
+        .item-name {
+            font-size: 1.1rem;
+            font-weight: 900;
+            margin-bottom: 5px;
+        }
+
+        .item-desc {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+            height: 35px;
+        }
+
+        .buy-btn {
+            background: #fff;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .buy-btn:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .buy-btn.equipped-btn {
+            background: #f1c40f;
+            color: #000;
+            border-color: #f1c40f;
+        }
+
+        .buy-btn.owned-btn {
+            background: #2ecc71;
+            color: #fff;
+            border-color: #2ecc71;
+        }
+
+        /* Toast Notification */
+        #toast {
+            position: fixed;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2ecc71;
+            color: #fff;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-weight: 900;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+            transition: top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        #toast.show {
+            top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+            .btn { padding: 10px 20px; font-size: 1.2rem; }
+            .touch-joystick { display: flex; }
+        }
+        @media (min-width: 601px) {
+            .touch-joystick { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="screen">
+        <h1>ICE DRIFT</h1>
+        <p>Winter physics drifting. Slide to survive.</p>
+        <div style="margin-bottom: 20px; font-weight: bold;">High Score: <span id="menu-highscore" style="color: var(--primary);">0</span></div>
+        <button class="btn" onclick="game.startGame()">Play Now</button>
+        <button class="btn btn-secondary" onclick="game.showShop()">Garage</button>
+        <p style="margin-top: 20px; font-size: 0.9rem;">Controls: W/S/A/D or Arrows / Touch Controls</p>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="screen hidden" style="background: transparent;">
+        <div class="hud-top">
+            <div class="score-box">
+                <div class="score-label">Score</div>
+                <div class="score-value" id="hud-score">0</div>
+            </div>
+            <div class="multiplier" id="hud-multiplier">x1.0</div>
+        </div>
+        <div id="touch-controls">
+            <div class="touch-joystick left-joy">
+                <div class="touch-btn" id="btn-left">◄</div>
+                <div class="touch-btn" id="btn-right">►</div>
+            </div>
+            <div class="touch-joystick right-joy">
+                <div class="touch-btn" id="btn-brake" style="font-size: 1rem; font-weight: bold;">BRK</div>
+                <div class="touch-btn" id="btn-gas" style="font-size: 1rem; font-weight: bold;">GAS</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over" class="screen hidden">
+        <h1 style="color: var(--secondary); text-shadow: none;">CRASHED</h1>
+        <div class="score-box" style="margin-bottom: 30px; text-align: center; background: #fff;">
+            <div class="score-label">Final Score</div>
+            <div class="score-value" id="go-score">0</div>
+            <div style="color: #7f8c8d; margin-top: 10px; font-weight: bold;">Best: <span id="go-highscore">0</span></div>
+        </div>
+        <button class="btn" onclick="game.startGame()">Play Again</button>
+        <button class="btn btn-secondary" onclick="game.showMenu()">Main Menu</button>
+    </div>
+
+    <!-- Shop -->
+    <div id="shop-menu" class="screen hidden">
+        <div class="shop-container">
+            <div class="shop-header">
+                <h2>GARAGE & UPGRADES</h2>
+                <button class="btn btn-secondary" style="font-size: 1rem; padding: 8px 20px;" onclick="game.showMenu()">Back</button>
+            </div>
+            
+            <div id="shop-content">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast">+2 SimgaBucks!</div>
+</div>
+
+<script>
+/**
+ * ICE DRIFT
+ * A realistic-lite physics drifting game on ice.
+ */
+
+const GAME_ID = "ice";
+
+// --- API INTEGRATION ---
+const API = {
+    addSimgaBucks: (amount) => {
+        window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+        UI.showToast(`+${amount} SimgaBucks!`);
+    },
+    spendSimgaBucks: (amount, id) => {
+        const msgId = "spend_" + id + "_" + Date.now();
+        window.parent.postMessage({ type: "spendSimgaBucks", amount: amount, msgId: msgId }, "*");
+        return msgId;
+    },
+    saveData: (data) => {
+        window.parent.postMessage({ type: "saveData", gameId: GAME_ID, data: data }, "*");
+    },
+    loadData: () => {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+        return loadMsgId;
+    }
+};
+
+// --- DATA SYSTEM ---
+let SaveData = {
+    highScore: 0,
+    skins: ['#e74c3c'], // Hex colors
+    currentSkin: '#e74c3c',
+    smokes: ['#ffffff'],
+    currentSmoke: '#ffffff',
+    multLevel: 1
+};
+
+let currentLoadId = null;
+let pendingPurchases = {};
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+
+    if (data.type === "loadResponse" && data.msgId === currentLoadId) {
+        if (data.data) {
+            SaveData = { ...SaveData, ...data.data };
+            UI.updateMenuHighscore();
+        }
+    }
+
+    if (data.type === "spendResponse") {
+        const pending = pendingPurchases[data.msgId];
+        if (pending) {
+            if (data.success) {
+                game.applyPurchase(pending.item);
+            } else {
+                alert("Transaction failed! Not enough SimgaBucks.");
+            }
+            delete pendingPurchases[data.msgId];
+        }
+    }
+});
+
+// --- SHOP CONFIG ---
+const SHOP_ITEMS = [
+    { id: 'skin_red', type: 'skin', name: 'Cherry Red', desc: 'Standard sporty red paint.', cost: 20, value: '#e74c3c' },
+    { id: 'skin_blue', type: 'skin', name: 'Ocean Blue', desc: 'Deep blue car paint.', cost: 50, value: '#2980b9' },
+    { id: 'skin_black', type: 'skin', name: 'Midnight Black', desc: 'Sleek dark paint job.', cost: 100, value: '#2c3e50' },
+    
+    { id: 'smoke_light', type: 'smoke', name: 'Light Snow Dust', desc: 'Standard snow kickup.', cost: 30, value: '#ffffff' },
+    { id: 'smoke_heavy', type: 'smoke', name: 'Heavy Blizzard', desc: 'Massive white snow trails.', cost: 80, value: '#e0f7fa' },
+    
+    { id: 'mult_2', type: 'mult', name: 'Spiked Tires v1', desc: 'Increases score multiplier rate.', cost: 25, level: 2 },
+    { id: 'mult_3', type: 'mult', name: 'Spiked Tires v2', desc: 'Further increases multiplier.', cost: 60, level: 3 },
+    { id: 'mult_4', type: 'mult', name: 'Pro Rally Setup', desc: 'Maximum drift points.', cost: 120, level: 4 }
+];
+
+// --- MATH & UTILS ---
+const MathUtils = {
+    clamp: (val, min, max) => Math.max(min, Math.min(max, val)),
+    rand: (min, max) => Math.random() * (max - min) + min,
+    angleDiff: (a, b) => {
+        let d = b - a;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        return d;
+    }
+};
+
+// --- CLASSES ---
+
+class Particle {
+    constructor(x, y, vx, vy, color, life, size) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        this.size = size;
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        // Friction for snow particles
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+        this.life -= dt;
+    }
+    draw(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class SkidMark {
+    constructor(x, y, size) {
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.life = 3.0; // Persists for a few seconds
+        this.maxLife = 3.0;
+    }
+    update(dt) {
+        this.life -= dt;
+    }
+    draw(ctx) {
+        const alpha = Math.max(0, (this.life / this.maxLife) * 0.15); // Very faint
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class Pickup {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 15;
+        this.angle = 0;
+        this.active = true;
+        this.hover = 0;
+    }
+    update(dt) {
+        this.angle += 3 * dt;
+        this.hover += 5 * dt;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        let yOffset = Math.sin(this.hover) * 5;
+        ctx.translate(this.x, this.y + yOffset);
+        
+        // Draw a shiny coin/medal
+        ctx.fillStyle = '#f1c40f'; // Gold
+        ctx.strokeStyle = '#d35400';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("S", 0, 0);
+        
+        ctx.restore();
+    }
+}
+
+class WaterSpill {
+    constructor(x, y, radius) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+    }
+    draw(ctx) {
+        let grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+        grad.addColorStop(0, 'rgba(150, 200, 230, 0.4)');
+        grad.addColorStop(0.8, 'rgba(150, 200, 230, 0.2)');
+        grad.addColorStop(1, 'rgba(150, 200, 230, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Car {
+    constructor() {
+        this.reset();
+        this.width = 24;
+        this.length = 46;
+    }
+
+    reset() {
+        this.x = 0;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.angle = -Math.PI / 2;
+        this.speed = 0;
+        this.drifting = false;
+        this.driftScore = 0;
+    }
+
+    update(dt, input, onWater) {
+        // Dynamic physics based on surface
+        const enginePower = onWater ? 550 : 700; 
+        const drag = onWater ? 0.999 : 0.995; // Extremely frictionless on water spill
+        const grip = onWater ? 0.1 : 1.2;  // Terrible steering grip on water
+        const turnSpeed = onWater ? 2.0 : 3.5;
+
+        let throttle = 0.0;
+        if (input.up) {
+            throttle = 1.0;
+        } else if (input.down) {
+            throttle = -0.6; // Reverse / Brake
+        }
+
+        let turnInput = 0;
+        if (input.left) turnInput -= 1;
+        if (input.right) turnInput += 1;
+        
+        this.angle += turnInput * turnSpeed * dt * Math.min(this.speed / 150, 1.2);
+
+        let ax = Math.cos(this.angle) * enginePower * throttle;
+        let ay = Math.sin(this.angle) * enginePower * throttle;
+
+        this.vx += ax * dt;
+        this.vy += ay * dt;
+
+        // Apply natural drag; slightly increase drag if not pressing gas to help stop
+        let currentDrag = drag;
+        if (throttle === 0 && this.speed > 5) {
+            currentDrag -= 0.005; // Slightly faster deceleration when coasting
+        }
+
+        this.vx *= Math.pow(currentDrag, dt * 60);
+        this.vy *= Math.pow(currentDrag, dt * 60);
+
+        this.speed = Math.hypot(this.vx, this.vy);
+        
+        if (this.speed > 10) {
+            let targetVx = Math.cos(this.angle) * this.speed;
+            let targetVy = Math.sin(this.angle) * this.speed;
+            
+            this.vx += (targetVx - this.vx) * (grip * dt);
+            this.vy += (targetVy - this.vy) * (grip * dt);
+        }
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        let moveAngle = Math.atan2(this.vy, this.vx);
+        let slipAngle = Math.abs(MathUtils.angleDiff(this.angle, moveAngle));
+        
+        if (slipAngle > 0.35 && this.speed > 100) {
+            this.drifting = true;
+            this.driftScore = this.speed * slipAngle;
+        } else {
+            this.drifting = false;
+            this.driftScore = 0;
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        // Draw Car Body
+        ctx.fillStyle = SaveData.currentSkin;
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 2;
+        
+        // Main rectangle body
+        ctx.beginPath();
+        ctx.roundRect(-this.length/2, -this.width/2, this.length, this.width, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Windows
+        ctx.fillStyle = '#34495e';
+        // Windshield
+        ctx.beginPath();
+        ctx.roundRect(-2, -this.width/2 + 2, 12, this.width - 4, 2);
+        ctx.fill();
+        // Rear window
+        ctx.beginPath();
+        ctx.roundRect(-this.length/2 + 6, -this.width/2 + 3, 8, this.width - 6, 2);
+        ctx.fill();
+
+        // Headlights
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath();
+        ctx.arc(this.length/2 - 2, -this.width/2 + 4, 3, 0, Math.PI*2);
+        ctx.arc(this.length/2 - 2, this.width/2 - 4, 3, 0, Math.PI*2);
+        ctx.fill();
+
+        // Light beams if moving
+        if (this.speed > 10) {
+            ctx.fillStyle = 'rgba(255, 255, 200, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(this.length/2, -this.width/2 + 4);
+            ctx.lineTo(this.length/2 + 100, -this.width/2 - 30);
+            ctx.lineTo(this.length/2 + 100, -this.width/2 + 40);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(this.length/2, this.width/2 - 4);
+            ctx.lineTo(this.length/2 + 100, this.width/2 - 40);
+            ctx.lineTo(this.length/2 + 100, this.width/2 + 30);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
+// --- GAME MANAGER ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const UI = {
+    screens: {
+        menu: document.getElementById('main-menu'),
+        hud: document.getElementById('hud'),
+        gameOver: document.getElementById('game-over'),
+        shop: document.getElementById('shop-menu')
+    },
+    els: {
+        hudScore: document.getElementById('hud-score'),
+        hudMult: document.getElementById('hud-multiplier'),
+        goScore: document.getElementById('go-score'),
+        goHigh: document.getElementById('go-highscore'),
+        menuHigh: document.getElementById('menu-highscore'),
+        toast: document.getElementById('toast'),
+        shopContent: document.getElementById('shop-content')
+    },
+    hideAll: () => {
+        Object.values(UI.screens).forEach(s => s.classList.add('hidden'));
+    },
+    show: (id) => {
+        UI.hideAll();
+        UI.screens[id].classList.remove('hidden');
+    },
+    updateScore: (score, mult) => {
+        UI.els.hudScore.innerText = Math.floor(score).toLocaleString();
+        if (mult > 1) {
+            UI.els.hudMult.innerText = `x${mult.toFixed(1)}`;
+            UI.els.hudMult.classList.add('active');
+        } else {
+            UI.els.hudMult.classList.remove('active');
+        }
+    },
+    updateMenuHighscore: () => {
+        UI.els.menuHigh.innerText = Math.floor(SaveData.highScore).toLocaleString();
+    },
+    showToast: (msg) => {
+        UI.els.toast.innerText = msg;
+        UI.els.toast.classList.add('show');
+        setTimeout(() => UI.els.toast.classList.remove('show'), 2000);
+    },
+    renderShop: () => {
+        let html = '';
+        const categories = { 'skin': 'CAR SKINS', 'smoke': 'TIRE EFFECTS', 'mult': 'PERFORMANCE' };
+        
+        for (let catKey in categories) {
+            html += `<div class="shop-category"><h3>${categories[catKey]}</h3><div class="shop-items">`;
+            
+            SHOP_ITEMS.filter(i => i.type === catKey).forEach(item => {
+                let status = 'buy';
+                let btnText = `${item.cost} SB`;
+                let btnClass = 'buy-btn';
+                
+                if (item.type === 'skin') {
+                    if (SaveData.skins.includes(item.value)) status = 'owned';
+                    if (SaveData.currentSkin === item.value) status = 'equipped';
+                } else if (item.type === 'smoke') {
+                    if (SaveData.smokes.includes(item.value)) status = 'owned';
+                    if (SaveData.currentSmoke === item.value) status = 'equipped';
+                } else if (item.type === 'mult') {
+                    if (SaveData.multLevel >= item.level) status = 'owned';
+                }
+
+                if (status === 'owned') { btnText = 'EQUIP'; btnClass += ' owned-btn'; }
+                if (status === 'equipped') { btnText = 'EQUIPPED'; btnClass += ' equipped-btn'; }
+                if (item.type === 'mult' && status === 'owned') { btnText = 'INSTALLED'; btnClass += ' equipped-btn'; }
+
+                let action = status === 'buy' ? `game.buyItem('${item.id}')` : `game.equipItem('${item.id}')`;
+                if (item.type === 'mult' && status !== 'buy') action = '';
+
+                html += `
+                    <div class="shop-item ${status === 'equipped' ? 'equipped' : ''} ${status === 'owned' ? 'owned' : ''}">
+                        <div class="item-name" style="color: ${item.type === 'skin' ? item.value : 'var(--text-dark)'}">${item.name}</div>
+                        <div class="item-desc">${item.desc}</div>
+                        <button class="${btnClass}" onclick="${action}" ${item.type === 'mult' && status === 'owned' ? 'disabled' : ''}>${btnText}</button>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+        }
+        UI.els.shopContent.innerHTML = html;
+    }
+};
+
+const game = {
+    state: 'MENU',
+    lastTime: 0,
+    car: new Car(),
+    particles: [],
+    skidmarks: [],
+    pickups: [],
+    spills: [],
+    iceScratches: [],
+    input: { left: false, right: false, up: false, down: false },
+    camera: { x: 0, y: 0 },
+    
+    score: 0,
+    multiplier: 1.0,
+    arenaRadius: 1500,
+    nextPickupTime: 0,
+    scoreMilestone: 5000,
+    
+    init: () => {
+        window.addEventListener('resize', game.resize);
+        game.resize();
+        
+        currentLoadId = API.loadData();
+        
+        window.addEventListener('keydown', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') game.input.left = true;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') game.input.right = true;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') game.input.up = true;
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') game.input.down = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') game.input.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') game.input.right = false;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') game.input.up = false;
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') game.input.down = false;
+        });
+
+        const bindTouch = (el, key) => {
+            el.addEventListener('touchstart', e => { e.preventDefault(); game.input[key] = true; });
+            el.addEventListener('touchend', e => { e.preventDefault(); game.input[key] = false; });
+        };
+        bindTouch(document.getElementById('btn-left'), 'left');
+        bindTouch(document.getElementById('btn-right'), 'right');
+        bindTouch(document.getElementById('btn-gas'), 'up');
+        bindTouch(document.getElementById('btn-brake'), 'down');
+
+        // Pre-generate Ice Scratches for texture
+        for(let i=0; i<500; i++) {
+            let r = MathUtils.rand(0, game.arenaRadius);
+            let a = MathUtils.rand(0, Math.PI * 2);
+            game.iceScratches.push({
+                x: Math.cos(a) * r,
+                y: Math.sin(a) * r,
+                angle: MathUtils.rand(0, Math.PI * 2),
+                length: MathUtils.rand(10, 80),
+                opacity: MathUtils.rand(0.05, 0.15)
+            });
+        }
+
+        requestAnimationFrame(game.loop);
+    },
+    
+    resize: () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    },
+
+    startGame: () => {
+        game.state = 'PLAYING';
+        UI.show('hud');
+        game.car.reset();
+        game.particles = [];
+        game.skidmarks = [];
+        game.pickups = [];
+        game.spills = [];
+        game.score = 0;
+        game.multiplier = 1.0;
+        game.nextPickupTime = performance.now() + 15000;
+        game.scoreMilestone = 5000;
+        game.lastTime = performance.now();
+
+        // Generate Water Spills
+        for(let i=0; i<12; i++) {
+            let radius = MathUtils.rand(100, 350);
+            let dist = MathUtils.rand(100, game.arenaRadius - radius - 50);
+            let angle = MathUtils.rand(0, Math.PI * 2);
+            game.spills.push(new WaterSpill(
+                Math.cos(angle) * dist,
+                Math.sin(angle) * dist,
+                radius
+            ));
+        }
+    },
+
+    endGame: () => {
+        game.state = 'GAMEOVER';
+        UI.show('gameOver');
+        
+        if (game.score > SaveData.highScore) SaveData.highScore = game.score;
+        
+        UI.els.goScore.innerText = Math.floor(game.score).toLocaleString();
+        UI.els.goHigh.innerText = Math.floor(SaveData.highScore).toLocaleString();
+        UI.updateMenuHighscore();
+        API.saveData(SaveData);
+    },
+
+    showMenu: () => {
+        game.state = 'MENU';
+        UI.show('menu');
+        UI.updateMenuHighscore();
+    },
+
+    showShop: () => {
+        game.state = 'SHOP';
+        UI.renderShop();
+        UI.show('shop');
+    },
+
+    buyItem: (id) => {
+        const item = SHOP_ITEMS.find(i => i.id === id);
+        if (!item) return;
+        const msgId = API.spendSimgaBucks(item.cost, item.id);
+        pendingPurchases[msgId] = { item: item, msgId: msgId };
+    },
+
+    applyPurchase: (item) => {
+        if (item.type === 'skin') {
+            SaveData.skins.push(item.value);
+            SaveData.currentSkin = item.value;
+        } else if (item.type === 'smoke') {
+            SaveData.smokes.push(item.value);
+            SaveData.currentSmoke = item.value;
+        } else if (item.type === 'mult') {
+            SaveData.multLevel = item.level;
+        }
+        API.saveData(SaveData);
+        UI.renderShop();
+        UI.showToast(`${item.name} Acquired!`);
+    },
+
+    equipItem: (id) => {
+        const item = SHOP_ITEMS.find(i => i.id === id);
+        if (item.type === 'skin') SaveData.currentSkin = item.value;
+        if (item.type === 'smoke') SaveData.currentSmoke = item.value;
+        API.saveData(SaveData);
+        UI.renderShop();
+    },
+
+    loop: (time) => {
+        const dt = Math.min((time - game.lastTime) / 1000, 0.1);
+        game.lastTime = time;
+
+        if (game.state === 'PLAYING') {
+            game.update(dt, time);
+        } else if (game.state === 'MENU') {
+            game.camera.x = Math.cos(time / 5000) * 300;
+            game.camera.y = Math.sin(time / 5000) * 300;
+        }
+
+        game.draw();
+        requestAnimationFrame(game.loop);
+    },
+
+    update: (dt, time) => {
+        // Check if on water spill
+        let onWater = false;
+        for (let spill of game.spills) {
+            if (Math.hypot(game.car.x - spill.x, game.car.y - spill.y) < spill.radius) {
+                onWater = true;
+                break;
+            }
+        }
+
+        game.car.update(dt, game.input, onWater);
+
+        const multGrowthRate = 0.5 * (1 + (SaveData.multLevel * 0.2)); 
+        if (game.car.drifting) {
+            game.multiplier += multGrowthRate * dt;
+            game.score += game.car.driftScore * game.multiplier * dt * 2;
+            
+            // Skid marks
+            let backX = game.car.x - Math.cos(game.car.angle) * (game.car.length/2);
+            let backY = game.car.y - Math.sin(game.car.angle) * (game.car.length/2);
+            
+            // Only add skid marks occasionally to save memory (less visible on water)
+            if (Math.random() < (onWater ? 0.05 : 0.3)) {
+                game.skidmarks.push(new SkidMark(
+                    backX + MathUtils.rand(-5, 5), 
+                    backY + MathUtils.rand(-5, 5),
+                    MathUtils.rand(3, 6)
+                ));
+            }
+            
+            // Snow spray (or splash if on water)
+            if (Math.random() < 0.6) {
+                let sprayAmount = SaveData.currentSmoke === '#e0f7fa' ? 3 : 1; 
+                let particleColor = onWater ? 'rgba(150, 200, 230, 0.8)' : SaveData.currentSmoke;
+
+                for(let i=0; i<sprayAmount; i++) {
+                    game.particles.push(new Particle(
+                        backX + MathUtils.rand(-8, 8), backY + MathUtils.rand(-8, 8),
+                        game.car.vx * 0.1 + MathUtils.rand(-50, 50),
+                        game.car.vy * 0.1 + MathUtils.rand(-50, 50),
+                        particleColor, 0.5 + Math.random(), MathUtils.rand(2, 5)
+                    ));
+                }
+            }
+        } else {
+            game.multiplier -= 2.0 * dt;
+        }
+        game.multiplier = MathUtils.clamp(game.multiplier, 1.0, 10.0 + SaveData.multLevel);
+
+        game.score += game.car.speed * dt * 0.1;
+        UI.updateScore(game.score, game.multiplier);
+
+        if (game.score > game.scoreMilestone) {
+            API.addSimgaBucks(1);
+            game.scoreMilestone += 5000;
+            
+            for(let i=0; i<20; i++) {
+                game.particles.push(new Particle(
+                    game.car.x, game.car.y,
+                    MathUtils.rand(-150, 150), MathUtils.rand(-150, 150),
+                    '#f1c40f', 1.0, MathUtils.rand(3, 6)
+                ));
+            }
+        }
+
+        if (time > game.nextPickupTime) {
+            let spawnRadius = MathUtils.rand(200, game.arenaRadius - 200);
+            let spawnAngle = MathUtils.rand(0, Math.PI * 2);
+            game.pickups.push(new Pickup(
+                Math.cos(spawnAngle) * spawnRadius,
+                Math.sin(spawnAngle) * spawnRadius
+            ));
+            game.nextPickupTime = time + MathUtils.rand(15000, 25000);
+        }
+
+        game.pickups.forEach(p => {
+            p.update(dt);
+            let dist = Math.hypot(p.x - game.car.x, p.y - game.car.y);
+            if (p.active && dist < p.radius + game.car.width) {
+                p.active = false;
+                API.addSimgaBucks(2);
+                for(let i=0; i<15; i++) {
+                    game.particles.push(new Particle(
+                        p.x, p.y, MathUtils.rand(-100, 100), MathUtils.rand(-100, 100),
+                        '#f1c40f', 0.8, MathUtils.rand(2, 5)
+                    ));
+                }
+            }
+        });
+        game.pickups = game.pickups.filter(p => p.active);
+
+        game.particles.forEach(p => p.update(dt));
+        game.particles = game.particles.filter(p => p.life > 0);
+        
+        game.skidmarks.forEach(s => s.update(dt));
+        game.skidmarks = game.skidmarks.filter(s => s.life > 0);
+
+        game.camera.x += (game.car.x - game.camera.x) * 5 * dt;
+        game.camera.y += (game.car.y - game.camera.y) * 5 * dt;
+
+        let distFromCenter = Math.hypot(game.car.x, game.car.y);
+        if (distFromCenter > game.arenaRadius) {
+            game.endGame();
+            for(let i=0; i<40; i++) {
+                game.particles.push(new Particle(
+                    game.car.x, game.car.y,
+                    MathUtils.rand(-300, 300), MathUtils.rand(-300, 300),
+                    '#e74c3c', 1.5, MathUtils.rand(4, 10)
+                ));
+            }
+        }
+    },
+
+    draw: () => {
+        // Clear with background color (outside arena)
+        ctx.fillStyle = '#ecf0f1';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        
+        if (game.state === 'PLAYING' && game.multiplier > 2) {
+            let intensity = (game.multiplier - 2) * 1.5;
+            ctx.translate(MathUtils.rand(-intensity, intensity), MathUtils.rand(-intensity, intensity));
+        }
+
+        // Apply Zoom here
+        const zoomLevel = 0.55; 
+        ctx.scale(zoomLevel, zoomLevel);
+
+        ctx.translate(-game.camera.x, -game.camera.y);
+
+        // Draw Ice Arena Base (Gradient for realistic ice)
+        let iceGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, game.arenaRadius);
+        iceGrad.addColorStop(0, '#ffffff');
+        iceGrad.addColorStop(0.7, '#e8f4f8');
+        iceGrad.addColorStop(1, '#dceef2');
+        ctx.fillStyle = iceGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, game.arenaRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Ice Texture (Scratches)
+        ctx.lineWidth = 1;
+        game.iceScratches.forEach(s => {
+            ctx.strokeStyle = `rgba(180, 210, 220, ${s.opacity})`;
+            ctx.beginPath();
+            ctx.moveTo(s.x, s.y);
+            ctx.lineTo(s.x + Math.cos(s.angle) * s.length, s.y + Math.sin(s.angle) * s.length);
+            ctx.stroke();
+        });
+        
+        // Draw Arena Boundary (Snow bank)
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 20;
+        ctx.beginPath();
+        ctx.arc(0, 0, game.arenaRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Draw Water Spills
+        game.spills.forEach(s => s.draw(ctx));
+
+        // Draw Skid Marks
+        game.skidmarks.forEach(s => s.draw(ctx));
+
+        // Draw Pickups
+        game.pickups.forEach(p => p.draw(ctx));
+
+        // Draw Car
+        if (game.state !== 'GAMEOVER') {
+            game.car.draw(ctx);
+        }
+
+        // Draw Particles (Snow / Splash)
+        game.particles.forEach(p => p.draw(ctx));
+
+        ctx.restore();
+    }
+};
+
+window.onload = game.init;
+
+</script>
+</body>
+</html>

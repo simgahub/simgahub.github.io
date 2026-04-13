@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Door Dash Puzzle</title>
+    <style>
+        :root {
+            --primary: #0ff;
+            --bg-dark: #050510;
+            --panel-bg: rgba(10, 15, 30, 0.85);
+            --text: #e0f0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas if no panel is blocking */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            background: radial-gradient(circle, transparent 0%, rgba(0,0,0,0.8) 100%);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 3.5rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px var(--primary), 0 0 30px #00aaff;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: var(--text);
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(0, 100, 255, 0.2));
+            border: 2px solid var(--primary);
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3) inset, 0 0 10px rgba(0, 255, 255, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.4), rgba(0, 100, 255, 0.4));
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6) inset, 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+            text-shadow: 0 0 10px white;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: white;
+            font-size: 1.2rem;
+            text-shadow: 0 2px 4px black;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Shop Screen */
+        .shop-container {
+            background: var(--panel-bg);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85%;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(0, 200, 255, 0.2);
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .shop-header h2 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 2rem;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .shop-item:hover {
+            border-color: rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .item-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            box-shadow: 0 0 10px inset rgba(0,255,255,0.2);
+        }
+
+        .item-name {
+            color: white;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .item-desc {
+            color: #aaa;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+
+        .buy-btn {
+            background: transparent;
+            border: 1px solid #ffd700;
+            color: #ffd700;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .buy-btn:hover:not(:disabled) {
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .buy-btn.equipped {
+            border-color: #00ff00;
+            color: #00ff00;
+            cursor: default;
+        }
+        
+        .buy-btn.equip {
+            border-color: #0ff;
+            color: #0ff;
+        }
+        .buy-btn.equip:hover {
+            background: rgba(0, 255, 255, 0.2);
+        }
+
+        .buy-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #555;
+            color: #888;
+        }
+
+        .close-shop {
+            align-self: center;
+            margin-top: 20px;
+            font-size: 1rem;
+            padding: 10px 30px;
+        }
+
+        /* Messages */
+        #notification-container {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .notification {
+            background: rgba(0, 255, 100, 0.2);
+            border: 1px solid #00ff64;
+            color: #e0ffe0;
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ff64;
+            animation: slideUpFade 2.5s ease-out forwards;
+            box-shadow: 0 0 15px rgba(0, 255, 100, 0.4);
+        }
+
+        .notification.error {
+            background: rgba(255, 50, 50, 0.2);
+            border-color: #ff3232;
+            color: #ffe0e0;
+            text-shadow: 0 0 5px #ff3232;
+            box-shadow: 0 0 15px rgba(255, 50, 50, 0.4);
+        }
+
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; transform: translateY(-10px); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Loading Overlay */
+        #loading {
+            background: var(--bg-dark);
+            z-index: 999;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0,255,255,0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+            .hud-box { padding: 5px 10px; font-size: 1rem; }
+            .shop-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+            .btn { padding: 10px 20px; font-size: 1.2rem; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="loading" class="screen active">
+            <div class="spinner"></div>
+            <p style="color: var(--primary); font-weight: bold; letter-spacing: 2px;">SYNCING SYSTEM...</p>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen">
+            <h1>Door Dash</h1>
+            <p class="subtitle">Choose the right path. Avoid the reset.</p>
+            <button class="btn" id="btn-play">Enter The Dash</button>
+            <button class="btn" id="btn-shop">Upgrades & Skins</button>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-box" id="hud-level">Level: 1</div>
+            <div class="hud-box" id="hud-room">Room: 1/3</div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen">
+            <div class="shop-container">
+                <div class="shop-header">
+                    <h2>Neural Exchange</h2>
+                    <div id="shop-status" style="color: #aaa; font-size: 0.9rem;"></div>
+                </div>
+                <div class="shop-grid" id="shop-items-container">
+                    <!-- Injected via JS -->
+                </div>
+                <button class="btn close-shop" id="btn-close-shop">Return</button>
+            </div>
+        </div>
+
+        <!-- Game Over / Level Complete (Handled mostly in canvas, but overlay for actions if needed) -->
+        <div id="notification-container"></div>
+
+    </div>
+</div>
+
+<script>
+    // ============================================================================
+    // PLATFORM CONSTANTS & STATE
+    // ============================================================================
+    const GAME_ID = "doordash_puzzle_v1";
+    
+    let saveData = {
+        highScore: 0,
+        highestLevel: 1,
+        skins: { default: true, mystic: false, golden: false },
+        themes: { void: true, crimson: false, grid: false },
+        upgrades: { hint: false, retry: false },
+        activeSkin: 'default',
+        activeTheme: 'void'
+    };
+
+    const SHOP_CATALOG = [
+        { id: 'mystic', type: 'skin', name: 'Mystic Arch', desc: 'Arcane stone and glowing runes.', cost: 20, icon: '🔮' },
+        { id: 'golden', type: 'skin', name: 'Golden Vault', desc: 'Heavy, luxurious solid gold.', cost: 40, icon: '🛡️' },
+        { id: 'crimson', type: 'theme', name: 'Crimson Hell', desc: 'Dark flames and red embers.', cost: 15, icon: '🔥' },
+        { id: 'grid', type: 'theme', name: 'Cyber Grid', desc: 'A neon dystopia matrix.', cost: 25, icon: '🌐' },
+        { id: 'hint', type: 'upgrade', name: 'Door Whisperer', desc: '20% chance to highlight a wrong door in red.', cost: 35, icon: '👁️' },
+        { id: 'retry', type: 'upgrade', name: 'Second Chance', desc: 'One free mistake per level saves you from resetting.', cost: 60, icon: '⏳' }
+    ];
+
+    let pendingPurchase = null;
+    let hasEarnedFirstReward = false; // Economy rule check
+
+    // ============================================================================
+    // PLATFORM COMMUNICATION
+    // ============================================================================
+    
+    function sendSaveData() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    function requestLoadData() {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+        
+        // Fallback if platform doesn't respond within 2 seconds
+        setTimeout(() => {
+            if (currentState === STATES.LOADING) {
+                console.log("Load timeout, using default save.");
+                initGameUI();
+            }
+        }, 2000);
+
+        return loadMsgId;
+    }
+
+    function addSimgaBucks(amount, reason) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        showNotification(`+${amount} SimgaBucks! ${reason}`);
+    }
+
+    function requestPurchase(itemId, cost) {
+        const msgId = Math.random().toString(36);
+        pendingPurchase = { id: itemId, cost: cost, msgId: msgId };
+        
+        // Disable UI momentarily
+        document.getElementById('shop-status').innerText = "Processing transaction...";
+        
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+
+        // Fallback timeout in case platform is unresponsive
+        setTimeout(() => {
+            if (pendingPurchase && pendingPurchase.msgId === msgId) {
+                pendingPurchase = null;
+                document.getElementById('shop-status').innerText = "Transaction timed out.";
+                renderShop();
+            }
+        }, 3000);
+    }
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse") {
+            if (data.data) {
+                // Merge loaded data with defaults
+                saveData = { ...saveData, ...data.data };
+                // Ensure nested objects aren't overwritten completely if missing properties
+                saveData.skins = { ...{ default: true, mystic: false, golden: false }, ...(data.data.skins || {}) };
+                saveData.themes = { ...{ void: true, crimson: false, grid: false }, ...(data.data.themes || {}) };
+                saveData.upgrades = { ...{ hint: false, retry: false }, ...(data.data.upgrades || {}) };
+            }
+            if (currentState === STATES.LOADING) {
+                initGameUI();
+            }
+        }
+
+        if (data.type === "spendResponse" && pendingPurchase) {
+            if (data.success) {
+                applyPurchase(pendingPurchase.id);
+                document.getElementById('shop-status').innerText = "Purchase successful!";
+            } else {
+                showNotification("Not enough SimgaBucks!", true);
+                document.getElementById('shop-status').innerText = "Transaction failed.";
+            }
+            pendingPurchase = null;
+            renderShop();
+            sendSaveData();
+        }
+    });
+
+    function applyPurchase(id) {
+        const item = SHOP_CATALOG.find(i => i.id === id);
+        if (!item) return;
+
+        if (item.type === 'skin') saveData.skins[id] = true;
+        if (item.type === 'theme') saveData.themes[id] = true;
+        if (item.type === 'upgrade') saveData.upgrades[id] = true;
+        
+        showNotification(`Unlocked: ${item.name}`);
+    }
+
+    // ============================================================================
+    // CORE GAME ENGINE SETUP
+    // ============================================================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    let width, height, cx, cy;
+    let time = 0;
+    let lastTime = 0;
+    
+    const STATES = { LOADING: 0, MENU: 1, PLAYING: 2, TRANSITION: 3, SHOP: 4 };
+    let currentState = STATES.LOADING;
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        cx = width / 2;
+        cy = height / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input Handling
+    const mouse = { x: -1000, y: -1000, isDown: false, clicked: false };
+    
+    function updateMouse(e) {
+        const rect = canvas.getBoundingClientRect();
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        mouse.x = clientX - rect.left;
+        mouse.y = clientY - rect.top;
+    }
+
+    window.addEventListener('mousemove', updateMouse);
+    window.addEventListener('touchmove', updateMouse, {passive: false});
+    
+    function handleDown(e) { updateMouse(e); mouse.isDown = true; }
+    function handleUp(e) { mouse.isDown = false; mouse.clicked = true; }
+    
+    window.addEventListener('mousedown', handleDown);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchstart', handleDown, {passive: false});
+    window.addEventListener('touchend', (e) => { handleUp(e); e.preventDefault(); }, {passive: false});
+
+    // ============================================================================
+    // GAME LOGIC & ENTITIES
+    // ============================================================================
+    
+    let level = 1;
+    let roomInLevel = 0;
+    let totalRoomsPerLevel = 3;
+    let doors = [];
+    let particles = [];
+    let backgroundStars = [];
+    let cameraShake = 0;
+    let transitionAlpha = 0;
+    let transitionState = 'none'; // 'none', 'fade_out', 'fade_in', 'error_flash'
+    let usedRetryThisLevel = false;
+
+    class Particle {
+        constructor(x, y, color, speed, size, life, angle) {
+            this.x = x; this.y = y;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.color = color;
+            this.size = size;
+            this.maxLife = life;
+            this.life = life;
+        }
+        update(dt) {
+            this.x += this.vx * (dt/16);
+            this.y += this.vy * (dt/16);
+            this.life -= dt;
+        }
+        draw(ctx) {
+            const alpha = Math.max(0, this.life / this.maxLife);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function spawnExplosion(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 8 + 2;
+            const size = Math.random() * 4 + 1;
+            const life = Math.random() * 500 + 300;
+            particles.push(new Particle(x, y, color, speed, size, life, angle));
+        }
+    }
+
+    class Door {
+        constructor(index, total, isCorrect, isHinted) {
+            this.index = index;
+            this.total = total;
+            this.isCorrect = isCorrect;
+            this.isHinted = isHinted;
+            
+            // Layout calculations (dynamically updated in draw based on screen size)
+            this.width = 0;
+            this.height = 0;
+            this.x = 0;
+            this.y = 0;
+            
+            this.state = 'idle'; // idle, hover, opening, wrong
+            this.openProgress = 0;
+            this.wobbleOffset = 0;
+        }
+
+        updateGeometry() {
+            const spacing = Math.min(width * 0.05, 50);
+            this.width = Math.min(200, (width - (this.total + 1) * spacing) / this.total);
+            this.height = this.width * 1.8;
+            
+            const totalWidth = (this.total * this.width) + ((this.total - 1) * spacing);
+            const startX = cx - totalWidth / 2;
+            
+            this.x = startX + this.index * (this.width + spacing) + this.width/2;
+            this.y = cy + this.height/4; // Slightly lower than center
+
+            // Input check
+            if (currentState === STATES.PLAYING && transitionState === 'none') {
+                const halfW = this.width/2;
+                const halfH = this.height/2;
+                const inBounds = mouse.x > this.x - halfW && mouse.x < this.x + halfW &&
+                                 mouse.y > this.y - halfH && mouse.y < this.y + halfH;
+                
+                if (inBounds) {
+                    this.state = 'hover';
+                    if (mouse.clicked) {
+                        handleDoorClick(this);
+                    }
+                } else {
+                    this.state = 'idle';
+                }
+            }
+        }
+
+        draw(ctx) {
+            this.updateGeometry();
+            
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            if (this.state === 'wrong') {
+                this.wobbleOffset = Math.sin(time * 0.05) * 5;
+                ctx.translate(this.wobbleOffset, 0);
+            } else if (this.state === 'opening') {
+                this.openProgress += 0.05;
+                if (this.openProgress > 1) this.openProgress = 1;
+            } else {
+                this.openProgress = 0;
+            }
+
+            const w = this.width;
+            const h = this.height;
+            const halfW = w/2;
+            const halfH = h/2;
+
+            // Hint visual (slight red pulse if upgraded)
+            let isHintGlowing = false;
+            if (this.isHinted && saveData.upgrades.hint) {
+                isHintGlowing = Math.sin(time * 0.005) > 0.5;
+            }
+
+            // --- Skin Rendering ---
+            const skin = saveData.activeSkin;
+            
+            // Base shadow/glow
+            ctx.shadowBlur = this.state === 'hover' ? 30 : 15;
+            ctx.shadowColor = this.state === 'wrong' || isHintGlowing ? '#ff0000' : 
+                              skin === 'mystic' ? '#a020f0' : 
+                              skin === 'golden' ? '#ffaa00' : '#00ffff';
+
+            if (skin === 'mystic') {
+                this.drawMysticSkin(ctx, halfW, halfH, isHintGlowing);
+            } else if (skin === 'golden') {
+                this.drawGoldenSkin(ctx, halfW, halfH, isHintGlowing);
+            } else {
+                this.drawCyberSkin(ctx, halfW, halfH, isHintGlowing);
+            }
+
+            // Open Animation (White light bursting from center)
+            if (this.state === 'opening') {
+                ctx.shadowBlur = 50;
+                ctx.shadowColor = '#ffffff';
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.openProgress})`;
+                ctx.fillRect(-halfW, -halfH, w, h);
+            }
+
+            ctx.restore();
+        }
+
+        drawCyberSkin(ctx, halfW, halfH, hintGlow) {
+            const glow = hintGlow || this.state === 'wrong' ? '#ff3333' : (this.state === 'hover' ? '#ffffff' : '#00ffff');
+            
+            // Frame
+            ctx.strokeStyle = glow;
+            ctx.lineWidth = 4;
+            ctx.fillStyle = '#0a101a';
+            ctx.beginPath();
+            ctx.moveTo(-halfW, halfH);
+            ctx.lineTo(-halfW, -halfH + 20);
+            ctx.lineTo(-halfW + 20, -halfH);
+            ctx.lineTo(halfW - 20, -halfH);
+            ctx.lineTo(halfW, -halfH + 20);
+            ctx.lineTo(halfW, halfH);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Inner tech lines
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = `rgba(0, 255, 255, ${this.state === 'hover' ? 0.8 : 0.3})`;
+            ctx.beginPath();
+            ctx.moveTo(-halfW + 10, halfH);
+            ctx.lineTo(-halfW + 10, -halfH + 25);
+            ctx.lineTo(0, -halfH + 10);
+            ctx.lineTo(halfW - 10, -halfH + 25);
+            ctx.lineTo(halfW - 10, halfH);
+            ctx.stroke();
+
+            // Center lock
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, 15, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        drawMysticSkin(ctx, halfW, halfH, hintGlow) {
+            const glow = hintGlow || this.state === 'wrong' ? '#ff0000' : (this.state === 'hover' ? '#e080ff' : '#9900ff');
+            
+            // Arch
+            ctx.fillStyle = '#10051a';
+            ctx.strokeStyle = glow;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(-halfW, halfH);
+            ctx.lineTo(-halfW, -halfH * 0.4);
+            ctx.quadraticCurveTo(0, -halfH * 1.5, halfW, -halfH * 0.4);
+            ctx.lineTo(halfW, halfH);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Runes
+            ctx.fillStyle = glow;
+            ctx.font = `${halfW * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚝', 0, -halfH * 0.3);
+            
+            // Floating gem
+            const bounce = Math.sin(time * 0.003 + this.index) * 10;
+            ctx.beginPath();
+            ctx.moveTo(0, bounce - 10);
+            ctx.lineTo(10, bounce);
+            ctx.lineTo(0, bounce + 10);
+            ctx.lineTo(-10, bounce);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        drawGoldenSkin(ctx, halfW, halfH, hintGlow) {
+            const glow = hintGlow || this.state === 'wrong' ? '#ff3300' : (this.state === 'hover' ? '#ffffaa' : '#ffcc00');
+            
+            // Heavy door
+            const grad = ctx.createLinearGradient(-halfW, -halfH, halfW, halfH);
+            grad.addColorStop(0, '#554400');
+            grad.addColorStop(0.5, '#aa8800');
+            grad.addColorStop(1, '#332200');
+            
+            ctx.fillStyle = grad;
+            ctx.strokeStyle = glow;
+            ctx.lineWidth = 6;
+            ctx.fillRect(-halfW, -halfH, this.width, this.height);
+            ctx.strokeRect(-halfW, -halfH, this.width, this.height);
+
+            // Vault Wheel
+            ctx.save();
+            ctx.translate(0, 0);
+            ctx.rotate(time * 0.001 * (this.state === 'hover' ? 2 : 0.5));
+            
+            ctx.strokeStyle = '#ffeeaa';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, halfW * 0.5, 0, Math.PI*2);
+            ctx.stroke();
+            
+            for(let i=0; i<4; i++) {
+                ctx.rotate(Math.PI/2);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, halfW * 0.7);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+
+    function initBackground() {
+        backgroundStars = [];
+        for(let i=0; i<150; i++) {
+            backgroundStars.push({
+                x: Math.random() * 2000 - 1000,
+                y: Math.random() * 2000 - 1000,
+                z: Math.random() * 1000 + 100,
+                size: Math.random() * 2 + 1
+            });
+        }
+    }
+
+    function drawBackground(ctx) {
+        const theme = saveData.activeTheme;
+
+        // Base gradient
+        const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(width, height));
+        if (theme === 'crimson') {
+            bgGrad.addColorStop(0, '#3a0000');
+            bgGrad.addColorStop(1, '#050000');
+        } else if (theme === 'grid') {
+            bgGrad.addColorStop(0, '#002222');
+            bgGrad.addColorStop(1, '#000505');
+        } else {
+            bgGrad.addColorStop(0, '#0a102a');
+            bgGrad.addColorStop(1, '#020205');
+        }
+        
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Theme specific elements
+        if (theme === 'grid') {
+            // Cyber perspective grid
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
+            const scroll = (time * 0.05) % 50;
+            ctx.beginPath();
+            for(let y = cy; y < height; y += 50) {
+                const dy = y - cy;
+                const scale = dy / (height - cy);
+                const actualY = cy + scale * scale * (height - cy) + (scroll * scale);
+                if (actualY < height) {
+                    ctx.moveTo(0, actualY);
+                    ctx.lineTo(width, actualY);
+                }
+            }
+            for(let x = -width; x < width*2; x += 100) {
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(x, height);
+            }
+            ctx.stroke();
+        } else {
+            // Starfield / Embers (Void / Crimson)
+            ctx.fillStyle = theme === 'crimson' ? '#ff5500' : '#ffffff';
+            backgroundStars.forEach(star => {
+                // Move stars towards camera
+                star.z -= 2;
+                if (star.z <= 0) {
+                    star.z = 1000;
+                    star.x = Math.random() * 2000 - 1000;
+                    star.y = Math.random() * 2000 - 1000;
+                }
+                
+                const sx = cx + (star.x / star.z) * 500;
+                const sy = cy + (star.y / star.z) * 500;
+                const sSize = (star.size / star.z) * 500;
+
+                if (sx > 0 && sx < width && sy > 0 && sy < height) {
+                    ctx.globalAlpha = Math.min(1, 100 / star.z);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sSize, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            });
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function generateRoom() {
+        doors = [];
+        const numDoors = 3;
+        const correctIndex = Math.floor(Math.random() * numDoors);
+        
+        // Decide which wrong door gets the hint (if unlocked and procs)
+        let hintedIndex = -1;
+        if (saveData.upgrades.hint && Math.random() < 0.20) {
+            let possibleHints = [0, 1, 2].filter(i => i !== correctIndex);
+            hintedIndex = possibleHints[Math.floor(Math.random() * possibleHints.length)];
+        }
+
+        for (let i = 0; i < numDoors; i++) {
+            doors.push(new Door(i, numDoors, i === correctIndex, i === hintedIndex));
+        }
+    }
+
+    function startLevel() {
+        roomInLevel = 1;
+        totalRoomsPerLevel = 2 + Math.floor(level / 2); // Scales up slowly
+        usedRetryThisLevel = false;
+        generateRoom();
+        updateHUD();
+    }
+
+    function handleDoorClick(door) {
+        if (transitionState !== 'none') return;
+
+        if (door.isCorrect) {
+            // Correct logic
+            door.state = 'opening';
+            spawnExplosion(door.x, door.y, '#ffffff', 50);
+            transitionState = 'fade_out';
+            
+            // First time reward economy rule
+            if (!hasEarnedFirstReward && level === 1 && roomInLevel === 1) {
+                hasEarnedFirstReward = true;
+                addSimgaBucks(1, "First Door Opened!");
+            }
+
+        } else {
+            // Wrong logic
+            door.state = 'wrong';
+            cameraShake = 20;
+            transitionState = 'error_flash';
+            spawnExplosion(door.x, door.y, '#ff0000', 30);
+        }
+    }
+
+    function resetLevel() {
+        level = 1;
+        startLevel();
+    }
+
+    function advanceRoom() {
+        roomInLevel++;
+        if (roomInLevel > totalRoomsPerLevel) {
+            // Level Complete!
+            level++;
+            if (level > saveData.highestLevel) {
+                saveData.highestLevel = level;
+                sendSaveData();
+            }
+            
+            // Economy Balance:
+            // 5-15 SB per 1-3 mins. A level takes about 15-30s.
+            // Small/Med reward per level.
+            let reward = 2;
+            let reason = `Level ${level-1} Cleared!`;
+            if ((level - 1) % 5 === 0) {
+                reward = 5;
+                reason = `Boss Milestone Reached!`;
+            }
+            addSimgaBucks(reward, reason);
+
+            startLevel();
+        } else {
+            generateRoom();
+            updateHUD();
+        }
+    }
+
+    // ============================================================================
+    // UI & RENDER LOOP
+    // ============================================================================
+
+    function initGameUI() {
+        document.getElementById('loading').classList.remove('active');
+        showScreen('menu-screen');
+        initBackground();
+        
+        document.getElementById('btn-play').onclick = () => {
+            showScreen(null);
+            document.getElementById('hud').style.opacity = 1;
+            currentState = STATES.PLAYING;
+            resetLevel(); // Start fresh
+        };
+
+        document.getElementById('btn-shop').onclick = () => {
+            showScreen('shop-screen');
+            renderShop();
+        };
+
+        document.getElementById('btn-close-shop').onclick = () => {
+            showScreen('menu-screen');
+        };
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (id) document.getElementById(id).classList.add('active');
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-level').innerText = `Level: ${level}`;
+        document.getElementById('hud-room').innerText = `Room: ${roomInLevel}/${totalRoomsPerLevel}`;
+    }
+
+    function showNotification(text, isError = false) {
+        const container = document.getElementById('notification-container');
+        const notif = document.createElement('div');
+        notif.className = `notification ${isError ? 'error' : ''}`;
+        notif.innerText = text;
+        container.appendChild(notif);
+        
+        setTimeout(() => {
+            if (container.contains(notif)) {
+                container.removeChild(notif);
+            }
+        }, 2500);
+    }
+
+    function renderShop() {
+        const container = document.getElementById('shop-items-container');
+        container.innerHTML = '';
+        document.getElementById('shop-status').innerText = "";
+
+        SHOP_CATALOG.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let isUnlocked = false;
+            let isEquipped = false;
+
+            if (item.type === 'skin') {
+                isUnlocked = saveData.skins[item.id];
+                isEquipped = saveData.activeSkin === item.id;
+            } else if (item.type === 'theme') {
+                isUnlocked = saveData.themes[item.id];
+                isEquipped = saveData.activeTheme === item.id;
+            } else if (item.type === 'upgrade') {
+                isUnlocked = saveData.upgrades[item.id];
+                isEquipped = isUnlocked; // Upgrades are passive
+            }
+
+            let btnHtml = '';
+            if (isEquipped) {
+                btnHtml = `<button class="buy-btn equipped" disabled>Equipped</button>`;
+            } else if (isUnlocked) {
+                btnHtml = `<button class="buy-btn equip" onclick="equipItem('${item.type}', '${item.id}')">Equip</button>`;
+            } else {
+                btnHtml = `<button class="buy-btn" ${pendingPurchase ? 'disabled' : ''} onclick="requestPurchase('${item.id}', ${item.cost})">${item.cost} SB</button>`;
+            }
+
+            div.innerHTML = `
+                <div class="item-icon">${item.icon}</div>
+                <div class="item-name">${item.name}</div>
+                <div class="item-desc">${item.desc}</div>
+                ${btnHtml}
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    window.equipItem = function(type, id) {
+        if (type === 'skin') saveData.activeSkin = id;
+        if (type === 'theme') saveData.activeTheme = id;
+        sendSaveData();
+        renderShop();
+    };
+
+    function update(dt) {
+        time += dt;
+
+        // Transitions
+        if (transitionState === 'fade_out') {
+            transitionAlpha += dt * 0.003;
+            if (transitionAlpha >= 1) {
+                transitionAlpha = 1;
+                transitionState = 'fade_in';
+                advanceRoom();
+            }
+        } else if (transitionState === 'fade_in') {
+            transitionAlpha -= dt * 0.003;
+            if (transitionAlpha <= 0) {
+                transitionAlpha = 0;
+                transitionState = 'none';
+            }
+        } else if (transitionState === 'error_flash') {
+            transitionAlpha += dt * 0.005;
+            if (transitionAlpha >= 1) {
+                transitionAlpha = 1;
+                transitionState = 'error_fade';
+                
+                // Retry logic
+                if (saveData.upgrades.retry && !usedRetryThisLevel) {
+                    usedRetryThisLevel = true;
+                    showNotification("Second Chance Activated!", false);
+                    generateRoom(); // Stay in same room, reshuffle
+                } else {
+                    resetLevel(); // Back to start
+                }
+            }
+        } else if (transitionState === 'error_fade') {
+            transitionAlpha -= dt * 0.002;
+            if (transitionAlpha <= 0) {
+                transitionAlpha = 0;
+                transitionState = 'none';
+            }
+        }
+
+        // Camera Shake decay
+        if (cameraShake > 0) {
+            cameraShake *= 0.9;
+            if (cameraShake < 0.5) cameraShake = 0;
+        }
+
+        // Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update(dt);
+            if (particles[i].life <= 0) {
+                particles.splice(i, 1);
+            }
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+
+        if (currentState !== STATES.PLAYING && currentState !== STATES.MENU) return;
+
+        ctx.save();
+        
+        // Apply Camera Shake
+        if (cameraShake > 0) {
+            ctx.translate(
+                (Math.random() - 0.5) * cameraShake, 
+                (Math.random() - 0.5) * cameraShake
+            );
+        }
+
+        drawBackground(ctx);
+
+        if (currentState === STATES.PLAYING) {
+            // Draw doors
+            doors.forEach(door => door.draw(ctx));
+        }
+
+        // Draw Particles
+        particles.forEach(p => p.draw(ctx));
+
+        ctx.restore();
+
+        // Overlays
+        if (transitionAlpha > 0) {
+            if (transitionState === 'fade_out' || transitionState === 'fade_in') {
+                ctx.fillStyle = `rgba(255, 255, 255, ${transitionAlpha})`;
+            } else if (transitionState === 'error_flash' || transitionState === 'error_fade') {
+                ctx.fillStyle = `rgba(255, 0, 0, ${transitionAlpha * 0.5})`;
+            }
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        // Reset input flag
+        mouse.clicked = false;
+    }
+
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(loop);
+    }
+
+    // Start everything
+    requestLoadData(); 
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tile Survival</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff0055;
+            --bg-dark: #0a0a12;
+            --panel-bg: rgba(15, 15, 25, 0.85);
+            --text-main: #ffffff;
+            --text-dim: #8892b0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+        }
+
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .ui-layer.hidden {
+            opacity: 0;
+            pointer-events: none !important;
+        }
+
+        .ui-layer.active {
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 2px solid rgba(0, 243, 255, 0.2);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #0055ff, #00d4ff);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 10px;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+            text-transform: uppercase;
+            pointer-events: auto;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.7);
+        }
+
+        .btn.shop-btn {
+            background: linear-gradient(45deg, #7b00ff, #d400ff);
+            box-shadow: 0 0 15px rgba(212, 0, 255, 0.4);
+        }
+
+        .btn.shop-btn:hover {
+            box-shadow: 0 0 25px rgba(212, 0, 255, 0.7);
+        }
+
+        /* HUD */
+        #hud {
+            justify-content: flex-start;
+            padding: 20px;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            pointer-events: none;
+        }
+
+        .hud-box {
+            background: rgba(10, 10, 20, 0.7);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #timerDisplay {
+            color: var(--primary);
+            text-shadow: 0 0 8px var(--primary);
+        }
+
+        #abilityDisplay {
+            color: #b0b0b0;
+            display: none;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        
+        #abilityDisplay.ready {
+            color: #ffff00;
+            text-shadow: 0 0 8px #ffff00;
+        }
+
+        /* Shop UI */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            max-height: 40vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .shop-grid::-webkit-scrollbar {
+            width: 6px;
+        }
+        .shop-grid::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .shop-item {
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .shop-item h3 {
+            font-size: 1rem;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .shop-item p {
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .buy-btn {
+            background: #2a2a3a;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .buy-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .buy-btn.equipped {
+            background: var(--primary);
+            color: #000;
+            cursor: default;
+        }
+
+        .buy-btn.equip {
+            background: #444;
+            border-color: #fff;
+            color: #fff;
+        }
+        .buy-btn.equip:hover {
+            background: #fff;
+            color: #000;
+        }
+
+        .price {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        /* Controls hint */
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.4);
+            pointer-events: none;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+        
+        .loading-text {
+            color: var(--primary);
+            animation: pulse 1s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI: Loading -->
+    <div id="loadingMenu" class="ui-layer active">
+        <div class="panel">
+            <h1 class="loading-text">CONNECTING</h1>
+            <p>Loading Game Data...</p>
+        </div>
+    </div>
+
+    <!-- UI: Main Menu -->
+    <div id="mainMenu" class="ui-layer hidden">
+        <div class="panel">
+            <h1>Tile Survival</h1>
+            <p>High Score: <span id="menuHighScore">0.0</span>s</p>
+            <button class="btn" id="startBtn">Play Game</button>
+            <button class="btn shop-btn" id="openShopBtn">Shop</button>
+        </div>
+        <div class="controls">WASD / ARROWS to Move</div>
+    </div>
+
+    <!-- UI: Shop Menu -->
+    <div id="shopMenu" class="ui-layer hidden">
+        <div class="panel" style="width: 500px;">
+            <h2>Upgrades & Skins</h2>
+            <div class="shop-grid" id="shopGrid">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn" id="closeShopBtn">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- UI: HUD -->
+    <div id="hud" class="ui-layer hidden">
+        <div class="hud-top">
+            <div class="hud-box" id="timerDisplay">0.0s</div>
+            <div class="hud-box" id="abilityDisplay">Freeze (SPACE)</div>
+        </div>
+        <div class="controls" id="hudControls">Survive the falling tiles!</div>
+    </div>
+
+    <!-- UI: Game Over -->
+    <div id="gameOverMenu" class="ui-layer hidden">
+        <div class="panel">
+            <h1 style="color: var(--secondary); text-shadow: 0 0 10px var(--secondary);">YOU FELL</h1>
+            <p>You survived for <span id="finalTime" style="color:#fff; font-weight:bold;">0.0</span> seconds.</p>
+            <p id="newRecordMsg" style="color: #00ff88; font-weight: bold; display: none;">New High Score!</p>
+            <div id="rewardsSummary" style="margin-bottom: 20px; color: #00d4ff;"></div>
+            <button class="btn" id="restartBtn">Play Again</button>
+            <button class="btn shop-btn" id="menuFromGameOverBtn">Menu</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * TILE SURVIVAL
+ * Single-file Canvas HTML5 Game with Parent-Iframe communication.
+ */
+
+// ==========================================
+// 1. CONFIGURATION & CONSTANTS
+// ==========================================
+const GAME_ID = "tile";
+
+const CONFIG = {
+    gridSize: 9, // 9x9 grid
+    baseTileWidth: 60, // Base size, scaled to screen
+    gap: 4,
+    colors: {
+        bg: '#05050A',
+        tileNormal: '#121220',
+        tileBorder: '#00f3ff',
+        tileWarning: '#ff0055',
+        playerDefault: '#00f3ff',
+        playerGold: '#ffd700',
+        playerPlasma: '#d400ff',
+        tileCyber: '#00ff88',
+        tileLava: '#ff4400'
+    }
+};
+
+const SHOP_CATALOG = {
+    skin_plasma: { id: 'skin_plasma', type: 'skin', name: 'Plasma Sphere', desc: 'A chaotic energy core.', cost: 20, color: CONFIG.colors.playerPlasma },
+    skin_gold:   { id: 'skin_gold', type: 'skin', name: 'Golden Core', desc: 'Shiny and valuable.', cost: 50, color: CONFIG.colors.playerGold },
+    tile_cyber:  { id: 'tile_cyber', type: 'tile', name: 'Cyber Neon', desc: 'Green neon grid.', cost: 25, color: CONFIG.colors.tileCyber },
+    tile_lava:   { id: 'tile_lava', type: 'tile', name: 'Lava Rock', desc: 'Scorching hot tiles.', cost: 25, color: CONFIG.colors.tileLava },
+    ability_freeze:{ id: 'ability_freeze', type: 'ability', name: 'Time Freeze', desc: 'Press SPACE to pause decay for 3s.', cost: 40 }
+};
+
+// ==========================================
+// 2. STATE MANAGEMENT & SAVE/LOAD
+// ==========================================
+let state = {
+    screen: 'loading', // loading, menu, shop, playing, gameover
+    highScore: 0,
+    unlocked: ['skin_default', 'tile_default'],
+    equipped: {
+        skin: 'skin_default',
+        tile: 'tile_default'
+    },
+    hasFreeze: false
+};
+
+let gameSession = {
+    time: 0,
+    active: false,
+    rewardsGiven: 0,
+    freezeCooldown: 0,
+    freezeActive: 0
+};
+
+let pendingPurchase = null;
+
+// Platform Integration: Saving
+function saveData() {
+    const saveObject = {
+        highScore: state.highScore,
+        unlocked: state.unlocked,
+        equipped: state.equipped,
+        hasFreeze: state.hasFreeze
+    };
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveObject
+    }, "*");
+}
+
+// Platform Integration: Loading
+function loadData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+    
+    // Fallback if platform doesn't respond in 2 seconds (e.g. running outside platform)
+    setTimeout(() => {
+        if(state.screen === 'loading') {
+            console.warn("No load response from platform, using default save.");
+            changeScreen('menu');
+        }
+    }, 2000);
+}
+
+// Platform Integration: Currency
+function addSimgaBucks(amount) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+}
+
+function requestPurchase(itemId, cost) {
+    const msgId = Math.random().toString(36).substring(2, 10);
+    pendingPurchase = { msgId, itemId };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+    
+    // Visual feedback on button
+    const btn = document.getElementById(`btn_${itemId}`);
+    if(btn) btn.innerText = "Processing...";
+}
+
+// Platform Message Listener
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === "loadResponse" && state.screen === 'loading') {
+        if (data.data) {
+            const save = data.data;
+            state.highScore = save.highScore || 0;
+            state.unlocked = save.unlocked || ['skin_default', 'tile_default'];
+            state.equipped = save.equipped || { skin: 'skin_default', tile: 'tile_default' };
+            state.hasFreeze = save.hasFreeze || false;
+        }
+        changeScreen('menu');
+    }
+
+    if (data.type === "spendResponse") {
+        if (pendingPurchase && data.msgId === pendingPurchase.msgId) {
+            if (data.success) {
+                // Unlock
+                state.unlocked.push(pendingPurchase.itemId);
+                if (pendingPurchase.itemId === 'ability_freeze') {
+                    state.hasFreeze = true;
+                } else if (SHOP_CATALOG[pendingPurchase.itemId].type === 'skin') {
+                    state.equipped.skin = pendingPurchase.itemId;
+                } else if (SHOP_CATALOG[pendingPurchase.itemId].type === 'tile') {
+                    state.equipped.tile = pendingPurchase.itemId;
+                }
+                saveData();
+                renderShop();
+            } else {
+                alert("Not enough SimgaBucks to purchase this item!");
+                renderShop(); // reset button text
+            }
+            pendingPurchase = null;
+        }
+    }
+});
+
+// ==========================================
+// 3. ENGINE SETUP (Canvas & Input)
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize
+let cw, ch, cx, cy;
+let tileSize, gridOffsetX, gridOffsetY;
+let lastTime = performance.now();
+let screenShake = 0;
+
+function resizeCanvas() {
+    cw = window.innerWidth;
+    ch = window.innerHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+    cx = cw / 2;
+    cy = ch / 2;
+    
+    // Calculate adaptive tile size
+    const minDim = Math.min(cw, ch);
+    // Grid should take up about 75% of the shortest screen dimension
+    tileSize = Math.floor((minDim * 0.75) / CONFIG.gridSize);
+    
+    const totalGridSize = (tileSize * CONFIG.gridSize) + (CONFIG.gap * (CONFIG.gridSize - 1));
+    gridOffsetX = cx - (totalGridSize / 2);
+    gridOffsetY = cy - (totalGridSize / 2) + 20; // Shift down slightly for UI
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+const keys = { w:false, a:false, s:false, d:false, space:false, up:false, down:false, left:false, right:false };
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || key === 'arrowup') keys.w = true;
+    if (key === 'a' || key === 'arrowleft') keys.a = true;
+    if (key === 's' || key === 'arrowdown') keys.s = true;
+    if (key === 'd' || key === 'arrowright') keys.d = true;
+    if (key === ' ') keys.space = true;
+});
+window.addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || key === 'arrowup') keys.w = false;
+    if (key === 'a' || key === 'arrowleft') keys.a = false;
+    if (key === 's' || key === 'arrowdown') keys.s = false;
+    if (key === 'd' || key === 'arrowright') keys.d = false;
+    if (key === ' ') keys.space = false;
+});
+
+// Touch controls via swipes
+let touchStartX = 0;
+let touchStartY = 0;
+window.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+}, {passive: true});
+
+window.addEventListener('touchend', (e) => {
+    if(!gameSession.active) return;
+    const touchEndX = e.changedTouches[0].screenX;
+    const touchEndY = e.changedTouches[0].screenY;
+    const dx = touchEndX - touchStartX;
+    const dy = touchEndY - touchStartY;
+    
+    // Swipe detection or tap for ability
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+        keys.space = true; // Tap for ability
+        setTimeout(()=>keys.space=false, 100);
+        return;
+    }
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 30) player.move(1, 0);
+        else if (dx < -30) player.move(-1, 0);
+    } else {
+        if (dy > 30) player.move(0, 1);
+        else if (dy < -30) player.move(0, -1);
+    }
+}, {passive: true});
+
+// ==========================================
+// 4. VISUAL EFFECTS & MATH
+// ==========================================
+const MathUtils = {
+    lerp: (a, b, t) => a + (b - a) * t,
+    rand: (min, max) => Math.random() * (max - min) + min,
+    randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+};
+
+class ParticleSystem {
+    constructor() {
+        this.particles = [];
+        this.stars = [];
+        // Init background stars
+        for(let i=0; i<100; i++){
+            this.stars.push({
+                x: Math.random() * cw,
+                y: Math.random() * ch,
+                z: Math.random() * 2 + 0.1,
+                size: Math.random() * 2
+            });
+        }
+    }
+    
+    emit(x, y, color, count, speed=2, life=1, type='normal') {
+        for(let i=0; i<count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const vel = Math.random() * speed;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * vel,
+                vy: Math.sin(angle) * vel,
+                life: life,
+                maxLife: life,
+                color: color,
+                size: Math.random() * 4 + 1,
+                type: type
+            });
+        }
+    }
+
+    update(dt) {
+        // Update particles
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            let p = this.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= dt;
+            
+            if (p.type === 'gravity') {
+                p.vy += 5 * dt; // gravity
+            } else {
+                p.vx *= 0.95; // friction
+                p.vy *= 0.95;
+            }
+
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+        
+        // Update background stars
+        for(let s of this.stars) {
+            s.y += s.z * 10 * dt;
+            if(s.y > ch) {
+                s.y = 0;
+                s.x = Math.random() * cw;
+            }
+        }
+    }
+
+    draw(ctx) {
+        // Draw Stars
+        ctx.fillStyle = '#ffffff';
+        for(let s of this.stars) {
+            ctx.globalAlpha = s.z / 2.1;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+
+        // Draw Particles
+        ctx.globalCompositeOperation = 'lighter';
+        for (let p of this.particles) {
+            const alpha = Math.max(0, p.life / p.maxLife);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            if(p.type === 'square') {
+                ctx.rect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+            } else {
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            }
+            ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+    }
+}
+const particles = new ParticleSystem();
+
+// ==========================================
+// 5. GAME ENTITIES
+// ==========================================
+class Tile {
+    constructor(gx, gy) {
+        this.gx = gx;
+        this.gy = gy;
+        this.state = 'idle'; // idle, warning, falling, fallen
+        this.timer = 0;
+        this.scale = 1.0;
+        this.yOffset = 0;
+        this.colorIndex = Math.random(); // For subtle variety
+    }
+
+    update(dt) {
+        if (gameSession.freezeActive > 0) return; // Time freeze!
+
+        if (this.state === 'warning') {
+            this.timer -= dt;
+            // Vibrate
+            this.yOffset = Math.sin(this.timer * 30) * 2;
+            if (this.timer <= 0) {
+                this.state = 'falling';
+                this.timer = 0.5; // Fall animation duration
+                screenShake = Math.max(screenShake, 5); // Add shake
+                
+                // Explode particles
+                const px = gridOffsetX + this.gx * (tileSize + CONFIG.gap) + tileSize/2;
+                const py = gridOffsetY + this.gy * (tileSize + CONFIG.gap) + tileSize/2;
+                particles.emit(px, py, CONFIG.colors.tileWarning, 15, 4, 0.8, 'gravity');
+            }
+        } else if (this.state === 'falling') {
+            this.timer -= dt;
+            this.scale = Math.max(0, this.timer / 0.5);
+            this.yOffset += 500 * dt; // Fall down
+            if (this.timer <= 0) {
+                this.state = 'fallen';
+            }
+        }
+    }
+
+    draw(ctx, baseColor) {
+        if (this.state === 'fallen') return;
+
+        const x = gridOffsetX + this.gx * (tileSize + CONFIG.gap);
+        const y = gridOffsetY + this.gy * (tileSize + CONFIG.gap) + this.yOffset;
+        
+        const cx = x + tileSize/2;
+        const cy = y + tileSize/2;
+        const currentSize = tileSize * this.scale;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        if (this.state === 'warning') {
+            const intensity = Math.abs(Math.sin(this.timer * 10));
+            ctx.shadowColor = CONFIG.colors.tileWarning;
+            ctx.shadowBlur = 15 + intensity * 10;
+            ctx.fillStyle = `rgba(255, 0, 85, ${0.3 + intensity*0.5})`;
+            ctx.strokeStyle = CONFIG.colors.tileWarning;
+        } else {
+            ctx.shadowColor = baseColor;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = CONFIG.colors.tileNormal;
+            ctx.strokeStyle = baseColor;
+            
+            // Subtle pulse for idle
+            if (this.state === 'idle') {
+                const pulse = Math.sin(performance.now() * 0.002 + this.colorIndex * 10) * 0.1 + 0.9;
+                ctx.scale(pulse, pulse);
+            }
+        }
+
+        ctx.lineWidth = 2;
+        
+        // Draw main body (rounded rect)
+        ctx.beginPath();
+        ctx.roundRect(-currentSize/2, -currentSize/2, currentSize, currentSize, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+class Grid {
+    constructor() {
+        this.tiles = [];
+        this.baseTileColor = CONFIG.colors.tileBorder;
+        this.init();
+    }
+
+    init() {
+        this.tiles = [];
+        for (let x = 0; x < CONFIG.gridSize; x++) {
+            this.tiles[x] = [];
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                this.tiles[x][y] = new Tile(x, y);
+            }
+        }
+        
+        // Setup theme colors based on equip
+        if (state.equipped.tile === 'tile_cyber') this.baseTileColor = CONFIG.colors.tileCyber;
+        else if (state.equipped.tile === 'tile_lava') this.baseTileColor = CONFIG.colors.tileLava;
+        else this.baseTileColor = CONFIG.colors.tileBorder;
+    }
+
+    update(dt) {
+        for (let x = 0; x < CONFIG.gridSize; x++) {
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                this.tiles[x][y].update(dt);
+            }
+        }
+    }
+
+    draw(ctx) {
+        for (let x = 0; x < CONFIG.gridSize; x++) {
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                this.tiles[x][y].draw(ctx, this.baseTileColor);
+            }
+        }
+    }
+
+    getTile(x, y) {
+        if (x >= 0 && x < CONFIG.gridSize && y >= 0 && y < CONFIG.gridSize) {
+            return this.tiles[x][y];
+        }
+        return null;
+    }
+}
+
+class Player {
+    constructor() {
+        this.gx = Math.floor(CONFIG.gridSize / 2);
+        this.gy = Math.floor(CONFIG.gridSize / 2);
+        // Visual pos
+        this.vx = this.gx;
+        this.vy = this.gy;
+        this.moveCooldown = 0;
+        
+        // Setup appearance
+        this.color = CONFIG.colors.playerDefault;
+        this.type = 'cube';
+        if (state.equipped.skin === 'skin_plasma') {
+            this.color = CONFIG.colors.playerPlasma;
+            this.type = 'sphere';
+        } else if (state.equipped.skin === 'skin_gold') {
+            this.color = CONFIG.colors.playerGold;
+            this.type = 'pyramid';
+        }
+    }
+
+    handleInput(dt) {
+        if (this.moveCooldown > 0) {
+            this.moveCooldown -= dt;
+            return;
+        }
+
+        let dx = 0, dy = 0;
+        if (keys.w) dy = -1;
+        else if (keys.s) dy = 1;
+        else if (keys.a) dx = -1;
+        else if (keys.d) dx = 1;
+
+        if (dx !== 0 || dy !== 0) {
+            this.move(dx, dy);
+        }
+        
+        // Handle ability
+        if (keys.space && state.hasFreeze && gameSession.freezeCooldown <= 0) {
+            this.activateFreeze();
+        }
+    }
+
+    move(dx, dy) {
+        const nx = this.gx + dx;
+        const ny = this.gy + dy;
+        
+        // Check bounds
+        if (nx >= 0 && nx < CONFIG.gridSize && ny >= 0 && ny < CONFIG.gridSize) {
+            this.gx = nx;
+            this.gy = ny;
+            this.moveCooldown = 0.12; // Input delay
+            
+            // Trail particles
+            const px = gridOffsetX + this.gx * (tileSize + CONFIG.gap) + tileSize/2;
+            const py = gridOffsetY + this.gy * (tileSize + CONFIG.gap) + tileSize/2;
+            particles.emit(px, py, this.color, 5, 1, 0.5);
+        }
+    }
+    
+    activateFreeze() {
+        gameSession.freezeActive = 3.0; // 3 seconds of freeze
+        gameSession.freezeCooldown = 15.0; // 15 seconds cooldown
+        
+        // Screen flash effect
+        const cx_scr = cw/2;
+        const cy_scr = ch/2;
+        particles.emit(cx_scr, cy_scr, '#ffffff', 50, 10, 1.0);
+        screenShake = 10;
+        
+        // Reset key to prevent rapid firing if logic fails
+        keys.space = false; 
+    }
+
+    update(dt) {
+        this.handleInput(dt);
+        // Lerp visual position to grid position
+        this.vx = MathUtils.lerp(this.vx, this.gx, dt * 15);
+        this.vy = MathUtils.lerp(this.vy, this.gy, dt * 15);
+    }
+
+    draw(ctx) {
+        const px = gridOffsetX + this.vx * (tileSize + CONFIG.gap) + tileSize/2;
+        const py = gridOffsetY + this.vy * (tileSize + CONFIG.gap) + tileSize/2;
+        const size = tileSize * 0.6;
+
+        ctx.save();
+        ctx.translate(px, py);
+        
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = this.color;
+        
+        if (this.type === 'sphere') {
+            // Plasma sphere
+            ctx.beginPath();
+            ctx.arc(0, 0, size/2, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Inner core
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            const pulse = Math.sin(performance.now() * 0.01) * 2;
+            ctx.arc(0, 0, size/4 + pulse, 0, Math.PI*2);
+            ctx.fill();
+
+        } else if (this.type === 'pyramid') {
+            // Golden Pyramid (Triangle)
+            const rot = performance.now() * 0.002;
+            ctx.rotate(rot);
+            ctx.beginPath();
+            ctx.moveTo(0, -size/2);
+            ctx.lineTo(size/2, size/2);
+            ctx.lineTo(-size/2, size/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Highlight
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(0, -size/2);
+            ctx.lineTo(0, size/2);
+            ctx.lineTo(-size/2, size/2);
+            ctx.closePath();
+            ctx.globalAlpha = 0.5;
+            ctx.fill();
+
+        } else {
+            // Default Cube
+            ctx.beginPath();
+            ctx.roundRect(-size/2, -size/2, size, size, 4);
+            ctx.fill();
+            
+            // Inner glow
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-size/4, -size/4, size/2, size/2);
+        }
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 6. MAIN GAME ENGINE
+// ==========================================
+let grid;
+let player;
+let gameLogicTimer = 0;
+let decayRate = 1.0; // Time between selecting tiles to warn
+let warningDuration = 2.0;
+
+function startNewGame() {
+    grid = new Grid();
+    player = new Player();
+    gameSession.time = 0;
+    gameSession.active = true;
+    gameSession.rewardsGiven = 0;
+    gameSession.freezeCooldown = 0;
+    gameSession.freezeActive = 0;
+    
+    gameLogicTimer = 0;
+    decayRate = 1.2;
+    warningDuration = 2.0;
+    
+    particles.particles = []; // clear particles
+    
+    changeScreen('playing');
+}
+
+function updateGame(dt) {
+    if (!gameSession.active) return;
+
+    gameSession.time += dt;
+    
+    // Ability Timers
+    if (gameSession.freezeActive > 0) {
+        gameSession.freezeActive -= dt;
+    } else {
+        if (gameSession.freezeCooldown > 0) {
+            gameSession.freezeCooldown -= dt;
+        }
+    }
+
+    // Economy & Rewards logic
+    // Goal: steady rewards. 1SB @ 15s, 1SB @ 30s, 2SB @ 45s, 2SB @ 60s, 3SB @ 90s, etc.
+    const milestones = [
+        { time: 15, reward: 1 },
+        { time: 30, reward: 1 },
+        { time: 45, reward: 2 },
+        { time: 60, reward: 2 },
+        { time: 90, reward: 3 },
+        { time: 120, reward: 4 },
+        { time: 180, reward: 5 }
+    ];
+    
+    for (let i = 0; i < milestones.length; i++) {
+        if (gameSession.time >= milestones[i].time && gameSession.rewardsGiven === i) {
+            gameSession.rewardsGiven++;
+            addSimgaBucks(milestones[i].reward);
+            // Visual feedback
+            showInGameMessage(`+${milestones[i].reward} SimgaBucks!`);
+        }
+    }
+
+    // Difficulty curve (caps at 90 seconds)
+    const diffFactor = Math.min(gameSession.time / 90.0, 1.0);
+    decayRate = MathUtils.lerp(1.2, 0.25, diffFactor); 
+    warningDuration = MathUtils.lerp(2.0, 0.6, diffFactor);
+
+    // Tile Logic
+    if (gameSession.freezeActive <= 0) {
+        gameLogicTimer += dt;
+        if (gameLogicTimer >= decayRate) {
+            gameLogicTimer = 0;
+            
+            // Pick multiple tiles as time goes on
+            let tilesToDrop = 1 + Math.floor(diffFactor * 2.5); // 1 to 3 tiles
+            
+            for(let i=0; i<tilesToDrop; i++) {
+                // Find an idle tile
+                let available = [];
+                for (let x = 0; x < CONFIG.gridSize; x++) {
+                    for (let y = 0; y < CONFIG.gridSize; y++) {
+                        let t = grid.getTile(x, y);
+                        // Don't target the exact tile the player is currently on immediately if possible
+                        if (t.state === 'idle' && (x !== player.gx || y !== player.gy)) {
+                            available.push(t);
+                        }
+                    }
+                }
+                
+                // Fallback if only player tile is left
+                if (available.length === 0) {
+                     let pt = grid.getTile(player.gx, player.gy);
+                     if(pt && pt.state === 'idle') available.push(pt);
+                }
+
+                if (available.length > 0) {
+                    let target = available[MathUtils.randInt(0, available.length - 1)];
+                    target.state = 'warning';
+                    target.timer = warningDuration;
+                }
+            }
+        }
+    }
+
+    // Update entities
+    grid.update(dt);
+    player.update(dt);
+    
+    // Death Check
+    const pTile = grid.getTile(player.gx, player.gy);
+    if (!pTile || pTile.state === 'fallen' || pTile.state === 'falling') {
+        // Player falls
+        gameOver();
+    }
+}
+
+// Temporary floating messages
+let floatingMsg = { text: "", timer: 0 };
+function showInGameMessage(text) {
+    floatingMsg.text = text;
+    floatingMsg.timer = 2.0;
+}
+
+function gameOver() {
+    gameSession.active = false;
+    
+    // Check High score
+    const isNewRecord = gameSession.time > state.highScore;
+    if (isNewRecord) {
+        state.highScore = gameSession.time;
+        saveData();
+    }
+    
+    // Extra End Game Reward if survived a decent amount
+    let bonus = 0;
+    if (gameSession.time > 10) bonus = 1;
+    if (gameSession.time > 60) bonus += 2;
+    if (bonus > 0) {
+        addSimgaBucks(bonus);
+    }
+    
+    // Setup UI
+    document.getElementById('finalTime').innerText = gameSession.time.toFixed(1);
+    document.getElementById('newRecordMsg').style.display = isNewRecord ? 'block' : 'none';
+    
+    let totalEarned = bonus;
+    // rough calc for summary
+    const milestones = [15,30,45,60,90,120,180];
+    const rews = [1,1,2,2,3,4,5];
+    for(let i=0; i<milestones.length; i++) {
+        if(gameSession.time >= milestones[i]) totalEarned += rews[i];
+    }
+    
+    document.getElementById('rewardsSummary').innerHTML = 
+        totalEarned > 0 ? `Total Session Earnings: <b style="color:#00ff88;">+${totalEarned} SimgaBucks</b>` : `Survive longer to earn SimgaBucks!`;
+    
+    // Big explosion
+    const px = gridOffsetX + player.vx * (tileSize + CONFIG.gap) + tileSize/2;
+    const py = gridOffsetY + player.vy * (tileSize + CONFIG.gap) + tileSize/2;
+    particles.emit(px, py, player.color, 50, 8, 1.5, 'gravity');
+    screenShake = 15;
+
+    setTimeout(() => {
+        changeScreen('gameover');
+    }, 1500); // Delay before showing menu
+}
+
+// ==========================================
+// 7. RENDER LOOP
+// ==========================================
+function render(dt) {
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, ch);
+    grad.addColorStop(0, CONFIG.colors.bg);
+    grad.addColorStop(1, '#020205');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Apply Screen Shake
+    ctx.save();
+    if (screenShake > 0) {
+        const sx = MathUtils.rand(-screenShake, screenShake);
+        const sy = MathUtils.rand(-screenShake, screenShake);
+        ctx.translate(sx, sy);
+        screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+
+    // Draw Particles (Background)
+    particles.draw(ctx);
+
+    // If game active or in animation to game over
+    if (state.screen === 'playing' || (state.screen === 'gameover' && !gameSession.active)) {
+        
+        // Draw grid connections/glows underlying
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i=0; i<=CONFIG.gridSize; i++) {
+            const lineX = gridOffsetX + i * (tileSize + CONFIG.gap) - CONFIG.gap/2;
+            const lineY = gridOffsetY + i * (tileSize + CONFIG.gap) - CONFIG.gap/2;
+            ctx.moveTo(lineX, gridOffsetY - CONFIG.gap/2);
+            ctx.lineTo(lineX, gridOffsetY + CONFIG.gridSize*(tileSize+CONFIG.gap));
+            ctx.moveTo(gridOffsetX - CONFIG.gap/2, lineY);
+            ctx.lineTo(gridOffsetX + CONFIG.gridSize*(tileSize+CONFIG.gap), lineY);
+        }
+        ctx.stroke();
+
+        // Draw entities
+        grid.draw(ctx);
+        if (gameSession.active) {
+            player.draw(ctx);
+        }
+
+        // Draw Freeze effect overlay
+        if (gameSession.freezeActive > 0) {
+            ctx.fillStyle = `rgba(0, 255, 255, ${0.1 + Math.sin(performance.now()*0.01)*0.05})`;
+            ctx.fillRect(0,0,cw,ch);
+            
+            ctx.fillStyle = '#00ffff';
+            ctx.font = 'bold 30px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.fillText("TIME FROZEN", cw/2, gridOffsetY - 40);
+            ctx.shadowBlur = 0;
+        }
+
+        // Floating Msg
+        if (floatingMsg.timer > 0) {
+            floatingMsg.timer -= dt;
+            ctx.fillStyle = `rgba(0, 255, 136, ${floatingMsg.timer})`;
+            ctx.font = 'bold 24px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ff88';
+            ctx.fillText(floatingMsg.text, cw/2, gridOffsetY - 80 - (2-floatingMsg.timer)*20);
+            ctx.shadowBlur = 0;
+        }
+
+        // Update HUD DOM elements
+        document.getElementById('timerDisplay').innerText = gameSession.time.toFixed(1) + "s";
+        
+        if (state.hasFreeze) {
+            const abUI = document.getElementById('abilityDisplay');
+            abUI.style.display = 'block';
+            if (gameSession.freezeActive > 0) {
+                abUI.innerText = "FREEZING...";
+                abUI.className = "hud-box";
+            } else if (gameSession.freezeCooldown > 0) {
+                abUI.innerText = `CD: ${Math.ceil(gameSession.freezeCooldown)}s`;
+                abUI.className = "hud-box";
+            } else {
+                abUI.innerText = "Freeze (SPACE)";
+                abUI.className = "hud-box ready";
+            }
+        }
+    }
+
+    ctx.restore();
+}
+
+function loop(timestamp) {
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    // Cap dt to prevent massive jumps if tab is inactive
+    const safeDt = Math.min(dt, 0.1);
+
+    particles.update(safeDt);
+    
+    if (state.screen === 'playing') {
+        updateGame(safeDt);
+    }
+
+    render(safeDt);
+    requestAnimationFrame(loop);
+}
+
+// ==========================================
+// 8. UI & MENU LOGIC
+// ==========================================
+function changeScreen(newScreen) {
+    // Hide all
+    document.querySelectorAll('.ui-layer').forEach(el => el.classList.remove('active', 'hidden'));
+    document.querySelectorAll('.ui-layer').forEach(el => el.classList.add('hidden'));
+
+    state.screen = newScreen;
+
+    if (newScreen === 'loading') {
+        document.getElementById('loadingMenu').classList.remove('hidden');
+        document.getElementById('loadingMenu').classList.add('active');
+    }
+    else if (newScreen === 'menu') {
+        document.getElementById('mainMenu').classList.remove('hidden');
+        document.getElementById('mainMenu').classList.add('active');
+        document.getElementById('menuHighScore').innerText = state.highScore.toFixed(1);
+    }
+    else if (newScreen === 'shop') {
+        document.getElementById('shopMenu').classList.remove('hidden');
+        document.getElementById('shopMenu').classList.add('active');
+        renderShop();
+    }
+    else if (newScreen === 'playing') {
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('hud').classList.add('active');
+    }
+    else if (newScreen === 'gameover') {
+        document.getElementById('gameOverMenu').classList.remove('hidden');
+        document.getElementById('gameOverMenu').classList.add('active');
+    }
+}
+
+function renderShop() {
+    const grid = document.getElementById('shopGrid');
+    grid.innerHTML = '';
+
+    for (let key in SHOP_CATALOG) {
+        const item = SHOP_CATALOG[key];
+        const isUnlocked = state.unlocked.includes(key);
+        const isEquipped = state.equipped.skin === key || state.equipped.tile === key;
+        
+        let btnHTML = '';
+        if (isEquipped) {
+            btnHTML = `<button class="buy-btn equipped">Equipped</button>`;
+        } else if (isUnlocked) {
+            // Abilities don't get "equipped" they are passive once unlocked
+            if(item.type === 'ability') {
+                btnHTML = `<button class="buy-btn equipped">Unlocked</button>`;
+            } else {
+                btnHTML = `<button class="buy-btn equip" onclick="equipItem('${key}', '${item.type}')">Equip</button>`;
+            }
+        } else {
+            btnHTML = `<button class="buy-btn" id="btn_${key}" onclick="buyItem('${key}', ${item.cost})">Buy: <span class="price">${item.cost} SB</span></button>`;
+        }
+
+        let visualDot = '';
+        if(item.color) {
+            visualDot = `<div style="width:20px;height:20px;background:${item.color};border-radius:50%;margin:0 auto 10px auto;box-shadow:0 0 10px ${item.color}"></div>`;
+        }
+
+        grid.innerHTML += `
+            <div class="shop-item">
+                ${visualDot}
+                <h3>${item.name}</h3>
+                <p>${item.desc}</p>
+                ${btnHTML}
+            </div>
+        `;
+    }
+}
+
+window.buyItem = function(id, cost) {
+    if (pendingPurchase) return; // Prevent spam
+    requestPurchase(id, cost);
+};
+
+window.equipItem = function(id, type) {
+    if (type === 'skin') state.equipped.skin = id;
+    if (type === 'tile') state.equipped.tile = id;
+    saveData();
+    renderShop();
+};
+
+// Button Listeners
+document.getElementById('startBtn').addEventListener('click', startNewGame);
+document.getElementById('restartBtn').addEventListener('click', startNewGame);
+document.getElementById('openShopBtn').addEventListener('click', () => changeScreen('shop'));
+document.getElementById('closeShopBtn').addEventListener('click', () => changeScreen('menu'));
+document.getElementById('menuFromGameOverBtn').addEventListener('click', () => changeScreen('menu'));
+
+// ==========================================
+// 9. INITIALIZATION
+// ==========================================
+// Start simulation and request load
+requestAnimationFrame(loop);
+loadData(); // Will trigger platform event, which changes screen to menu.
+
+</script>
+</body>
+</html>

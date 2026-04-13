@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Falling Pillars</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Righteous&display=swap');
+
+        :root {
+            --ui-bg: rgba(15, 20, 30, 0.85);
+            --ui-border: #4a90e2;
+            --text-main: #f0f4f8;
+            --accent: #e2a84a;
+            --danger: #e24a4a;
+            --success: #4ae26a;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Righteous', sans-serif;
+            color: var(--text-main);
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(10,15,25,0.7) 0%, rgba(5,5,10,0.95) 100%);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--ui-bg);
+            border: 2px solid var(--ui-border);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(74, 144, 226, 0.4), inset 0 0 20px rgba(0,0,0,0.8);
+            max-width: 90%;
+            width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 3rem;
+            color: var(--accent);
+            text-shadow: 0 0 15px var(--accent), 2px 2px 0px #000;
+            margin: 0 0 20px 0;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 0 0 15px 0;
+            color: var(--text-main);
+        }
+
+        .stats-display {
+            font-size: 1.2rem;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .stats-display span {
+            color: var(--accent);
+        }
+
+        button {
+            background: linear-gradient(180deg, #2a5a8f 0%, #1a3a6f 100%);
+            color: #fff;
+            border: 2px solid var(--ui-border);
+            padding: 12px 25px;
+            font-size: 1.2rem;
+            font-family: 'Righteous', sans-serif;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #3a7abf 0%, #2a5a8f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(74, 144, 226, 0.6);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #333;
+            border-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid var(--ui-border);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            text-shadow: 0 0 5px #000;
+            box-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        #score-display { color: #fff; }
+        #lives-display { color: var(--danger); }
+
+        #shop-btn-hud {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            pointer-events: auto;
+            border-radius: 50%;
+            width: 70px; height: 70px;
+            font-size: 1rem;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #e2a84a 0%, #b2781a 100%);
+            border-color: #ffda8a;
+            box-shadow: 0 0 15px rgba(226, 168, 74, 0.6);
+            z-index: 5;
+        }
+
+        #shop-btn-hud:hover {
+            box-shadow: 0 0 25px rgba(226, 168, 74, 1);
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .shop-item {
+            background: rgba(20, 30, 45, 0.9);
+            border: 1px solid #4a90e2;
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+        }
+
+        .shop-item-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .shop-item-info p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .shop-item-buy {
+            background: var(--success);
+            border: 1px solid #28a745;
+            padding: 8px 15px;
+            font-size: 1rem;
+            margin: 0;
+            min-width: 90px;
+        }
+
+        .shop-item-buy:hover { background: #5ceb7f; }
+
+        /* Notification */
+        #notification {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(226, 168, 74, 0.9);
+            color: #000;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(226, 168, 74, 0.8);
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        #notification.show {
+            top: 20px;
+        }
+
+        /* Scrollbar styling for shop */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-main); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" style="display: none;">
+        <div class="hud-box">Score: <span id="score-display">0</span></div>
+        <div class="hud-box">Health: <span id="lives-display">❤❤❤</span></div>
+    </div>
+    <button id="shop-btn-hud" style="display: none;">SHOP</button>
+
+    <!-- Main Menu Overlay -->
+    <div id="menu-overlay" class="overlay active">
+        <div class="panel">
+            <h1>Falling Pillars</h1>
+            <div class="stats-display">
+                <div>High Score: <br><span id="menu-highscore">0</span></div>
+            </div>
+            <button id="start-btn">Play Game</button>
+            <button id="menu-shop-btn">Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Shop Overlay -->
+    <div id="shop-overlay" class="overlay">
+        <div class="panel" style="width: 500px;">
+            <h2>SimgaBucks Shop</h2>
+            <div style="font-size: 0.9rem; color:#aaa; margin-bottom: 10px;">Spend SimgaBucks to power up!</div>
+            <div class="shop-grid" id="shop-container">
+                <!-- Shop items injected via JS -->
+            </div>
+            <button id="close-shop-btn" style="margin-top: 20px;">Back</button>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over-overlay" class="overlay">
+        <div class="panel">
+            <h1 style="color: var(--danger); text-shadow: 0 0 15px var(--danger);">Game Over</h1>
+            <div class="stats-display">
+                <div>Score: <br><span id="go-score">0</span></div>
+                <div>High Score: <br><span id="go-highscore">0</span></div>
+            </div>
+            <button id="restart-btn">Play Again</button>
+            <button id="go-shop-btn">Shop</button>
+        </div>
+    </div>
+
+    <div id="notification">Reward Unlocked!</div>
+</div>
+
+<script>
+    /* ==========================================================================
+       SYSTEM & PLATFORM INTEGRATION
+       ========================================================================== */
+    const GAME_ID = "pillars";
+    let pendingPurchases = {};
+
+    let saveData = {
+        highScore: 0,
+        upgrades: { damage: 0, slow: 0 },
+        skins: { hammer: 0, fx: 0 },
+        unlocked: { hammer_1: false, hammer_2: false, fx_1: false }
+    };
+
+    // Listen for platform responses
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            if (data.data) {
+                // Merge loaded data with defaults
+                saveData = {
+                    ...saveData,
+                    ...data.data,
+                    upgrades: { ...saveData.upgrades, ...(data.data.upgrades || {}) },
+                    skins: { ...saveData.skins, ...(data.data.skins || {}) },
+                    unlocked: { ...saveData.unlocked, ...(data.data.unlocked || {}) }
+                };
+                updateUI();
+                renderShop();
+            }
+        }
+
+        if (data.type === "spendResponse") {
+            const purchaseInfo = pendingPurchases[data.msgId];
+            if (purchaseInfo) {
+                if (data.success) {
+                    applyPurchase(purchaseInfo.itemId);
+                    showNotification("Purchase Successful!", "#4ae26a");
+                } else {
+                    showNotification("Not enough SimgaBucks", "#e24a4a");
+                }
+                delete pendingPurchases[data.msgId];
+                renderShop();
+                saveProgress();
+            }
+        }
+    });
+
+    function saveProgress() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    function awardSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        showNotification(`+${amount} SimgaBucks!`, "#e2a84a");
+    }
+
+    function requestPurchase(itemId, cost) {
+        const msgId = Math.random().toString(36);
+        pendingPurchases[msgId] = { itemId, cost };
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+    }
+
+    function showNotification(text, color) {
+        const notif = document.getElementById("notification");
+        notif.innerText = text;
+        notif.style.background = color || "rgba(226, 168, 74, 0.9)";
+        notif.classList.add("show");
+        setTimeout(() => notif.classList.remove("show"), 2500);
+    }
+
+    /* ==========================================================================
+       SHOP CONFIGURATION
+       ========================================================================== */
+    const SHOP_ITEMS = {
+        damage: { 
+            id: 'damage', name: "Stronger Strikes", desc: "Deal more damage to pillars.",
+            baseCost: 20, costMult: 1.5, maxLevel: 10, type: "upgrade"
+        },
+        slow: { 
+            id: 'slow', name: "Time Dilation", desc: "Reduces falling speed of pillars.",
+            baseCost: 30, costMult: 1.4, maxLevel: 8, type: "upgrade"
+        },
+        hammer_1: { 
+            id: 'hammer_1', name: "Iron Hammer", desc: "A sturdy iron mallet.",
+            cost: 50, type: "skin_hammer", skinId: 1
+        },
+        hammer_2: { 
+            id: 'hammer_2', name: "Neon Hammer", desc: "A futuristic glowing hammer.",
+            cost: 150, type: "skin_hammer", skinId: 2
+        },
+        fx_1: { 
+            id: 'fx_1', name: "Cosmic Debris", desc: "Shiny stardust particle effects.",
+            cost: 80, type: "skin_fx", skinId: 1
+        }
+    };
+
+    function getCost(itemId) {
+        const item = SHOP_ITEMS[itemId];
+        if (item.type === "upgrade") {
+            const level = saveData.upgrades[itemId] || 0;
+            return Math.floor(item.baseCost * Math.pow(item.costMult, level));
+        }
+        return item.cost;
+    }
+
+    function applyPurchase(itemId) {
+        const item = SHOP_ITEMS[itemId];
+        if (item.type === "upgrade") {
+            saveData.upgrades[itemId] = (saveData.upgrades[itemId] || 0) + 1;
+        } else {
+            saveData.unlocked[itemId] = true;
+            if (item.type === "skin_hammer") saveData.skins.hammer = item.skinId;
+            if (item.type === "skin_fx") saveData.skins.fx = item.skinId;
+        }
+    }
+
+    function equipItem(itemId) {
+        const item = SHOP_ITEMS[itemId];
+        if (item.type === "skin_hammer") saveData.skins.hammer = item.skinId;
+        if (item.type === "skin_fx") saveData.skins.fx = item.skinId;
+        saveProgress();
+        renderShop();
+    }
+
+    /* ==========================================================================
+       UI LOGIC
+       ========================================================================== */
+    const UI = {
+        menu: document.getElementById('menu-overlay'),
+        shop: document.getElementById('shop-overlay'),
+        gameOver: document.getElementById('game-over-overlay'),
+        hud: document.getElementById('hud'),
+        shopBtnHud: document.getElementById('shop-btn-hud')
+    };
+
+    function switchState(state) {
+        Object.values(UI).forEach(el => el.classList?.remove('active'));
+        if (state !== 'PLAYING') {
+            UI.hud.style.display = 'none';
+            UI.shopBtnHud.style.display = 'none';
+        }
+
+        switch(state) {
+            case 'MENU':
+                UI.menu.classList.add('active');
+                updateUI();
+                break;
+            case 'SHOP':
+                UI.shop.classList.add('active');
+                renderShop();
+                break;
+            case 'PLAYING':
+                UI.hud.style.display = 'flex';
+                UI.shopBtnHud.style.display = 'flex';
+                startGame();
+                break;
+            case 'GAMEOVER':
+                UI.gameOver.classList.add('active');
+                document.getElementById('go-score').innerText = state_score;
+                document.getElementById('go-highscore').innerText = saveData.highScore;
+                break;
+        }
+    }
+
+    document.getElementById('start-btn').onclick = () => switchState('PLAYING');
+    document.getElementById('restart-btn').onclick = () => switchState('PLAYING');
+    document.getElementById('menu-shop-btn').onclick = () => switchState('SHOP');
+    document.getElementById('go-shop-btn').onclick = () => switchState('SHOP');
+    document.getElementById('close-shop-btn').onclick = () => switchState(gameState === 'GAMEOVER' ? 'GAMEOVER' : 'MENU');
+    document.getElementById('shop-btn-hud').onclick = () => {
+        isPaused = true;
+        switchState('SHOP');
+    };
+
+    function updateUI() {
+        document.getElementById('menu-highscore').innerText = saveData.highScore;
+    }
+
+    function renderShop() {
+        const container = document.getElementById('shop-container');
+        container.innerHTML = '';
+
+        for (const key in SHOP_ITEMS) {
+            const item = SHOP_ITEMS[key];
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let btnHTML = '';
+            
+            if (item.type === "upgrade") {
+                const level = saveData.upgrades[key] || 0;
+                const cost = getCost(key);
+                if (level >= item.maxLevel) {
+                    btnHTML = `<button class="shop-item-buy" disabled>MAX</button>`;
+                } else {
+                    btnHTML = `<button class="shop-item-buy" onclick="requestPurchase('${key}', ${cost})">${cost} SB</button>`;
+                }
+                div.innerHTML = `
+                    <div class="shop-item-info">
+                        <h3>${item.name} (Lvl ${level}/${item.maxLevel})</h3>
+                        <p>${item.desc}</p>
+                    </div>
+                    ${btnHTML}
+                `;
+            } else {
+                const unlocked = saveData.unlocked[key];
+                const isEquipped = (item.type === "skin_hammer" && saveData.skins.hammer === item.skinId) || 
+                                   (item.type === "skin_fx" && saveData.skins.fx === item.skinId);
+                
+                if (isEquipped) {
+                    btnHTML = `<button class="shop-item-buy" style="background:#4a90e2; border-color:#fff" disabled>Equipped</button>`;
+                } else if (unlocked) {
+                    btnHTML = `<button class="shop-item-buy" onclick="equipItem('${key}')">Equip</button>`;
+                } else {
+                    btnHTML = `<button class="shop-item-buy" onclick="requestPurchase('${key}', ${item.cost})">${item.cost} SB</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="shop-item-info">
+                        <h3>${item.name}</h3>
+                        <p>${item.desc}</p>
+                    </div>
+                    ${btnHTML}
+                `;
+            }
+            container.appendChild(div);
+        }
+    }
+
+    /* ==========================================================================
+       GAME ENGINE & LOGIC
+       ========================================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    let cw, ch;
+    function resize() {
+        cw = canvas.width = window.innerWidth;
+        ch = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Game Variables
+    let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+    let isPaused = false;
+    let lastTime = 0;
+    
+    // Play session variables
+    let state_score = 0;
+    let state_lives = 3;
+    let state_time = 0;
+    let state_pillarsDestroyed = 0;
+    let state_sbAwardedThisSession = 0;
+    
+    let spawnTimer = 0;
+    let spawnInterval = 1500;
+    
+    // Entities
+    let pillars = [];
+    let particles = [];
+    let floatingTexts = [];
+    let bgParticles = [];
+
+    // Screen shake
+    let shakeAmount = 0;
+
+    // Mouse/Hammer tracking
+    let mouse = { x: -1000, y: -1000, swing: 0 };
+    
+    canvas.addEventListener('pointermove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+
+    canvas.addEventListener('pointerdown', (e) => {
+        if (gameState !== 'PLAYING' || isPaused) return;
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        mouse.swing = 1.0; // Trigger hammer animation
+        handleHit(mouse.x, mouse.y);
+    });
+
+    function initBackground() {
+        bgParticles = [];
+        for(let i=0; i<50; i++) {
+            bgParticles.push({
+                x: Math.random() * cw,
+                y: Math.random() * ch,
+                size: Math.random() * 2 + 1,
+                speedY: Math.random() * -0.5 - 0.1,
+                alpha: Math.random() * 0.5 + 0.1
+            });
+        }
+    }
+    initBackground();
+
+    function startGame() {
+        gameState = 'PLAYING';
+        isPaused = false;
+        state_score = 0;
+        state_lives = 3;
+        state_time = 0;
+        state_pillarsDestroyed = 0;
+        state_sbAwardedThisSession = 0;
+        spawnTimer = 0;
+        spawnInterval = 1800;
+        pillars = [];
+        particles = [];
+        floatingTexts = [];
+        shakeAmount = 0;
+        updateHUD();
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+        gameState = 'GAMEOVER';
+        if (state_score > saveData.highScore) {
+            saveData.highScore = state_score;
+            saveProgress();
+        }
+        switchState('GAMEOVER');
+    }
+
+    function updateHUD() {
+        document.getElementById('score-display').innerText = state_score;
+        let hearts = "";
+        for(let i=0; i<3; i++) {
+            hearts += (i < state_lives) ? "❤" : "♡";
+        }
+        document.getElementById('lives-display').innerText = hearts;
+    }
+
+    function addShake(amount) {
+        shakeAmount = Math.min(shakeAmount + amount, 30);
+    }
+
+    /* Economy Logic */
+    function checkEconomyRewards(isGolden) {
+        state_pillarsDestroyed++;
+        
+        // Fast early reward (First 20-30s usually means destroying 1-3 pillars)
+        if (state_pillarsDestroyed === 1) {
+            awardSimgaBucks(1);
+            state_sbAwardedThisSession += 1;
+        } 
+        else if (isGolden) {
+            awardSimgaBucks(5);
+            state_sbAwardedThisSession += 5;
+        }
+        // Milestone rewards (steady drip)
+        else if (state_pillarsDestroyed % 10 === 0) {
+            let amount = 2;
+            if (state_pillarsDestroyed % 30 === 0) amount = 4;
+            awardSimgaBucks(amount);
+            state_sbAwardedThisSession += amount;
+        }
+    }
+
+    /* Hit Logic */
+    function handleHit(x, y) {
+        let playerDamage = 1 + (saveData.upgrades.damage || 0);
+        let hitSomething = false;
+
+        // Check pillars backwards (top rendered first)
+        for (let i = pillars.length - 1; i >= 0; i--) {
+            let p = pillars[i];
+            // Expanded hit box slightly for mobile ease
+            if (x > p.x - 20 && x < p.x + p.w + 20 && y > p.y - 20 && y < p.y + p.h + 20) {
+                p.health -= playerDamage;
+                hitSomething = true;
+                addShake(3);
+                
+                // Hit sparks
+                spawnParticles(x, y, p.isGolden ? "#ffd700" : "#cccccc", 5, "spark");
+                
+                floatingTexts.push({
+                    x: x + (Math.random()*40-20),
+                    y: y - 20,
+                    text: `-${playerDamage}`,
+                    life: 1.0,
+                    color: '#ff4444'
+                });
+
+                if (p.health <= 0) {
+                    destroyPillar(i);
+                }
+                break; // Only hit one pillar per click
+            }
+        }
+
+        if (!hitSomething) {
+            // Swing and miss effect
+            spawnParticles(x, y, "#ffffff", 2, "dust");
+        }
+    }
+
+    function destroyPillar(index) {
+        let p = pillars[index];
+        pillars.splice(index, 1);
+        
+        state_score += p.maxHealth;
+        addShake(8);
+        
+        // Sound/Visuals
+        spawnParticles(p.x + p.w/2, p.y + p.h/2, p.color, 30, "debris");
+        if (p.isGolden) {
+            spawnParticles(p.x + p.w/2, p.y + p.h/2, "#ffffff", 20, "spark");
+        }
+
+        floatingTexts.push({
+            x: p.x + p.w/2,
+            y: p.y,
+            text: `+${p.maxHealth}`,
+            life: 1.5,
+            color: '#4ae26a'
+        });
+
+        checkEconomyRewards(p.isGolden);
+        updateHUD();
+    }
+
+    /* Spawner */
+    function spawnPillar() {
+        let baseHealth = 2 + Math.floor(state_time / 20000); // Increases over time
+        let isGolden = Math.random() < 0.05; // 5% chance
+        let health = isGolden ? baseHealth * 2 : baseHealth;
+        
+        // width scales slightly with health
+        let w = 60 + Math.min(health * 5, 60);
+        let h = 120 + Math.min(health * 10, 80);
+        
+        let x = Math.random() * (cw - w - 40) + 20;
+        let y = -h - 20;
+
+        // Slow upgrade effect
+        let slowFactor = 1.0 - ((saveData.upgrades.slow || 0) * 0.08); 
+        let speed = (100 + (state_time / 1000)) * slowFactor; // pixels per second
+
+        let colors = isGolden ? ["#ffeb3b", "#fbc02d", "#f57f17"] : ["#b0bec5", "#78909c", "#455a64"];
+
+        // Pre-calculate cracks to prevent flickering
+        let cracks = [];
+        for(let i=0; i<5; i++) {
+            cracks.push({
+                xFactor: Math.random() * 0.8 + 0.1,
+                yFactor: Math.random() * 0.8 + 0.1,
+                midOffX: Math.random() * 20 - 10,
+                endOffX: Math.random() * 30 - 15
+            });
+        }
+
+        pillars.push({
+            x: x, y: y, w: w, h: h,
+            health: health, maxHealth: health,
+            speed: speed,
+            isGolden: isGolden,
+            color: colors[0], shadow: colors[2], highlight: colors[1],
+            cracks: cracks // Add to pillar object
+        });
+    }
+
+    /* Effects */
+    function spawnParticles(x, y, color, count, type) {
+        let isCosmic = saveData.skins.fx === 1;
+        
+        for(let i=0; i<count; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let speed = Math.random() * (type === "spark" ? 300 : 200) + 50;
+            let actualColor = color;
+            
+            if (isCosmic && type === "debris") {
+                const hues = [280, 320, 200, 60];
+                actualColor = `hsl(${hues[Math.floor(Math.random()*hues.length)]}, 100%, 70%)`;
+            }
+
+            particles.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - (type === "debris" ? 100 : 0),
+                life: 1.0,
+                maxLife: type === "spark" ? 0.5 + Math.random()*0.5 : 1.0 + Math.random(),
+                color: actualColor,
+                size: type === "spark" ? Math.random()*3+1 : Math.random()*8+4,
+                type: type,
+                rot: Math.random() * Math.PI,
+                vrot: (Math.random() - 0.5) * 10
+            });
+        }
+    }
+
+    /* Drawing Functions */
+    function drawPillar(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        
+        // Glow if golden
+        if (p.isGolden) {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "#ffeb3b";
+        }
+
+        // Gradient for 3D effect
+        let grad = ctx.createLinearGradient(0, 0, p.w, 0);
+        grad.addColorStop(0, p.shadow);
+        grad.addColorStop(0.3, p.color);
+        grad.addColorStop(0.7, p.highlight);
+        grad.addColorStop(1, p.shadow);
+
+        ctx.fillStyle = grad;
+
+        // Base and Cap
+        ctx.fillRect(-10, 0, p.w + 20, 15);
+        ctx.fillRect(-10, p.h - 15, p.w + 20, 15);
+        
+        // Shaft
+        ctx.fillRect(0, 15, p.w, p.h - 30);
+
+        // Fluting (vertical lines)
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        for(let i=1; i<4; i++) {
+            ctx.fillRect((p.w/4)*i - 2, 15, 4, p.h - 30);
+        }
+
+        // Damage cracks
+        if (p.health < p.maxHealth) {
+            ctx.strokeStyle = "rgba(0,0,0,0.6)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            let ratio = p.health / p.maxHealth;
+            // Use ceil so even a little damage shows at least 1 crack
+            let numCracks = Math.ceil((1 - ratio) * 5); 
+            for(let i=0; i<numCracks; i++) {
+                let c = p.cracks[i];
+                if (!c) continue; // Safety check
+                let startX = p.w * c.xFactor;
+                let startY = p.h * c.yFactor;
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(startX + c.midOffX, startY + 20);
+                ctx.lineTo(startX + c.endOffX, startY + 40);
+            }
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function drawHammer() {
+        if (mouse.x < -100) return; // Out of bounds
+        
+        ctx.save();
+        ctx.translate(mouse.x, mouse.y);
+        
+        // Swing animation
+        let rot = Math.sin(mouse.swing * Math.PI) * 1.5;
+        ctx.rotate(rot);
+        
+        let skin = saveData.skins.hammer;
+        
+        // Handle offset so head hits the mouse point
+        ctx.translate(10, -10); 
+
+        if (skin === 2) { // Neon Hammer
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00ffff";
+            ctx.fillStyle = "#222";
+            ctx.fillRect(-5, 0, 10, 50); // handle
+            ctx.fillStyle = "#00ffff";
+            ctx.fillRect(-20, -20, 40, 20); // head
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-15, -15, 30, 10);
+        } else if (skin === 1) { // Iron Hammer
+            ctx.fillStyle = "#555";
+            ctx.fillRect(-4, 0, 8, 45); // handle
+            ctx.fillStyle = "#888";
+            ctx.fillRect(-18, -15, 36, 18); // head
+            ctx.fillStyle = "#bbb";
+            ctx.fillRect(-18, -15, 36, 4); // highlight
+            // Rivets
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.arc(-10, -6, 2, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(10, -6, 2, 0, Math.PI*2); ctx.fill();
+        } else { // Basic Wood
+            ctx.fillStyle = "#8b5a2b";
+            ctx.fillRect(-4, 0, 8, 40); // handle
+            ctx.fillStyle = "#a0522d";
+            ctx.fillRect(-15, -12, 30, 15); // head
+        }
+
+        ctx.restore();
+    }
+
+    /* Main Loop */
+    function gameLoop(time) {
+        if (gameState !== 'PLAYING' || isPaused) return;
+        
+        let dt = (time - lastTime) / 1000;
+        lastTime = time;
+        if (dt > 0.1) dt = 0.1; // Cap delta time
+
+        state_time += dt * 1000;
+
+        // --- UPDATE ---
+        
+        // Spawning
+        spawnTimer += dt * 1000;
+        // Decrease spawn interval over time down to a minimum of 400ms
+        let currentInterval = Math.max(400, spawnInterval - (state_time * 0.015));
+        
+        if (spawnTimer > currentInterval) {
+            spawnPillar();
+            spawnTimer = 0;
+        }
+
+        // Pillars
+        for (let i = pillars.length - 1; i >= 0; i--) {
+            let p = pillars[i];
+            p.y += p.speed * dt;
+            
+            // Missed pillar
+            if (p.y > ch) {
+                pillars.splice(i, 1);
+                state_lives--;
+                updateHUD();
+                addShake(15);
+                
+                // Flash red overlay
+                let oldFill = ctx.fillStyle;
+                ctx.fillStyle = "rgba(255,0,0,0.3)";
+                ctx.fillRect(0,0,cw,ch);
+                ctx.fillStyle = oldFill;
+
+                if (state_lives <= 0) {
+                    endGame();
+                    return; // Stop update loop
+                }
+            }
+        }
+
+        // Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 600 * dt; // Gravity
+            p.rot += p.vrot * dt;
+            p.life -= dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Texts
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            let ft = floatingTexts[i];
+            ft.y -= 50 * dt;
+            ft.life -= dt;
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+
+        // BG Particles
+        bgParticles.forEach(bp => {
+            bp.y += bp.speedY * dt * 60;
+            if(bp.y < -10) bp.y = ch + 10;
+        });
+
+        // Hammer animation
+        if (mouse.swing > 0) {
+            mouse.swing -= dt * 6; // swing duration
+            if (mouse.swing < 0) mouse.swing = 0;
+        }
+
+        // Screen shake decay
+        if (shakeAmount > 0) {
+            shakeAmount *= 0.9;
+            if (shakeAmount < 0.5) shakeAmount = 0;
+        }
+
+        // --- DRAW ---
+        
+        // Background
+        let bgGrad = ctx.createRadialGradient(cw/2, ch, 0, cw/2, ch, ch*1.5);
+        bgGrad.addColorStop(0, "#1a1525");
+        bgGrad.addColorStop(1, "#050510");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, cw, ch);
+
+        // BG Motes
+        ctx.fillStyle = "rgba(100, 150, 255, 0.5)";
+        bgParticles.forEach(bp => {
+            ctx.beginPath();
+            ctx.arc(bp.x, bp.y, bp.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        ctx.save();
+        if (shakeAmount > 0) {
+            let sx = (Math.random() - 0.5) * shakeAmount;
+            let sy = (Math.random() - 0.5) * shakeAmount;
+            ctx.translate(sx, sy);
+        }
+
+        // Draw Pillars
+        pillars.forEach(p => drawPillar(p));
+
+        // Draw Particles
+        particles.forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            if (p.type === "spark") {
+                ctx.globalCompositeOperation = "lighter";
+                ctx.fillStyle = p.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+            }
+            ctx.restore();
+        });
+
+        // Draw Texts
+        ctx.font = "bold 24px 'Righteous', sans-serif";
+        ctx.textAlign = "center";
+        floatingTexts.forEach(ft => {
+            ctx.globalAlpha = Math.max(0, ft.life);
+            ctx.fillStyle = ft.color;
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "#000";
+            ctx.fillText(ft.text, ft.x, ft.y);
+        });
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+
+        ctx.restore(); // Restore shake translation
+
+        drawHammer();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initial render of empty background to look nice behind menu
+    function initialRender() {
+        let bgGrad = ctx.createRadialGradient(cw/2, ch, 0, cw/2, ch, ch*1.5);
+        bgGrad.addColorStop(0, "#1a1525");
+        bgGrad.addColorStop(1, "#050510");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, cw, ch);
+    }
+    initialRender();
+
+</script>
+</body>
+</html>

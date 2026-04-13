@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Color Link</title>
+    <style>
+        :root {
+            --bg-color: #0b0d17;
+            --panel-bg: rgba(15, 20, 35, 0.85);
+            --border-color: #3a4b86;
+            --text-main: #e0e6ff;
+            --accent: #00eeff;
+            --accent-hover: #00bbee;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none; /* Prevent mobile scrolling */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, rgba(11, 13, 23, 0.6) 0%, rgba(5, 7, 12, 0.95) 100%);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 238, 255, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 0 0 8px var(--accent);
+        }
+
+        button {
+            background: linear-gradient(135deg, #1a2652, #2a3b7d);
+            border: 2px solid var(--accent);
+            color: #fff;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(0, 238, 255, 0.2);
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #2a3b7d, #3a4b86);
+            box-shadow: 0 0 20px rgba(0, 238, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #555;
+            box-shadow: none;
+            color: #aaa;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 600px;
+            pointer-events: none; /* Let clicks pass through empty space */
+        }
+
+        .hud-element {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hud-btn {
+            padding: 8px 15px;
+            font-size: 1rem;
+        }
+
+        /* Shop Grid */
+        .shop-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid #445;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .shop-item h3 {
+            font-size: 1rem;
+            color: var(--accent);
+        }
+
+        .cost {
+            color: #ffaa00;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .buy-btn {
+            padding: 8px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        #loading-screen {
+            background: var(--bg-color);
+            z-index: 100;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 238, 255, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen">
+        <div class="spinner"></div>
+        <h2>Loading Data...</h2>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="screen hidden">
+        <div class="panel">
+            <h1>Color Link</h1>
+            <p>Connect matching nodes. Lines cannot cross!</p>
+            <button id="btn-play">Play Level <span id="menu-level-disp">1</span></button>
+            <button id="btn-shop">Shop & Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="shop-menu" class="screen hidden">
+        <div class="panel">
+            <h2>Simga Shop</h2>
+            <div class="shop-items">
+                <div class="shop-item">
+                    <h3>Neon Glow</h3>
+                    <p class="cost">15 SB</p>
+                    <button class="buy-btn" id="buy-glow" data-cost="15" data-item="glow">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Diamond Nodes</h3>
+                    <p class="cost">20 SB</p>
+                    <button class="buy-btn" id="buy-diamond" data-cost="20" data-item="diamond">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Hint Charge</h3>
+                    <p class="cost">5 SB</p>
+                    <button class="buy-btn" id="buy-hint" data-cost="5" data-item="hint">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Undo Charge</h3>
+                    <p class="cost">3 SB</p>
+                    <button class="buy-btn" id="buy-undo" data-cost="3" data-item="undo">Buy</button>
+                </div>
+            </div>
+            <button id="btn-shop-close" style="margin-top: 10px;">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-element">Lv. <span id="hud-level">1</span></div>
+        <div style="display: flex; gap: 10px;">
+            <button class="hud-element hud-btn" id="btn-hint">Hint (<span id="hint-count">0</span>)</button>
+            <button class="hud-element hud-btn" id="btn-undo">Undo (<span id="undo-count">0</span>)</button>
+            <button class="hud-element hud-btn" id="btn-quit" style="background: #521a1a; border-color: #ff3333;">Quit</button>
+        </div>
+    </div>
+
+    <!-- Level Complete -->
+    <div id="level-complete" class="screen hidden">
+        <div class="panel">
+            <h2>Level Cleared!</h2>
+            <p style="font-size: 1.5rem; color: #33ff33;">+<span id="reward-amount">2</span> SimgaBucks</p>
+            <button id="btn-next">Next Level</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * COLOR LINK
+ * A polished HTML5 Canvas mini-game for the Simga platform.
+ */
+
+// --- CONSTANTS & CONFIG ---
+const GAME_ID = "color";
+const COLORS = [
+    '#ff0055', // Neon Pink
+    '#00eeff', // Cyan
+    '#33ff33', // Neon Green
+    '#ffaa00', // Orange
+    '#aa00ff', // Purple
+    '#ffff00', // Yellow
+    '#ffffff', // White
+    '#ff3333'  // Red
+];
+
+// --- GAME STATE ---
+let saveData = {
+    level: 1,
+    hints: 1, // Start with 1 free hint
+    undos: 2, // Start with 2 free undos
+    glowUnlocked: false,
+    diamondUnlocked: false,
+    hasConnectedFirstPair: false
+};
+
+let gameState = "LOADING"; // LOADING, MENU, PLAYING, SHOP, COMPLETE
+let pendingPurchases = {};
+let loadMsgId = null;
+
+// Grid State
+let gridSize = 4; // Starts at 4x4, increases with level
+let grid = [];
+let endpoints = [];
+let paths = {}; // paths[colorId] = [{x,y}, {x,y}...]
+let cellSize = 0;
+let gridOffsetX = 0;
+let gridOffsetY = 0;
+
+// Input State
+let drawingId = null;
+let lastModifiedId = null;
+
+// Visuals
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+let particles = [];
+let bgParticles = [];
+let time = 0;
+
+// --- PLATFORM COMMUNICATION ---
+
+function saveGame() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function loadGame() {
+    loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+    
+    // Fallback if platform doesn't respond within 1.5 seconds
+    setTimeout(() => {
+        if (gameState === "LOADING") {
+            console.warn("Load timeout, starting fresh.");
+            finishLoading();
+        }
+    }, 1500);
+}
+
+function giveSimgaBucks(amount) {
+    if (amount <= 0) return;
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+}
+
+function requestPurchase(itemType, cost) {
+    const msgId = Math.random().toString(36).substr(2, 9);
+    pendingPurchases[msgId] = { type: itemType, cost: cost };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+        if (data.data) {
+            // Merge loaded data with defaults
+            saveData = { ...saveData, ...data.data };
+        }
+        finishLoading();
+    }
+
+    if (data.type === "spendResponse") {
+        const purchase = pendingPurchases[data.msgId];
+        if (purchase) {
+            if (data.success) {
+                applyPurchase(purchase.type);
+            } else {
+                alert("Not enough SimgaBucks!");
+            }
+            delete pendingPurchases[data.msgId];
+        }
+    }
+});
+
+function applyPurchase(type) {
+    switch(type) {
+        case 'glow': 
+            saveData.glowUnlocked = true; 
+            updateShopUI();
+            break;
+        case 'diamond': 
+            saveData.diamondUnlocked = true; 
+            updateShopUI();
+            break;
+        case 'hint': 
+            saveData.hints++; 
+            updateHUD();
+            break;
+        case 'undo': 
+            saveData.undos++; 
+            updateHUD();
+            break;
+    }
+    saveGame();
+    spawnBurst(canvas.width/2, canvas.height/2, '#ffffff', 50); // Celebration burst
+}
+
+
+// --- INITIALIZATION & UI ---
+
+function finishLoading() {
+    gameState = "MENU";
+    document.getElementById('loading-screen').classList.add('hidden');
+    showScreen('main-menu');
+    updateMenuUI();
+    initBackground();
+}
+
+function updateMenuUI() {
+    document.getElementById('menu-level-disp').innerText = saveData.level;
+}
+
+function updateHUD() {
+    document.getElementById('hud-level').innerText = saveData.level;
+    document.getElementById('hint-count').innerText = saveData.hints;
+    document.getElementById('undo-count').innerText = saveData.undos;
+}
+
+function updateShopUI() {
+    const btnGlow = document.getElementById('buy-glow');
+    if(saveData.glowUnlocked) {
+        btnGlow.innerText = "Owned";
+        btnGlow.disabled = true;
+    } else {
+        btnGlow.innerText = "Buy";
+        btnGlow.disabled = false;
+    }
+
+    const btnDiamond = document.getElementById('buy-diamond');
+    if(saveData.diamondUnlocked) {
+        btnDiamond.innerText = "Owned";
+        btnDiamond.disabled = true;
+    } else {
+        btnDiamond.innerText = "Buy";
+        btnDiamond.disabled = false;
+    }
+}
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen, #hud').forEach(el => el.classList.add('hidden'));
+    if(screenId) {
+        document.getElementById(screenId).classList.remove('hidden');
+    }
+}
+
+// Button Listeners
+document.getElementById('btn-play').addEventListener('click', startGame);
+document.getElementById('btn-next').addEventListener('click', startGame);
+document.getElementById('btn-quit').addEventListener('click', () => {
+    gameState = "MENU";
+    updateMenuUI();
+    showScreen('main-menu');
+});
+
+document.getElementById('btn-shop').addEventListener('click', () => {
+    gameState = "SHOP";
+    updateShopUI();
+    showScreen('shop-menu');
+});
+
+document.getElementById('btn-shop-close').addEventListener('click', () => {
+    gameState = "MENU";
+    showScreen('main-menu');
+});
+
+document.querySelectorAll('.buy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const item = e.target.getAttribute('data-item');
+        const cost = parseInt(e.target.getAttribute('data-cost'));
+        requestPurchase(item, cost);
+    });
+});
+
+document.getElementById('btn-hint').addEventListener('click', useHint);
+document.getElementById('btn-undo').addEventListener('click', useUndo);
+
+// --- LEVEL GENERATION (Random Walk Algorithm) ---
+
+function generateLevel() {
+    // Determine size and complexity based on level
+    gridSize = Math.min(8, 4 + Math.floor((saveData.level - 1) / 3)); // 4x4 up to 8x8
+    let numColors = Math.min(COLORS.length, Math.floor(gridSize * 1.2));
+
+    let success = false;
+    let attempts = 0;
+    
+    // Attempt generation until we get a valid board with enough pairs
+    while(!success && attempts < 50) {
+        attempts++;
+        grid = Array(gridSize).fill(0).map(() => Array(gridSize).fill(null));
+        endpoints = [];
+        let tempPaths = [];
+
+        const dirs = [[0,1], [1,0], [0,-1], [-1,0]];
+        let colorId = 0;
+
+        for(let i=0; i<numColors; i++) {
+            let start = findEmptyCell(grid);
+            if(!start) break;
+            
+            let path = [start];
+            grid[start.y][start.x] = colorId;
+            let curr = start;
+            let walkLen = Math.floor(Math.random() * (gridSize)) + 2; 
+
+            for(let step=0; step<walkLen; step++) {
+                let neighbors = [];
+                for(let d of dirs) {
+                    let nx = curr.x + d[0], ny = curr.y + d[1];
+                    if(nx>=0 && ny>=0 && nx<gridSize && ny<gridSize && grid[ny][nx]===null) {
+                        neighbors.push({x:nx, y:ny});
+                    }
+                }
+                if(neighbors.length === 0) break;
+                
+                let next = neighbors[Math.floor(Math.random()*neighbors.length)];
+                path.push(next);
+                grid[next.y][next.x] = colorId;
+                curr = next;
+            }
+
+            if(path.length > 1) {
+                endpoints.push({
+                    id: colorId,
+                    color: COLORS[colorId % COLORS.length],
+                    start: path[0],
+                    end: path[path.length-1],
+                    solution: path
+                });
+                tempPaths.push(path);
+                colorId++;
+            } else {
+                grid[start.y][start.x] = null; // revert start
+            }
+        }
+
+        // Must have at least 3 pairs for a valid game (or 2 for level 1)
+        if(endpoints.length >= Math.max(2, Math.floor(numColors * 0.7))) {
+            success = true;
+        }
+    }
+
+    // Clear the grid cells (player has to fill them)
+    grid = Array(gridSize).fill(0).map(() => Array(gridSize).fill(null));
+    paths = {};
+    
+    // Place endpoints in grid
+    endpoints.forEach(ep => {
+        grid[ep.start.y][ep.start.x] = { type: 'end', id: ep.id };
+        grid[ep.end.y][ep.end.x] = { type: 'end', id: ep.id };
+        paths[ep.id] = [];
+    });
+}
+
+function findEmptyCell(g) {
+    let empty = [];
+    for(let y=0; y<gridSize; y++) {
+        for(let x=0; x<gridSize; x++) {
+            if(g[y][x] === null) empty.push({x,y});
+        }
+    }
+    if(empty.length === 0) return null;
+    return empty[Math.floor(Math.random() * empty.length)];
+}
+
+
+// --- GAMEPLAY MECHANICS ---
+
+function startGame() {
+    generateLevel();
+    calculateLayout();
+    updateHUD();
+    showScreen(null); // hide all screens
+    document.getElementById('hud').classList.remove('hidden');
+    gameState = "PLAYING";
+    drawingId = null;
+    lastModifiedId = null;
+}
+
+function calculateLayout() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Calculate grid layout
+    const maxGridWidth = Math.min(canvas.width * 0.9, 600);
+    const maxGridHeight = Math.min(canvas.height * 0.7, 600); // Leave room for HUD
+    
+    cellSize = Math.min(maxGridWidth, maxGridHeight) / gridSize;
+    gridOffsetX = (canvas.width - (cellSize * gridSize)) / 2;
+    gridOffsetY = (canvas.height - (cellSize * gridSize)) / 2 + 20; // Slight offset for HUD
+}
+
+window.addEventListener('resize', () => {
+    if(gameState === "PLAYING" || gameState === "MENU" || gameState === "COMPLETE") {
+        calculateLayout();
+    }
+});
+
+// Input Handling
+function getGridPos(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left - gridOffsetX;
+    const y = clientY - rect.top - gridOffsetY;
+    
+    if(x < 0 || y < 0 || x >= cellSize * gridSize || y >= cellSize * gridSize) return null;
+    
+    return {
+        gx: Math.floor(x / cellSize),
+        gy: Math.floor(y / cellSize)
+    };
+}
+
+function handlePointerDown(e) {
+    if(gameState !== "PLAYING") return;
+    const pos = getGridPos(e.clientX || e.touches[0].clientX, e.clientY || e.touches[0].clientY);
+    if(!pos) return;
+
+    const cell = grid[pos.gy][pos.gx];
+    
+    if(cell) {
+        if(cell.type === 'end') {
+            // Start drawing from endpoint
+            drawingId = cell.id;
+            lastModifiedId = drawingId;
+            paths[drawingId] = [{x: pos.gx, y: pos.gy}];
+            rebuildGrid();
+        } else if(cell.type === 'path') {
+            // Pick up existing path
+            drawingId = cell.id;
+            lastModifiedId = drawingId;
+            // Truncate path up to this point
+            const p = paths[drawingId];
+            const idx = p.findIndex(pt => pt.x === pos.gx && pt.y === pos.gy);
+            if(idx !== -1) {
+                paths[drawingId] = p.slice(0, idx + 1);
+                rebuildGrid();
+            }
+        }
+    }
+}
+
+function handlePointerMove(e) {
+    if(gameState !== "PLAYING" || drawingId === null) return;
+    e.preventDefault(); // Prevent scrolling on touch
+    
+    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : null);
+    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : null);
+    if(clientX === null) return;
+    
+    const pos = getGridPos(clientX, clientY);
+    if(!pos) return;
+
+    const p = paths[drawingId];
+    if(p.length === 0) return;
+    
+    const last = p[p.length - 1];
+    
+    // Check if moved to an adjacent cell (not diagonal)
+    const dx = Math.abs(pos.gx - last.x);
+    const dy = Math.abs(pos.gy - last.y);
+    
+    if((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+        const targetCell = grid[pos.gy][pos.gx];
+        
+        if(targetCell) {
+            if(targetCell.type === 'end') {
+                if(targetCell.id === drawingId) {
+                    // Reached the matching endpoint!
+                    p.push({x: pos.gx, y: pos.gy});
+                    drawingId = null; // Stop drawing
+                    rebuildGrid();
+                    
+                    // Visual flair
+                    const px = gridOffsetX + pos.gx * cellSize + cellSize/2;
+                    const py = gridOffsetY + pos.gy * cellSize + cellSize/2;
+                    spawnBurst(px, py, COLORS[targetCell.id % COLORS.length], 20);
+                    
+                    // First time reward
+                    if(!saveData.hasConnectedFirstPair) {
+                        saveData.hasConnectedFirstPair = true;
+                        giveSimgaBucks(1); 
+                        saveGame();
+                    }
+                    
+                    checkWin();
+                }
+            } else if(targetCell.type === 'path') {
+                if(targetCell.id === drawingId) {
+                    // Backtracking on own path
+                    const idx = p.findIndex(pt => pt.x === pos.gx && pt.y === pos.gy);
+                    if(idx !== -1) {
+                        paths[drawingId] = p.slice(0, idx + 1);
+                        rebuildGrid();
+                    }
+                } else {
+                    // Cutting another path!
+                    const otherId = targetCell.id;
+                    const otherP = paths[otherId];
+                    const idx = otherP.findIndex(pt => pt.x === pos.gx && pt.y === pos.gy);
+                    if(idx !== -1) {
+                        paths[otherId] = otherP.slice(0, idx); // Cut the other path before this cell
+                    }
+                    p.push({x: pos.gx, y: pos.gy});
+                    rebuildGrid();
+                }
+            }
+        } else {
+            // Empty cell, just add to path
+            p.push({x: pos.gx, y: pos.gy});
+            rebuildGrid();
+        }
+    }
+}
+
+function handlePointerUp() {
+    if(gameState === "PLAYING") {
+        drawingId = null;
+    }
+}
+
+canvas.addEventListener('mousedown', handlePointerDown);
+canvas.addEventListener('mousemove', handlePointerMove);
+window.addEventListener('mouseup', handlePointerUp);
+
+canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
+window.addEventListener('touchend', handlePointerUp);
+
+function rebuildGrid() {
+    // Clear paths from grid
+    for(let y=0; y<gridSize; y++) {
+        for(let x=0; x<gridSize; x++) {
+            if(grid[y][x] && grid[y][x].type === 'path') {
+                grid[y][x] = null;
+            }
+        }
+    }
+    // Repopulate paths
+    Object.keys(paths).forEach(id => {
+        const p = paths[id];
+        // Skip index 0 and length-1 if they are endpoints
+        for(let i=0; i<p.length; i++) {
+            const cell = grid[p[i].y][p[i].x];
+            if(!cell || cell.type !== 'end') {
+                grid[p[i].y][p[i].x] = { type: 'path', id: parseInt(id) };
+            }
+        }
+    });
+}
+
+function useHint() {
+    if(gameState !== "PLAYING" || saveData.hints <= 0) return;
+    
+    // Find an unconnected pair
+    for(let ep of endpoints) {
+        if(!isPairConnected(ep.id)) {
+            // Apply hint
+            paths[ep.id] = [...ep.solution];
+            saveData.hints--;
+            updateHUD();
+            rebuildGrid();
+            saveGame();
+            checkWin();
+            return;
+        }
+    }
+}
+
+function useUndo() {
+    if(gameState !== "PLAYING" || saveData.undos <= 0) return;
+    
+    if(lastModifiedId !== null && paths[lastModifiedId].length > 0) {
+        paths[lastModifiedId] = [];
+        saveData.undos--;
+        updateHUD();
+        rebuildGrid();
+        saveGame();
+    } else {
+        // Just clear the first path we find that has length
+        for(let id in paths) {
+            if(paths[id].length > 0) {
+                paths[id] = [];
+                saveData.undos--;
+                updateHUD();
+                rebuildGrid();
+                saveGame();
+                break;
+            }
+        }
+    }
+}
+
+function isPairConnected(id) {
+    const p = paths[id];
+    if(!p || p.length < 2) return false;
+    
+    const start = endpoints.find(e => e.id === parseInt(id)).start;
+    const end = endpoints.find(e => e.id === parseInt(id)).end;
+    
+    const pStart = p[0];
+    const pEnd = p[p.length-1];
+    
+    const connects = (pStart.x === start.x && pStart.y === start.y && pEnd.x === end.x && pEnd.y === end.y) ||
+                     (pStart.x === end.x && pStart.y === end.y && pEnd.x === start.x && pEnd.y === start.y);
+    
+    return connects;
+}
+
+function checkWin() {
+    let won = true;
+    for(let ep of endpoints) {
+        if(!isPairConnected(ep.id)) {
+            won = false;
+            break;
+        }
+    }
+    
+    if(won) {
+        gameState = "COMPLETE";
+        drawingId = null;
+        spawnBurst(canvas.width/2, canvas.height/2, '#ffffff', 100);
+        
+        setTimeout(() => {
+            let reward = 2; // Base reward
+            if(saveData.level % 5 === 0) reward = 5; // Milestone reward
+            
+            saveData.level++;
+            giveSimgaBucks(reward);
+            saveGame();
+            
+            document.getElementById('reward-amount').innerText = reward;
+            document.getElementById('hud').classList.add('hidden');
+            showScreen('level-complete');
+        }, 1000);
+    }
+}
+
+
+// --- RENDERING & EFFECTS ---
+
+function initBackground() {
+    bgParticles = [];
+    for(let i=0; i<100; i++) {
+        bgParticles.push({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            s: Math.random() * 2 + 1,
+            vy: Math.random() * 0.5 + 0.1,
+            a: Math.random() * 0.5 + 0.1
+        });
+    }
+}
+
+function spawnBurst(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 2;
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            decay: Math.random() * 0.03 + 0.015,
+            color: color,
+            size: Math.random() * 4 + 2
+        });
+    }
+}
+
+function drawBackground() {
+    // Solid background
+    ctx.fillStyle = '#0b0d17';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Grid glow at center
+    const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height));
+    gradient.addColorStop(0, 'rgba(26, 38, 82, 0.3)');
+    gradient.addColorStop(1, 'rgba(11, 13, 23, 0.9)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Floating particles
+    ctx.fillStyle = '#ffffff';
+    bgParticles.forEach(p => {
+        ctx.globalAlpha = p.a;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.s, 0, Math.PI*2);
+        ctx.fill();
+        p.y -= p.vy;
+        if(p.y < -10) p.y = canvas.height + 10;
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+function drawGrid() {
+    // Draw cells
+    ctx.strokeStyle = 'rgba(0, 238, 255, 0.15)';
+    ctx.lineWidth = 2;
+    for(let y=0; y<gridSize; y++) {
+        for(let x=0; x<gridSize; x++) {
+            ctx.strokeRect(gridOffsetX + x * cellSize, gridOffsetY + y * cellSize, cellSize, cellSize);
+            // Subtle fill
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(gridOffsetX + x * cellSize, gridOffsetY + y * cellSize, cellSize, cellSize);
+        }
+    }
+}
+
+function drawPaths() {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    Object.keys(paths).forEach(id => {
+        const p = paths[id];
+        if(p.length < 2) return;
+        
+        const color = COLORS[id % COLORS.length];
+        
+        ctx.beginPath();
+        ctx.moveTo(gridOffsetX + p[0].x * cellSize + cellSize/2, gridOffsetY + p[0].y * cellSize + cellSize/2);
+        for(let i=1; i<p.length; i++) {
+            ctx.lineTo(gridOffsetX + p[i].x * cellSize + cellSize/2, gridOffsetY + p[i].y * cellSize + cellSize/2);
+        }
+        
+        // Glow effect
+        if(saveData.glowUnlocked) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+        } else {
+            ctx.shadowBlur = 0;
+        }
+
+        // Outer line
+        ctx.strokeStyle = color;
+        ctx.lineWidth = cellSize * 0.3;
+        ctx.stroke();
+
+        // Inner highlight
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = cellSize * 0.1;
+        ctx.stroke();
+    });
+}
+
+function drawEndpoints() {
+    endpoints.forEach(ep => {
+        const drawNode = (pos, color) => {
+            const cx = gridOffsetX + pos.x * cellSize + cellSize/2;
+            const cy = gridOffsetY + pos.y * cellSize + cellSize/2;
+            const size = cellSize * 0.3;
+            
+            if(saveData.glowUnlocked) {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = color;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+
+            // Pulse effect
+            const pulse = Math.sin(time * 0.005 + ep.id) * 0.1 + 0.9;
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            
+            if(saveData.diamondUnlocked) {
+                ctx.moveTo(cx, cy - size * pulse);
+                ctx.lineTo(cx + size * pulse, cy);
+                ctx.lineTo(cx, cy + size * pulse);
+                ctx.lineTo(cx - size * pulse, cy);
+            } else {
+                ctx.arc(cx, cy, size * pulse, 0, Math.PI*2);
+            }
+            ctx.fill();
+
+            // Inner white dot
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(cx, cy, size * 0.3, 0, Math.PI*2);
+            ctx.fill();
+        };
+
+        drawNode(ep.start, ep.color);
+        drawNode(ep.end, ep.color);
+    });
+}
+
+function updateAndDrawParticles() {
+    ctx.shadowBlur = 10;
+    for(let i=particles.length-1; i>=0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+        
+        if(p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+        
+        ctx.globalAlpha = p.life;
+        ctx.shadowColor = p.color;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
+}
+
+function loop(timestamp) {
+    time = timestamp;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawBackground();
+    
+    if(gameState === "PLAYING" || gameState === "COMPLETE") {
+        drawGrid();
+        drawPaths();
+        drawEndpoints();
+    }
+    
+    updateAndDrawParticles();
+    
+    requestAnimationFrame(loop);
+}
+
+// Start
+calculateLayout();
+requestAnimationFrame(loop);
+
+// Attempt to load saved data when game starts
+loadGame();
+
+</script>
+</body>
+</html>

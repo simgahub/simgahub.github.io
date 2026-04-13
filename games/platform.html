@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Falling Platform Escape</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff00ea;
+            --dark: #050510;
+            --panel: rgba(10, 10, 25, 0.85);
+            --text: #e0e0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--dark);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass to child elements */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: var(--panel);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(255, 0, 234, 0.1);
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        button {
+            background: linear-gradient(45deg, #0a0a2a, #1a1a3a);
+            color: var(--text);
+            border: 1px solid var(--primary);
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #1a1a3a, #2a2a5a);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #555;
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+
+        #hud.active { display: block; }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 700px;
+            margin-top: 20px;
+        }
+
+        .shop-item {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255, 0, 234, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            transition: border-color 0.3s;
+        }
+
+        .shop-item:hover {
+            border-color: var(--secondary);
+        }
+
+        .item-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: #111;
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.1);
+        }
+
+        .item-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
+        .item-desc { font-size: 0.8rem; color: #aaa; margin-bottom: 15px; text-align: center; height: 30px;}
+
+        /* Touch Controls */
+        #touch-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            display: none;
+            justify-content: space-between;
+            padding: 0 30px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .touch-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .touch-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 35px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            color: rgba(255,255,255,0.7);
+            font-size: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+            user-select: none;
+        }
+
+        .touch-btn:active {
+            background: rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast {
+            background: rgba(20, 20, 40, 0.9);
+            border-left: 4px solid var(--secondary);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-weight: bold;
+            animation: slideIn 0.3s ease-out forwards, fadeOut 0.5s ease-out 2.5s forwards;
+            opacity: 0;
+            transform: translateX(100%);
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeOut { to { opacity: 0; } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            #touch-controls { display: flex; }
+            h1 { font-size: 1.8rem; }
+            .shop-grid { grid-template-columns: 1fr 1fr; }
+            .screen { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        Score: <span id="scoreVal">0</span><br>
+        <span style="font-size: 1rem; color: #aaa;">High: <span id="highScoreVal">0</span></span>
+    </div>
+
+    <div id="ui-layer">
+        <!-- Loading Screen -->
+        <div id="screen-loading" class="screen active">
+            <h1>Connecting...</h1>
+            <p>Syncing data with platform.</p>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <h1>Falling Platform Escape</h1>
+            <p style="margin-bottom: 20px; color: #ccc;">Leap upwards. The void is rising.</p>
+            <button onclick="startGame()">Play Game</button>
+            <button onclick="showScreen('screen-shop')">Shop</button>
+            <p style="margin-top: 20px; font-size: 0.9rem; color: #888;">Controls: A/D or Left/Right Arrows to Move.<br>W/Up/Space to Jump.</p>
+        </div>
+
+        <!-- Game Over -->
+        <div id="screen-gameover" class="screen">
+            <h1>You Fell!</h1>
+            <h2>Score: <span id="finalScore">0</span></h2>
+            <div id="newBestTag" style="display:none; color: var(--secondary); font-weight: bold; margin-bottom: 10px; animation: pulse 1s infinite;">NEW BEST!</div>
+            <button onclick="startGame()">Play Again</button>
+            <button onclick="showScreen('screen-menu')">Main Menu</button>
+        </div>
+
+        <!-- Shop -->
+        <div id="screen-shop" class="screen">
+            <h1>Upgrades & Skins</h1>
+            <div class="shop-grid" id="shopContainer">
+                <!-- Shop items injected via JS -->
+            </div>
+            <button onclick="showScreen('screen-menu')" style="margin-top: 20px; width: 200px;">Back</button>
+        </div>
+    </div>
+
+    <!-- Touch Controls -->
+    <div id="touch-controls">
+        <div class="touch-group">
+            <div class="touch-btn" id="btn-left">◀</div>
+            <div class="touch-btn" id="btn-right">▶</div>
+        </div>
+        <div class="touch-btn" id="btn-jump">▲</div>
+    </div>
+
+    <div id="toast-container"></div>
+
+<script>
+/**
+ * FALLING PLATFORM ESCAPE
+ * Visually stunning arcade jumper.
+ * Implements full platform constraints, SimgaBucks economy, save/load, and single-file setup.
+ */
+
+// --- CONFIGURATION ---
+const GAME_ID = "platform";
+
+// --- GAME STATE ---
+const GameState = {
+    state: 'loading', // loading, menu, playing, gameover
+    cameraY: 0,
+    score: 0,
+    lastRewardScore: 0,
+    timeAlive: 0,
+    frame: 0
+};
+
+// --- SAVE DATA STRUCTURE ---
+let SaveData = {
+    highScore: 0,
+    upgrades: {
+        doubleJump: false,
+        stabilizer: false,
+        trail: false
+    },
+    skins: {
+        base: true,
+        neon: false,
+        plasma: false
+    },
+    currentSkin: 'base'
+};
+
+// --- SHOP ITEMS CONFIG ---
+const SHOP_ITEMS = [
+    { id: 'trail', type: 'upgrade', title: 'Cyber Trail', desc: 'Leaves a glowing trail.', cost: 20, icon: '☄️' },
+    { id: 'stabilizer', type: 'upgrade', title: 'Stabilizer', desc: 'Platforms last longer.', cost: 30, icon: '🛡️' },
+    { id: 'doubleJump', type: 'upgrade', title: 'Double Jump', desc: 'Jump once in mid-air.', cost: 50, icon: '⏫' },
+    { id: 'neon', type: 'skin', title: 'Neon Skin', desc: 'Vibrant pink/yellow glow.', cost: 15, icon: '🟥' },
+    { id: 'plasma', type: 'skin', title: 'Plasma Skin', desc: 'Pulsing green/blue core.', cost: 30, icon: '🟩' }
+];
+
+// --- CANVAS SETUP ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+let CW = window.innerWidth;
+let CH = window.innerHeight;
+
+function resize() {
+    CW = window.innerWidth;
+    CH = window.innerHeight;
+    canvas.width = CW;
+    canvas.height = CH;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- PLATFORM API COMMUNICATION ---
+let pendingPurchaseId = null;
+let pendingPurchaseItem = null;
+const loadMsgId = "load_" + Date.now();
+
+// 1. Request Load on Init
+window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+
+// Fallback if platform doesn't respond within 2.5s
+let loadTimeout = setTimeout(() => {
+    if(GameState.state === 'loading') {
+        showScreen('screen-menu');
+        GameState.state = 'menu';
+        showToast("Playing Locally", "#aaaaaa");
+    }
+}, 2500);
+
+// Listen to platform messages
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    // Load Response
+    if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+        clearTimeout(loadTimeout);
+        if (data.data) {
+            // Merge loaded data with defaults
+            SaveData = { ...SaveData, ...data.data };
+            // Ensure nested objects exist
+            if (!SaveData.upgrades) SaveData.upgrades = {};
+            if (!SaveData.skins) SaveData.skins = { base: true };
+        }
+        updateShopUI();
+        document.getElementById('highScoreVal').innerText = Math.floor(SaveData.highScore);
+        showScreen('screen-menu');
+        GameState.state = 'menu';
+    }
+
+    // Purchase Response
+    if (data.type === "spendResponse") {
+        if (data.success && data.msgId === pendingPurchaseId) {
+            handlePurchaseSuccess(pendingPurchaseItem);
+            showToast("Purchase Successful!", "var(--primary)");
+        } else {
+            // Could be another msgId, but we check anyway
+            if (data.msgId === pendingPurchaseId) {
+                showToast("Not enough SimgaBucks", "#ff4444");
+                pendingPurchaseId = null;
+                pendingPurchaseItem = null;
+                updateShopUI(); // re-enable buttons
+            }
+        }
+    }
+});
+
+// Save Function
+function saveGameData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: SaveData
+    }, "*");
+}
+
+// Earn Currency Function
+function earnSimgaBucks(amount, reason) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks (${reason})`, "var(--primary)");
+}
+
+// Spend Currency Function
+function attemptPurchase(item) {
+    if (pendingPurchaseId) return; // Wait for current transaction
+    pendingPurchaseId = Math.random().toString(36);
+    pendingPurchaseItem = item;
+    
+    // Disable UI temporarily
+    updateShopUI(true); 
+
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: item.cost,
+        msgId: pendingPurchaseId
+    }, "*");
+}
+
+function handlePurchaseSuccess(item) {
+    if (item.type === 'upgrade') {
+        SaveData.upgrades[item.id] = true;
+    } else if (item.type === 'skin') {
+        SaveData.skins[item.id] = true;
+        SaveData.currentSkin = item.id;
+    }
+    pendingPurchaseId = null;
+    pendingPurchaseItem = null;
+    saveGameData();
+    updateShopUI();
+}
+
+function equipSkin(skinId) {
+    SaveData.currentSkin = skinId;
+    saveGameData();
+    updateShopUI();
+}
+
+// --- UI MANAGEMENT ---
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    if (id) document.getElementById(id).classList.add('active');
+    
+    document.getElementById('hud').classList.remove('active');
+}
+
+function showToast(msg, color) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = msg;
+    if (color) toast.style.borderLeftColor = color;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3000);
+}
+
+function updateShopUI(disableAll = false) {
+    const container = document.getElementById('shopContainer');
+    container.innerHTML = '';
+
+    SHOP_ITEMS.forEach(item => {
+        let isOwned = false;
+        let isEquipped = false;
+
+        if (item.type === 'upgrade') isOwned = SaveData.upgrades[item.id];
+        if (item.type === 'skin') {
+            isOwned = SaveData.skins[item.id];
+            isEquipped = (SaveData.currentSkin === item.id);
+        }
+
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        
+        let btnHTML = '';
+        if (isEquipped) {
+            btnHTML = `<button disabled style="border-color:var(--secondary); color:var(--secondary);">Equipped</button>`;
+        } else if (isOwned) {
+            if (item.type === 'skin') {
+                btnHTML = `<button onclick="equipSkin('${item.id}')">Equip</button>`;
+            } else {
+                btnHTML = `<button disabled style="border-color:var(--primary); color:var(--primary);">Owned</button>`;
+            }
+        } else {
+            btnHTML = `<button ${disableAll?'disabled':''} onclick='attemptPurchase(${JSON.stringify(item)})'>Buy (${item.cost} SB)</button>`;
+        }
+
+        div.innerHTML = `
+            <div class="item-icon">${item.icon}</div>
+            <div class="item-title">${item.title}</div>
+            <div class="item-desc">${item.desc}</div>
+            ${btnHTML}
+        `;
+        container.appendChild(div);
+    });
+}
+
+// --- INPUT HANDLING ---
+const keys = { left: false, right: false, jump: false };
+let jumpPressed = false;
+
+window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+        if (!keys.jump) jumpPressed = true;
+        keys.jump = true;
+    }
+});
+
+window.addEventListener('keyup', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = false;
+});
+
+// Touch controls mapping
+const setupTouch = (id, keyName) => {
+    const el = document.getElementById(id);
+    const press = (e) => { e.preventDefault(); if(keyName==='jump' && !keys.jump) jumpPressed=true; keys[keyName] = true; };
+    const release = (e) => { e.preventDefault(); keys[keyName] = false; };
+    el.addEventListener('touchstart', press);
+    el.addEventListener('touchend', release);
+    // Mouse fallback for testing touch UI on desktop
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+};
+setupTouch('btn-left', 'left');
+setupTouch('btn-right', 'right');
+setupTouch('btn-jump', 'jump');
+
+
+// --- GAME ENGINE & ENTITIES ---
+let entities = [];
+let particles = [];
+let stars = [];
+let player = null;
+let lavaY = 0;
+let highestY = 0;
+let baseDifficulty = 1;
+
+class Player {
+    constructor() {
+        this.w = 30;
+        this.h = 30;
+        this.x = CW / 2 - this.w / 2;
+        this.y = CH - 150;
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 7;
+        this.gravity = 0.6;
+        this.jumpPower = -14;
+        this.grounded = false;
+        this.jumpsLeft = SaveData.upgrades.doubleJump ? 2 : 1;
+        this.maxJumps = SaveData.upgrades.doubleJump ? 2 : 1;
+        this.glowPulse = 0;
+    }
+
+    update() {
+        // Horizontal Movement
+        if (keys.left) this.vx -= 1.5;
+        if (keys.right) this.vx += 1.5;
+        this.vx *= 0.8; // Friction
+        
+        // Wrap around screen
+        if (this.x > CW) this.x = -this.w;
+        if (this.x + this.w < 0) this.x = CW;
+
+        // Apply Gravity
+        this.vy += this.gravity;
+        
+        // Terminal velocity
+        if (this.vy > 15) this.vy = 15;
+
+        // Jump Logic
+        if (jumpPressed) {
+            jumpPressed = false;
+            if (this.grounded || this.jumpsLeft > 0) {
+                this.vy = this.jumpPower;
+                this.grounded = false;
+                this.jumpsLeft--;
+                spawnParticles(this.x + this.w/2, this.y + this.h, 10, '#ffffff', 2);
+            }
+        }
+
+        // Apply movement
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Check platform collisions (only when falling)
+        this.grounded = false;
+        if (this.vy > 0) {
+            for (let e of entities) {
+                if (e.type === 'platform' && !e.broken) {
+                    // Simple AABB collision with top of platform
+                    if (this.x < e.x + e.w && 
+                        this.x + this.w > e.x && 
+                        this.y + this.h >= e.y && 
+                        this.y + this.h <= e.y + this.vy + 2) {
+                        
+                        this.y = e.y - this.h;
+                        this.vy = 0;
+                        this.grounded = true;
+                        this.jumpsLeft = this.maxJumps;
+                        e.touch();
+                        
+                        // Landing effect
+                        if(this.vy > 10) spawnParticles(this.x + this.w/2, this.y + this.h, 5, '#00f3ff', 1);
+                    }
+                }
+            }
+        }
+
+        // Trail effect
+        if (SaveData.upgrades.trail && GameState.frame % 3 === 0 && (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1)) {
+            particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, 0, 0, getSkinColor(), 0.5, 15, true));
+        }
+
+        this.glowPulse += 0.1;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Tilt based on velocity
+        ctx.translate(this.w/2, this.h/2);
+        ctx.rotate(this.vx * 0.05);
+        ctx.translate(-this.w/2, -this.h/2);
+
+        const skinColor = getSkinColor();
+        const innerColor = getSkinInnerColor();
+
+        ctx.shadowBlur = 20 + Math.sin(this.glowPulse) * 5;
+        ctx.shadowColor = skinColor;
+        ctx.fillStyle = innerColor;
+        ctx.strokeStyle = skinColor;
+        ctx.lineWidth = 3;
+
+        // Draw character (Stylized cube)
+        ctx.beginPath();
+        ctx.roundRect(0, 0, this.w, this.h, 8);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Eyes/Core
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 0;
+        ctx.fillRect(8, 8, 4, 8);
+        ctx.fillRect(18, 8, 4, 8);
+
+        ctx.restore();
+    }
+}
+
+function getSkinColor() {
+    if (SaveData.currentSkin === 'neon') return '#ff00ea';
+    if (SaveData.currentSkin === 'plasma') return '#00ff44';
+    return '#00f3ff'; // base
+}
+function getSkinInnerColor() {
+    if (SaveData.currentSkin === 'neon') return '#ffea00';
+    if (SaveData.currentSkin === 'plasma') return '#00f3ff';
+    return '#ffffff'; // base
+}
+
+class Platform {
+    constructor(y, lastX) {
+        this.type = 'platform';
+        this.w = 80 + Math.random() * 40;
+        this.h = 15;
+        
+        // Constrain horizontal spawn to be within a reachable distance of the last platform
+        if (lastX !== undefined) {
+            let maxReach = 180; // Safe jumping distance
+            let minX = Math.max(0, lastX - maxReach - this.w/2);
+            let maxX = Math.min(CW - this.w, lastX + maxReach - this.w/2);
+            
+            if (maxX < minX) {
+                this.x = Math.random() * (CW - this.w);
+            } else {
+                this.x = minX + Math.random() * (maxX - minX);
+            }
+        } else {
+            this.x = Math.random() * (CW - this.w);
+        }
+        
+        this.y = y;
+        this.baseLife = SaveData.upgrades.stabilizer ? 90 : 45; // Frames before breaking after touch
+        this.life = this.baseLife;
+        this.touched = false;
+        this.broken = false;
+        
+        // Moving platform mechanics
+        this.isMoving = Math.random() < (0.2 + baseDifficulty * 0.1);
+        this.moveSpeed = this.isMoving ? (Math.random() > 0.5 ? 2 : -2) * (1 + baseDifficulty*0.5) : 0;
+        this.color = this.isMoving ? '#ff00ea' : '#00f3ff';
+    }
+
+    touch() {
+        if (!this.touched) {
+            this.touched = true;
+            // Reward minor actions sometimes based on moving platforms
+            if(this.isMoving && Math.random() < 0.2) {
+                spawnFloatingText("+1 SB", this.x + this.w/2, this.y, '#ff00ea');
+                earnSimgaBucks(1, "Tricky Jump");
+            }
+        }
+    }
+
+    update() {
+        if (this.broken) return;
+
+        if (this.isMoving) {
+            this.x += this.moveSpeed;
+            if (this.x < 0 || this.x + this.w > CW) this.moveSpeed *= -1;
+        }
+
+        if (this.touched) {
+            this.life--;
+            // Shake effect before breaking
+            this.x += (Math.random() - 0.5) * 2;
+            
+            if (this.life <= 0) {
+                this.broken = true;
+                spawnParticles(this.x + this.w/2, this.y, 20, this.color, 4);
+                screenShake = 5;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.broken) return;
+
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        
+        // Flicker when low life
+        if (this.touched && this.life < 20 && GameState.frame % 4 < 2) {
+            ctx.fillStyle = '#fff';
+        } else {
+            ctx.fillStyle = '#111';
+        }
+        
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y, this.w, this.h, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // Warning bar
+        if (this.touched) {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = this.color;
+            let ratio = this.life / this.baseLife;
+            ctx.fillRect(this.x + 2, this.y + 2, (this.w - 4) * ratio, this.h - 4);
+        }
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy, color, lifeDecay, size, isSquare=false) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.alpha = 1;
+        this.lifeDecay = lifeDecay || 0.02 + Math.random() * 0.03;
+        this.size = size || 2 + Math.random() * 4;
+        this.isSquare = isSquare;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.alpha -= this.lifeDecay;
+    }
+    draw(ctx) {
+        if (this.alpha <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        if(this.isSquare) {
+            ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+        } else {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+}
+
+class FloatingText {
+    constructor(text, x, y, color) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.alpha = 1;
+        this.vy = -1;
+    }
+    update() {
+        this.y += this.vy;
+        this.alpha -= 0.015;
+    }
+    draw(ctx) {
+        if(this.alpha <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+function spawnParticles(x, y, count, color, speed) {
+    for (let i = 0; i < count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let v = Math.random() * speed;
+        particles.push(new Particle(x, y, Math.cos(angle)*v, Math.sin(angle)*v, color));
+    }
+}
+
+let floatingTexts = [];
+function spawnFloatingText(text, x, y, color) {
+    floatingTexts.push(new FloatingText(text, x, y, color));
+}
+
+// Background generator
+function initStars() {
+    stars = [];
+    for(let i=0; i<100; i++) {
+        stars.push({
+            x: Math.random() * CW,
+            y: Math.random() * CH,
+            s: Math.random() * 2 + 1,
+            c: Math.random() > 0.5 ? '#00f3ff' : '#ff00ea',
+            speed: Math.random() * 0.5 + 0.1
+        });
+    }
+}
+
+// --- GAME LOGIC ---
+let screenShake = 0;
+let lastPlatformY = CH - 50;
+
+function startGame() {
+    showScreen(null);
+    document.getElementById('hud').classList.add('active');
+    
+    // Reset State
+    GameState.state = 'playing';
+    GameState.cameraY = 0;
+    GameState.score = 0;
+    GameState.lastRewardScore = 0;
+    GameState.timeAlive = 0;
+    GameState.frame = 0;
+    
+    baseDifficulty = 0;
+    screenShake = 0;
+    particles = [];
+    floatingTexts = [];
+    entities = [];
+    
+    // Setup Player
+    player = new Player();
+    
+    // Initial Platforms
+    lastPlatformY = CH - 50;
+    
+    // Create a safe starting platform right under the player
+    let startPlatform = new Platform(lastPlatformY);
+    startPlatform.isMoving = false; // Guarantee it doesn't move
+    startPlatform.moveSpeed = 0;
+    startPlatform.w = 120; // Make it a bit wider to be safe
+    startPlatform.x = CW / 2 - startPlatform.w / 2;
+    startPlatform.color = '#00f3ff';
+    entities.push(startPlatform);
+
+    // Snap player exactly to the start platform
+    player.x = startPlatform.x + startPlatform.w / 2 - player.w / 2;
+    player.y = startPlatform.y - player.h;
+    player.vy = 0;
+    player.grounded = true;
+
+    for (let i = 0; i < 15; i++) {
+        generatePlatform();
+    }
+
+    // Start Lava way below
+    lavaY = CH + 400;
+}
+
+function generatePlatform() {
+    // Gap increases slightly with difficulty
+    let gap = 80 + Math.random() * 40 + (baseDifficulty * 20);
+    lastPlatformY -= gap;
+    
+    // Find the last platform's X center to ensure reachable spawns
+    let lastX;
+    if (entities.length > 0) {
+        let lastPlatform = entities[entities.length - 1];
+        lastX = lastPlatform.x + lastPlatform.w / 2;
+    }
+
+    entities.push(new Platform(lastPlatformY, lastX));
+}
+
+function gameOver() {
+    GameState.state = 'gameover';
+    
+    // Update Best
+    let isNewBest = false;
+    if (GameState.score > SaveData.highScore) {
+        SaveData.highScore = GameState.score;
+        isNewBest = true;
+        document.getElementById('highScoreVal').innerText = Math.floor(SaveData.highScore);
+    }
+    
+    document.getElementById('finalScore').innerText = Math.floor(GameState.score);
+    document.getElementById('newBestTag').style.display = isNewBest ? 'block' : 'none';
+    
+    // Give final reward if played a decent amount
+    if (GameState.score > 200) {
+        earnSimgaBucks(2, "Run Complete");
+    }
+    
+    saveGameData();
+    showScreen('screen-gameover');
+}
+
+// --- MAIN LOOP ---
+function update() {
+    if (GameState.state !== 'playing') return;
+    
+    GameState.frame++;
+    
+    // Initial quick reward logic (within 20-30s). Roughly 500 score early on.
+    if (GameState.score > 500 && GameState.lastRewardScore === 0) {
+        GameState.lastRewardScore = 500;
+        earnSimgaBucks(2, "First Milestone");
+        spawnFloatingText("Milestone! +2 SB", player.x, player.y - 50, '#00ff44');
+    }
+
+    // Regular reward pacing (every 1500 score -> ~3 SB)
+    if (GameState.score - GameState.lastRewardScore >= 1500) {
+        GameState.lastRewardScore = GameState.score;
+        earnSimgaBucks(3, "Distance Milestone");
+        spawnFloatingText("Distance! +3 SB", player.x, player.y - 50, '#00ff44');
+        spawnParticles(player.x, player.y, 30, '#00ff44', 5);
+    }
+
+    // Increase difficulty slowly
+    baseDifficulty = Math.min(2.5, GameState.score / 5000);
+
+    // Update Player
+    player.update();
+
+    // Camera follow (only going up)
+    let targetCamY = player.y - CH * 0.6;
+    if (targetCamY < GameState.cameraY) {
+        // Smooth camera, but snap if moving too fast
+        GameState.cameraY = targetCamY;
+    }
+
+    // Score based on height
+    let currentHeight = -GameState.cameraY;
+    if (currentHeight > GameState.score) {
+        GameState.score = currentHeight;
+        document.getElementById('scoreVal').innerText = Math.floor(GameState.score);
+    }
+
+    // Lava Rising Mechanic
+    // Base speed + slightly faster over time to force player to hurry
+    let lavaSpeed = 2 + (baseDifficulty * 1.5);
+    // If player is super high up, make lava catch up a bit faster to keep tension
+    if (lavaY > GameState.cameraY + CH + 500) {
+        lavaSpeed += 3; 
+    }
+    lavaY -= lavaSpeed;
+
+    // Generate new platforms if needed
+    if (lastPlatformY > GameState.cameraY - CH) {
+        generatePlatform();
+    }
+
+    // Update Entities
+    for (let i = entities.length - 1; i >= 0; i--) {
+        let e = entities[i];
+        e.update();
+        // Remove off-screen entities below lava
+        if (e.y > lavaY + 100 || e.broken) {
+            entities.splice(i, 1);
+        }
+    }
+
+    // Update Particles & Text
+    particles.forEach((p, i) => { p.update(); if(p.alpha<=0) particles.splice(i,1); });
+    floatingTexts.forEach((t, i) => { t.update(); if(t.alpha<=0) floatingTexts.splice(i,1); });
+
+    // Death check
+    if (player.y > lavaY) {
+        spawnParticles(player.x + player.w/2, player.y + player.h/2, 50, '#ff0000', 8);
+        gameOver();
+    }
+}
+
+function drawGrid(ctx, camY) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
+    ctx.lineWidth = 1;
+    let gridSize = 100;
+    let offsetY = camY % gridSize;
+
+    ctx.beginPath();
+    // Verticals
+    for (let x = 0; x < CW; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, CH);
+    }
+    // Horizontals (moving with camera)
+    for (let y = -offsetY; y < CH; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(CW, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawLava(ctx, camY) {
+    let visualLavaY = lavaY - camY;
+    if (visualLavaY > CH) return; // Below screen
+
+    ctx.save();
+    // Lava Body
+    let grad = ctx.createLinearGradient(0, visualLavaY, 0, CH);
+    grad.addColorStop(0, 'rgba(255, 0, 100, 0.8)');
+    grad.addColorStop(1, 'rgba(50, 0, 20, 1)');
+    
+    ctx.fillStyle = grad;
+    
+    // Wavy top edge
+    ctx.beginPath();
+    ctx.moveTo(0, CH);
+    ctx.lineTo(0, visualLavaY);
+    for (let x = 0; x <= CW; x += 20) {
+        let wave = Math.sin((x + GameState.frame * 2) * 0.05) * 15;
+        let wave2 = Math.cos((x - GameState.frame) * 0.02) * 10;
+        ctx.lineTo(x, visualLavaY + wave + wave2);
+    }
+    ctx.lineTo(CW, CH);
+    ctx.fill();
+
+    // Lava Edge Glow
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#ff00ea';
+    ctx.strokeStyle = '#ff00ea';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Embers
+    if (GameState.frame % 5 === 0) {
+        particles.push(new Particle(Math.random()*CW, visualLavaY + camY, 0, -Math.random()*3-1, '#ff00ea', 0.01, 3));
+    }
+    ctx.restore();
+}
+
+function draw() {
+    // Clear & Gradient Base
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Only draw game stuff if playing or game over
+    if (GameState.state === 'menu' || GameState.state === 'loading') {
+        // Draw some decorative background for menu
+        drawGrid(ctx, GameState.frame);
+        initStars(); // just use it as simple dots
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        stars.forEach(s => {
+            s.y = (s.y - s.speed) % CH;
+            if(s.y < 0) s.y += CH;
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill();
+        });
+        return;
+    }
+
+    ctx.save();
+    
+    // Screen Shake
+    if (screenShake > 0) {
+        ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+        screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+
+    // Parallax Background
+    drawGrid(ctx, GameState.cameraY * 0.5);
+    
+    // Draw Stars (Parallax)
+    ctx.save();
+    stars.forEach(s => {
+        let sy = (s.y - GameState.cameraY * s.speed) % CH;
+        if (sy < 0) sy += CH;
+        ctx.fillStyle = s.c;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(s.x, sy, s.s, 0, Math.PI*2);
+        ctx.fill();
+    });
+    ctx.restore();
+
+    // Apply Camera Transform for game world
+    ctx.translate(0, -GameState.cameraY);
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Entities
+    entities.forEach(e => e.draw(ctx));
+    
+    // Player
+    if (GameState.state === 'playing') {
+        player.draw(ctx);
+    }
+
+    // Particles
+    particles.forEach(p => p.draw(ctx));
+
+    // Floating Text
+    floatingTexts.forEach(t => t.draw(ctx));
+
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // Lava (Needs raw un-translated coordinates for gradient ease, or translate it back)
+    ctx.restore(); 
+    drawLava(ctx, GameState.cameraY);
+
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// Init
+initStars();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

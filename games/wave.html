@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wave Rider</title>
+    <style>
+        :root {
+            --primary: #00e5ff;
+            --secondary: #ff007f;
+            --dark: #0a1128;
+            --panel-bg: rgba(10, 17, 40, 0.85);
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 2px solid rgba(0, 229, 255, 0.4);
+            border-radius: 20px;
+            padding: 30px 40px;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.2), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            max-width: 90%;
+            width: 450px;
+            text-align: center;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 3rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+            font-style: italic;
+        }
+
+        h2 {
+            margin: 0 0 15px 0;
+            color: var(--primary);
+            font-size: 1.8rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #0088ff, #00e5ff);
+            border: none;
+            border-radius: 10px;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: white;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn.secondary {
+            background: linear-gradient(135deg, #ff007f, #ff5e00);
+            box-shadow: 0 4px 15px rgba(255, 0, 127, 0.3);
+        }
+        
+        .btn.secondary:hover {
+            box-shadow: 0 6px 20px rgba(255, 0, 127, 0.5);
+        }
+
+        .btn:disabled {
+            background: #444;
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Shop Layout */
+        .shop-list {
+            width: 100%;
+            max-height: 40vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 5px;
+        }
+
+        .shop-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .shop-list::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
+        .shop-list::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .item-info {
+            text-align: left;
+        }
+
+        .item-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .item-desc {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .shop-btn {
+            background: var(--primary);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: 80px;
+            transition: all 0.2s;
+        }
+
+        .shop-btn:hover { background: #fff; }
+        .shop-btn.equipped { background: #444; color: #fff; cursor: default; }
+        .shop-btn.equip { background: #ff007f; color: #fff; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-box {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            backdrop-filter: blur(4px);
+            text-shadow: 0 1px 3px #000;
+        }
+        
+        #hud-center {
+            display: flex;
+            gap: 15px;
+        }
+        .icon-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            border: 2px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+        .icon-badge.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            color: var(--primary);
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: absolute;
+            background: #000;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary);
+            font-size: 2rem;
+            font-weight: bold;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+        .spinner {
+            border: 4px solid rgba(0,229,255,0.2);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Notification Toast */
+        #toast-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+        .toast {
+            background: rgba(0, 255, 128, 0.2);
+            border: 1px solid #00ff80;
+            color: #00ff80;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 128, 0.4);
+            animation: toastAnim 2s forwards;
+        }
+        @keyframes toastAnim {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <span>Connecting...</span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="hud-box">DIST: <span id="hud-score">0</span>m</div>
+        <div id="hud-center">
+            <div id="icon-shield" class="icon-badge">🛡️</div>
+            <div id="icon-speed" class="icon-badge">⚡</div>
+        </div>
+        <div class="hud-box">BEST: <span id="hud-high">0</span>m</div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div id="ui-layer">
+        
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <h1>Wave Rider</h1>
+            <button class="btn" onclick="startGame()">Ride the Wave</button>
+            <button class="btn secondary" onclick="showScreen('screen-shop')">Shop & Upgrades</button>
+        </div>
+
+        <!-- Shop Menu -->
+        <div id="screen-shop" class="screen">
+            <h2>Simga Surf Shop</h2>
+            <div class="shop-list" id="shop-container">
+                <!-- Populated by JS -->
+            </div>
+            <button class="btn" onclick="showScreen('screen-menu')" style="margin-top:20px;">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Menu -->
+        <div id="screen-gameover" class="screen">
+            <h1>Wipeout!</h1>
+            <h2 style="color: #fff;">Distance: <span id="go-score" style="color:var(--primary)">0</span>m</h2>
+            <p style="color: #aaa; margin-top:0;">High Score: <span id="go-high">0</span>m</p>
+            <button class="btn" onclick="startGame()">Ride Again</button>
+            <button class="btn secondary" onclick="showScreen('screen-menu')">Main Menu</button>
+        </div>
+
+    </div>
+
+<script>
+// ==========================================
+// GAME CONSTANTS & PLATFORM API
+// ==========================================
+const GAME_ID = "wave";
+
+const SHOP_ITEMS = [
+    { id: 'skin_neon', name: 'Neon Board', desc: 'Glowing blue deck.', cost: 20, type: 'skin' },
+    { id: 'skin_fire', name: 'Inferno Board', desc: 'Leaves a trail of fire.', cost: 50, type: 'skin' },
+    { id: 'trail_rainbow', name: 'Rainbow Spray', desc: 'Colorful water splash.', cost: 30, type: 'trail' },
+    { id: 'upgrade_shield', name: 'Aqua Shield', desc: 'Absorb 1 hit per run.', cost: 40, type: 'upgrade' },
+    { id: 'upgrade_speed', name: 'Jet Thruster', desc: 'Score distance 20% faster.', cost: 40, type: 'upgrade' }
+];
+
+let gameData = {
+    highScore: 0,
+    unlocked: { 'skin_default': true, 'trail_white': true },
+    equipped: { skin: 'skin_default', trail: 'trail_white' }
+};
+
+let pendingPurchase = null;
+
+// ==========================================
+// PARENT COMMUNICATION (SAVE/LOAD/ECONOMY)
+// ==========================================
+function sendParentMsg(msg) {
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage(msg, "*");
+    }
+}
+
+function addSimgaBucks(amount, reason) {
+    sendParentMsg({ type: "addSimgaBucks", amount: amount });
+    showToast(`+${amount} SimgaBucks (${reason})`);
+}
+
+function requestPurchase(itemId, cost) {
+    const msgId = "spend_" + Math.random().toString(36).substr(2, 9);
+    pendingPurchase = { id: itemId, msgId: msgId };
+    
+    // Disable all shop buttons temporarily
+    document.querySelectorAll('.shop-btn').forEach(btn => btn.disabled = true);
+    
+    sendParentMsg({ type: "spendSimgaBucks", amount: cost, msgId: msgId });
+
+    // Fallback if no parent responds
+    setTimeout(() => {
+        if (pendingPurchase && pendingPurchase.msgId === msgId) {
+            alert("Purchase request timed out.");
+            pendingPurchase = null;
+            renderShop();
+        }
+    }, 2500);
+}
+
+function saveData() {
+    const saveObj = {
+        highScore: gameData.highScore,
+        unlocked: gameData.unlocked,
+        equipped: gameData.equipped
+    };
+    sendParentMsg({ type: "saveData", gameId: GAME_ID, data: saveObj });
+}
+
+function loadData() {
+    const loadMsgId = "load_" + Date.now();
+    sendParentMsg({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId });
+
+    // Fallback to start if not in an iframe or parent doesn't respond
+    const loadTimeout = setTimeout(() => {
+        finishLoading();
+    }, 1500);
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            clearTimeout(loadTimeout);
+            if (data.data) {
+                if(data.data.highScore) gameData.highScore = data.data.highScore;
+                if(data.data.unlocked) gameData.unlocked = Object.assign(gameData.unlocked, data.data.unlocked);
+                if(data.data.equipped) gameData.equipped = Object.assign(gameData.equipped, data.data.equipped);
+            }
+            finishLoading();
+        }
+
+        if (data.type === "spendResponse" && pendingPurchase && data.msgId === pendingPurchase.msgId) {
+            if (data.success) {
+                const itemId = pendingPurchase.id;
+                gameData.unlocked[itemId] = true;
+                equipItem(itemId);
+                saveData();
+            } else {
+                alert("Not enough SimgaBucks!");
+            }
+            pendingPurchase = null;
+            renderShop();
+        }
+    });
+}
+
+function finishLoading() {
+    document.getElementById('loading').style.opacity = 0;
+    setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+        showScreen('screen-menu');
+        initGraphics();
+        requestAnimationFrame(gameLoop);
+    }, 500);
+}
+
+// ==========================================
+// UI LOGIC
+// ==========================================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    if(id) document.getElementById(id).classList.add('active');
+    
+    document.getElementById('hud').style.display = (id === 'play') ? 'flex' : 'none';
+    
+    if (id === 'screen-shop') {
+        renderShop();
+    }
+}
+
+function showToast(text) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = text;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 2000);
+}
+
+function renderShop() {
+    const container = document.getElementById('shop-container');
+    container.innerHTML = '';
+
+    SHOP_ITEMS.forEach(item => {
+        const isUnlocked = gameData.unlocked[item.id];
+        const isEquipped = (gameData.equipped[item.type] === item.id) || (item.type === 'upgrade' && isUnlocked);
+        
+        let btnHtml = '';
+        if (isEquipped && item.type !== 'upgrade') {
+            btnHtml = `<button class="shop-btn equipped" disabled>Equipped</button>`;
+        } else if (isEquipped && item.type === 'upgrade') {
+            btnHtml = `<button class="shop-btn equipped" disabled>Owned</button>`;
+        } else if (isUnlocked) {
+            btnHtml = `<button class="shop-btn equip" onclick="equipItem('${item.id}', '${item.type}')">Equip</button>`;
+        } else {
+            btnHtml = `<button class="shop-btn" onclick="requestPurchase('${item.id}', ${item.cost})">${item.cost} SB</button>`;
+        }
+
+        container.innerHTML += `
+            <div class="shop-item">
+                <div class="item-info">
+                    <div class="item-title">${item.name}</div>
+                    <div class="item-desc">${item.desc}</div>
+                </div>
+                ${btnHtml}
+            </div>
+        `;
+    });
+}
+
+function equipItem(id) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if(item && item.type !== 'upgrade') {
+        gameData.equipped[item.type] = id;
+        saveData();
+    }
+    renderShop();
+}
+
+// ==========================================
+// ENGINE SETUP & GRAPHICS
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+let waveBaseY;
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    waveBaseY = height * 0.45;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game State variables
+let gameState = 'menu'; // menu, playing, gameover
+let lastTime = 0;
+let time = 0;
+let distance = 0;
+let gameSpeed = 1;
+let screenShake = 0;
+let nextRewardScore = 2000;
+
+// Entities
+let player;
+let obstacles = [];
+let particles = [];
+let floatTexts = [];
+let backgroundElements = [];
+
+// Input
+let inputY = height / 2;
+let isPointerDown = false;
+
+window.addEventListener('pointerdown', e => { 
+    isPointerDown = true; 
+    inputY = e.clientY; 
+    if (gameState === 'playing') createRipple(e.clientX, e.clientY);
+});
+window.addEventListener('pointermove', e => { if (isPointerDown) inputY = e.clientY; });
+window.addEventListener('pointerup', () => { isPointerDown = false; });
+window.addEventListener('keydown', e => {
+    if (gameState !== 'playing') return;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') inputY -= 40;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') inputY += 40;
+    // Clamp input mapping
+    if(inputY < waveBaseY) inputY = waveBaseY;
+    if(inputY > height) inputY = height;
+});
+
+// ==========================================
+// GAME CLASSES
+// ==========================================
+class Player {
+    constructor() {
+        this.x = 150;
+        this.y = height / 2 + 50;
+        this.targetY = this.y;
+        this.vy = 0;
+        this.radius = 18;
+        this.hasShield = gameData.unlocked['upgrade_shield'];
+        this.speedMultiplier = gameData.unlocked['upgrade_speed'] ? 1.2 : 1.0;
+        this.dead = false;
+        
+        // Visual setup based on upgrades
+        this.skin = gameData.equipped.skin;
+        this.trail = gameData.equipped.trail;
+    }
+
+    update(dt) {
+        if (this.dead) return;
+
+        // Smooth movement towards inputY
+        let target = inputY;
+        
+        // Bounds checking against wave edge
+        let waveY = getWaveY(this.x, time);
+        if (target < waveY + 20) target = waveY + 20;
+        if (target > height - 20) target = height - 20;
+
+        let diff = target - this.y;
+        this.vy = diff * 5; // Spring force
+        this.y += this.vy * dt;
+
+        // Ensure absolute bounds
+        if (this.y < waveY) this.y = waveY;
+
+        // Generate spray particles
+        if (Math.random() < 0.6) {
+            let color = 'rgba(255, 255, 255, 0.6)';
+            let isFire = this.skin === 'skin_fire';
+            let pType = isFire ? 'fire' : 'water';
+            
+            if (this.trail === 'trail_rainbow') {
+                color = `hsla(${(time*300)%360}, 100%, 70%, 0.8)`;
+            } else if (isFire) {
+                color = `rgba(255, ${Math.floor(Math.random()*150)+50}, 0, 0.8)`;
+            }
+
+            particles.push(new Particle(
+                this.x - 20, 
+                this.y + 10, 
+                -100 - Math.random() * 100, 
+                (isFire ? -50 : -20) + Math.random() * (isFire ? -50 : 80), 
+                color,
+                pType
+            ));
+        }
+    }
+
+    draw(ctx) {
+        if (this.dead) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Tilt based on vertical velocity
+        let tilt = Math.max(-0.5, Math.min(0.5, this.vy * 0.001));
+        ctx.rotate(tilt);
+
+        // Draw Shield
+        if (this.hasShield) {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 15, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00e5ff';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw Board
+        ctx.beginPath();
+        ctx.roundRect(-25, -5, 50, 10, 5);
+        
+        if (this.skin === 'skin_neon') {
+            let grad = ctx.createLinearGradient(-25, 0, 25, 0);
+            grad.addColorStop(0, '#00e5ff');
+            grad.addColorStop(1, '#ff007f');
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00e5ff';
+        } else if (this.skin === 'skin_fire') {
+            ctx.fillStyle = '#ff4400';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff0000';
+        } else {
+            ctx.fillStyle = '#fce45d';
+        }
+        
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Draw Stylized Surfer Silhouette
+        ctx.strokeStyle = '#050a14';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Legs
+        ctx.beginPath();
+        ctx.moveTo(-12, -5); ctx.lineTo(-18, -15); ctx.lineTo(-10, -25); // Back leg
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(12, -5); ctx.lineTo(18, -15); ctx.lineTo(10, -25); // Front leg
+        ctx.stroke();
+
+        // Body curve (aerodynamic)
+        ctx.beginPath();
+        ctx.moveTo(-10, -25); // Hips
+        ctx.quadraticCurveTo(5, -30, 15, -20); // Back to shoulders
+        ctx.stroke();
+
+        // Arms
+        ctx.beginPath();
+        ctx.moveTo(15, -20); ctx.lineTo(25, -12); // Front arm pointing forward
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(5, -25); ctx.lineTo(-15, -18); // Back arm balance
+        ctx.stroke();
+
+        // Head
+        ctx.beginPath();
+        ctx.arc(18, -25, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#050a14';
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Obstacle {
+    constructor(type) {
+        this.type = type; // 'rock', 'jellyfish', 'starfish'
+        this.x = width + 50;
+        this.markedForDeletion = false;
+        
+        // Y positioning logic
+        if (type === 'rock') {
+            this.y = height - Math.random() * (height - waveBaseY - 50);
+            this.radius = 25;
+            // Generate jagged polygon
+            this.pts = [];
+            let sides = 6 + Math.floor(Math.random()*4);
+            for(let i=0; i<sides; i++){
+                let ang = (Math.PI*2/sides) * i;
+                let r = this.radius * (0.7 + Math.random()*0.3);
+                this.pts.push({x: Math.cos(ang)*r, y: Math.sin(ang)*r});
+            }
+        } else if (type === 'jellyfish') {
+            this.y = waveBaseY + 40 + Math.random() * (height - waveBaseY - 80);
+            this.radius = 18;
+            this.offsetY = Math.random() * 100;
+        } else if (type === 'starfish') {
+            this.y = waveBaseY + 30 + Math.random() * (height - waveBaseY - 60);
+            this.radius = 20;
+            this.rot = 0;
+        }
+    }
+
+    update(dt) {
+        // Move relative to game speed
+        this.x -= 300 * gameSpeed * dt;
+        
+        if (this.type === 'jellyfish') {
+            this.y += Math.sin(time * 3 + this.offsetY) * 60 * dt;
+        } else if (this.type === 'starfish') {
+            this.rot += dt;
+        }
+
+        if (this.x < -100) this.markedForDeletion = true;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        if (this.type === 'rock') {
+            ctx.beginPath();
+            ctx.moveTo(this.pts[0].x, this.pts[0].y);
+            for(let i=1; i<this.pts.length; i++){
+                ctx.lineTo(this.pts[i].x, this.pts[i].y);
+            }
+            ctx.closePath();
+            
+            let grad = ctx.createLinearGradient(0, -this.radius, 0, this.radius);
+            grad.addColorStop(0, '#667');
+            grad.addColorStop(1, '#223');
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.strokeStyle = '#445';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+        } else if (this.type === 'jellyfish') {
+            // Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff00aa';
+            
+            // Dome
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, Math.PI, 0);
+            ctx.quadraticCurveTo(0, 5, -this.radius, 0);
+            ctx.fillStyle = 'rgba(255, 0, 170, 0.8)';
+            ctx.fill();
+            
+            // Tentacles
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255, 0, 170, 0.6)';
+            ctx.lineWidth = 2;
+            let tWave = Math.sin(time*5 + this.offsetY) * 5;
+            for(let i = -10; i <= 10; i+=10) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.quadraticCurveTo(i + tWave, 15, i - tWave, 30);
+                ctx.stroke();
+            }
+
+        } else if (this.type === 'starfish') {
+            ctx.rotate(this.rot);
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ffcc00';
+            ctx.fillStyle = '#ffe100';
+            ctx.strokeStyle = '#ff8800';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            for(let i=0; i<10; i++){
+                let r = (i%2 === 0) ? this.radius : this.radius/2.5;
+                let a = (Math.PI*2/10)*i - Math.PI/2;
+                ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy, color, type='water') {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.type = type;
+        this.life = 1.0;
+        this.decay = 0.5 + Math.random() * 1.5;
+        this.size = (type==='explosion') ? (5 + Math.random()*10) : (2 + Math.random()*5);
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= this.decay * dt;
+        
+        if (this.type === 'water' || this.type === 'explosion') {
+            this.vy += 800 * dt; // gravity
+        } else if (this.type === 'fire') {
+            this.vy -= 200 * dt; // rise
+            this.vx *= 0.95;
+            this.size *= 0.95;
+        }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.5;
+    }
+    update(dt) {
+        this.y -= 50 * dt;
+        this.life -= dt;
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life / 1.5);
+        ctx.font = 'bold 24px "Segoe UI"';
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#000';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+    }
+}
+
+// ==========================================
+// CORE LOGIC & RENDERING
+// ==========================================
+
+function getWaveY(x, t) {
+    // Generates a nice scrolling wave curve
+    let base = waveBaseY;
+    let wave1 = Math.sin(x * 0.003 - t * 3) * 30;
+    let wave2 = Math.sin(x * 0.007 - t * 4.5) * 15;
+    return base + wave1 + wave2;
+}
+
+function initGraphics() {
+    // Generate background clouds/stars
+    backgroundElements = [];
+    for(let i=0; i<15; i++) {
+        backgroundElements.push({
+            x: Math.random() * width,
+            y: Math.random() * waveBaseY,
+            speed: 10 + Math.random() * 20,
+            size: 20 + Math.random() * 50,
+            opacity: 0.1 + Math.random() * 0.3
+        });
+    }
+}
+
+function startGame() {
+    showScreen(null); // Hide menus
+    document.getElementById('hud').style.display = 'flex';
+    
+    // Reset state
+    gameState = 'playing';
+    distance = 0;
+    gameSpeed = 1.0;
+    screenShake = 0;
+    nextRewardScore = 2000;
+    inputY = height / 2;
+
+    player = new Player();
+    obstacles = [];
+    particles = [];
+    floatTexts = [];
+    
+    // Update HUD Icons
+    const shieldIcon = document.getElementById('icon-shield');
+    if (player.hasShield) shieldIcon.classList.add('active'); else shieldIcon.classList.remove('active');
+    
+    const speedIcon = document.getElementById('icon-speed');
+    if (gameData.unlocked['upgrade_speed']) speedIcon.classList.add('active'); else speedIcon.classList.remove('active');
+
+    // Spawn an early starfish to ensure first SimgaBuck reward within ~10 seconds
+    obstacles.push(new Obstacle('starfish'));
+    obstacles[0].x = width + 800; // Will appear soon
+}
+
+function gameOver() {
+    gameState = 'gameover';
+    player.dead = true;
+    screenShake = 20;
+
+    // Splash Explosion
+    for(let i=0; i<50; i++) {
+        particles.push(new Particle(
+            player.x, player.y, 
+            (Math.random()-0.5)*400, (Math.random()-1)*400, 
+            '#ffffff', 'explosion'
+        ));
+    }
+
+    if (Math.floor(distance) > gameData.highScore) {
+        gameData.highScore = Math.floor(distance);
+        saveData();
+    }
+
+    document.getElementById('go-score').innerText = Math.floor(distance);
+    document.getElementById('go-high').innerText = gameData.highScore;
+
+    // Delay showing menu so explosion is seen
+    setTimeout(() => {
+        showScreen('screen-gameover');
+    }, 1500);
+}
+
+function spawnObstacle() {
+    let rand = Math.random();
+    let type = 'rock';
+    if (rand > 0.85) type = 'starfish';
+    else if (rand > 0.6) type = 'jellyfish';
+    
+    obstacles.push(new Obstacle(type));
+}
+
+function checkCollisions() {
+    if (player.dead) return;
+
+    for (let obs of obstacles) {
+        let dx = player.x - obs.x;
+        let dy = player.y - obs.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < player.radius + obs.radius - 5) {
+            
+            if (obs.type === 'starfish') {
+                // Collect
+                obs.markedForDeletion = true;
+                createRipple(obs.x, obs.y, '#ffcc00');
+                addSimgaBucks(1, "Starfish found");
+                floatTexts.push(new FloatingText(player.x, player.y - 40, "+1 SB", "#ffcc00"));
+                
+            } else {
+                // Hit hazard
+                if (player.hasShield) {
+                    player.hasShield = false;
+                    document.getElementById('icon-shield').classList.remove('active');
+                    obs.markedForDeletion = true;
+                    screenShake = 15;
+                    createRipple(obs.x, obs.y, '#00e5ff');
+                    floatTexts.push(new FloatingText(player.x, player.y - 40, "SHIELD BROKEN", "#00e5ff"));
+                } else {
+                    gameOver();
+                }
+            }
+        }
+    }
+}
+
+function createRipple(x, y, color='#fff') {
+    for(let i=0; i<15; i++){
+        particles.push(new Particle(
+            x, y, 
+            (Math.random()-0.5)*200, (Math.random()-0.5)*200, 
+            color, 'sparkle'
+        ));
+    }
+}
+
+function update(dt) {
+    time += dt;
+
+    if (gameState === 'playing') {
+        // Increase difficulty
+        gameSpeed += dt * 0.01;
+        
+        // Distance scoring (boosted by upgrade)
+        distance += (300 * gameSpeed * dt * player.speedMultiplier) / 100;
+        
+        // SimgaBucks Mileage Reward logic
+        if (distance >= nextRewardScore) {
+            addSimgaBucks(2, "Distance milestone");
+            floatTexts.push(new FloatingText(player.x, player.y - 50, "WAVE CLEARED! +2 SB", "#00ffaa"));
+            nextRewardScore += 2000;
+            
+            // Also spawn a starfish soon after a wave clear as a bonus chance
+            setTimeout(() => {
+                if(gameState==='playing') obstacles.push(new Obstacle('starfish'));
+            }, 2000);
+        }
+
+        // Spawn obstacles
+        if (Math.random() < 0.015 * gameSpeed) {
+            // Prevent spawning too close to another
+            if (obstacles.length === 0 || width - obstacles[obstacles.length-1].x > 300) {
+                spawnObstacle();
+            }
+        }
+
+        player.update(dt);
+        checkCollisions();
+        
+        // Update HUD
+        document.getElementById('hud-score').innerText = Math.floor(distance);
+        document.getElementById('hud-high').innerText = gameData.highScore;
+    }
+
+    // Update entities regardless of play state (for menu animations/explosions)
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].update(dt);
+        if (obstacles[i].markedForDeletion) obstacles.splice(i, 1);
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt);
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    for (let i = floatTexts.length - 1; i >= 0; i--) {
+        floatTexts[i].update(dt);
+        if (floatTexts[i].life <= 0) floatTexts.splice(i, 1);
+    }
+
+    // Parallax background update
+    for (let bg of backgroundElements) {
+        bg.x -= bg.speed * gameSpeed * dt;
+        if (bg.x < -100) {
+            bg.x = width + 100;
+            bg.y = Math.random() * waveBaseY;
+        }
+    }
+
+    if (screenShake > 0) {
+        screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+
+    if (screenShake > 0) {
+        ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+    }
+
+    // 1. Draw Sky Gradient
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, waveBaseY);
+    skyGrad.addColorStop(0, '#ff7b54');
+    skyGrad.addColorStop(0.5, '#ffd56b');
+    skyGrad.addColorStop(1, '#ffecb3');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Sun
+    ctx.beginPath();
+    ctx.arc(width * 0.7, waveBaseY * 0.6, 60, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.shadowBlur = 50;
+    ctx.shadowColor = '#fff';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Background Parallax (Clouds/Distant items)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    for (let bg of backgroundElements) {
+        ctx.beginPath();
+        ctx.ellipse(bg.x, bg.y, bg.size, bg.size*0.4, 0, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // 2. Draw Distant Ocean layer
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    for (let x = 0; x <= width; x += 40) {
+        let y = waveBaseY - 20 + Math.sin(x*0.005 - time*1.5)*15;
+        ctx.lineTo(x, y);
+    }
+    ctx.lineTo(width, height);
+    ctx.fillStyle = '#0a75ad';
+    ctx.fill();
+
+    // 3. Draw Main Wave Face
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    for (let x = 0; x <= width; x += 20) {
+        ctx.lineTo(x, getWaveY(x, time));
+    }
+    ctx.lineTo(width, height);
+    
+    let waveGrad = ctx.createLinearGradient(0, waveBaseY, 0, height);
+    waveGrad.addColorStop(0, '#00e5ff');
+    waveGrad.addColorStop(0.3, '#0088ff');
+    waveGrad.addColorStop(1, '#001144');
+    ctx.fillStyle = waveGrad;
+    ctx.fill();
+
+    // Wave Crest Foam
+    ctx.beginPath();
+    for (let x = 0; x <= width; x += 20) {
+        let wy = getWaveY(x, time);
+        if (x===0) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Speed lines underwater
+    if (gameState === 'playing') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 2;
+        for(let i=0; i<10; i++) {
+            let sx = ((time*1000 + i*150) % width);
+            let sy = waveBaseY + 50 + (i * 30 % (height-waveBaseY));
+            ctx.beginPath();
+            ctx.moveTo(width - sx, sy);
+            ctx.lineTo(width - sx + 100, sy);
+            ctx.stroke();
+        }
+    }
+
+    // 4. Draw Entities (Z-sorting: Obstacles -> Player -> Particles -> Text)
+    for (let obs of obstacles) obs.draw(ctx);
+    if (player && gameState === 'playing' || gameState === 'gameover') player.draw(ctx);
+    for (let p of particles) p.draw(ctx);
+    for (let ft of floatTexts) ft.draw(ctx);
+
+    // Vignette / Foreground overlay
+    let vg = ctx.createRadialGradient(width/2, height/2, height*0.4, width/2, height/2, width*0.7);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.4)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
+}
+
+function gameLoop(timestamp) {
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    if (dt > 0.1) dt = 0.1; // Cap dt to prevent physics tunneling
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Start API initialization
+loadData();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sliding Block Escape</title>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: rgba(11, 12, 16, 0.85);
+            --border-glow: #66fcf1;
+            --text-main: #c5c6c7;
+            --text-highlight: #66fcf1;
+            --btn-bg: #1f2833;
+            --btn-hover: #45a29e;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.6) 100%);
+            pointer-events: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glow);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 0 25px rgba(102, 252, 241, 0.15), inset 0 0 15px rgba(102, 252, 241, 0.05);
+            text-align: center;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #fff;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--text-highlight), 0 0 20px var(--text-highlight);
+        }
+
+        h2 {
+            font-size: 24px;
+            color: #fff;
+            margin-bottom: 15px;
+            text-shadow: 0 0 8px var(--text-highlight);
+        }
+
+        button {
+            background: var(--btn-bg);
+            color: #fff;
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            box-shadow: 0 0 20px rgba(102, 252, 241, 0.5);
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(31, 40, 51, 0.8);
+            border: 1px solid rgba(102, 252, 241, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .shop-item:hover {
+            border-color: var(--border-glow);
+        }
+
+        .shop-item-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .shop-item-cost {
+            font-size: 16px;
+            color: #fde047;
+            text-shadow: 0 0 5px rgba(253, 224, 71, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .shop-item-btn {
+            padding: 8px 12px;
+            font-size: 12px;
+            margin: 0;
+            width: 100%;
+        }
+
+        .shop-item-btn.equipped {
+            background: var(--text-highlight);
+            color: #000;
+            box-shadow: 0 0 15px var(--text-highlight);
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+
+        .hud-element {
+            background: rgba(11, 12, 16, 0.6);
+            border: 1px solid rgba(102, 252, 241, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: auto;
+            text-shadow: 0 0 5px var(--text-highlight);
+            backdrop-filter: blur(5px);
+        }
+
+        .controls-group {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .hud-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-glow);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .hud-btn:hover {
+            background: var(--btn-hover);
+        }
+        .hud-btn:active {
+            background: #fff; color: #000;
+        }
+
+        #loadingOverlay {
+            background: var(--bg-color);
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-highlight);
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="uiLayer">
+        
+        <!-- HUD (Hidden by default, shown in PLAYING) -->
+        <div id="hud" style="display: none;">
+            <div class="hud-element" id="levelDisplay">LEVEL 1</div>
+            <div class="controls-group">
+                <button class="hud-btn" id="btnUndo">UNDO (<span id="undoCount">0</span>)</button>
+                <button class="hud-btn" id="btnHint">HINT (<span id="hintCount">0</span>)</button>
+                <button class="hud-btn" id="btnMenu">MENU</button>
+            </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="screenMenu" class="screen">
+            <div class="panel">
+                <h1>Sliding Block Escape</h1>
+                <p style="margin-bottom: 25px; color: #a5a6a7;">Slide to the glowing portal.</p>
+                <button id="btnPlay">Play Game</button>
+                <button id="btnShop">Shop & Upgrades</button>
+            </div>
+        </div>
+
+        <!-- Shop -->
+        <div id="screenShop" class="screen">
+            <div class="panel" style="max-width: 600px;">
+                <h2>Shop</h2>
+                <div class="shop-grid" id="shopGrid">
+                    <!-- Shop items generated by JS -->
+                </div>
+                <button id="btnShopBack">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Level Complete -->
+        <div id="screenComplete" class="screen">
+            <div class="panel">
+                <h1>SYSTEM BREACHED</h1>
+                <h2 id="rewardText" style="color: #fde047; text-shadow: 0 0 10px #fde047;">+2 SimgaBucks</h2>
+                <button id="btnNextLevel">Next Level</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="loadingOverlay">INITIALIZING...</div>
+
+<script>
+    /* =========================================================================
+       CONSTANTS & INTEGRATION API
+       ========================================================================= */
+    const GAME_ID = "slidingBlock";
+    let pendingPurchases = {};
+    let dataLoaded = false;
+
+    function addSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+    }
+
+    function spendSimgaBucks(amount, onSuccess, onFail) {
+        const msgId = Math.random().toString(36);
+        pendingPurchases[msgId] = { onSuccess, onFail };
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: amount,
+            msgId: msgId
+        }, "*");
+    }
+
+    function saveData() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveState
+        }, "*");
+    }
+
+    function loadData() {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+
+        // Fallback for local testing
+        setTimeout(() => {
+            if(!dataLoaded) {
+                console.log("Load timeout or offline. Proceeding with defaults.");
+                dataLoaded = true;
+                initApp();
+            }
+        }, 1500);
+    }
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data.type === "spendResponse") {
+            const pending = pendingPurchases[data.msgId];
+            if (pending) {
+                if (data.success) {
+                    pending.onSuccess();
+                } else {
+                    if (pending.onFail) pending.onFail();
+                    else alert("Purchase failed or not enough SimgaBucks.");
+                }
+                delete pendingPurchases[data.msgId];
+            }
+        } else if (data.type === "loadResponse") {
+            if (data.data) {
+                saveState = { ...saveState, ...data.data };
+            }
+            dataLoaded = true;
+            initApp();
+        }
+    });
+
+
+    /* =========================================================================
+       GAME STATE & CONFIGURATION
+       ========================================================================= */
+    let saveState = {
+        level: 1,
+        skins: ['neon'],
+        floors: ['dark'],
+        currentSkin: 'neon',
+        currentFloor: 'dark',
+        undos: 3,
+        hints: 3
+    };
+
+    const SKINS = {
+        'neon': { core: '#45A29E', glow: '#66FCF1' },
+        'plasma': { core: '#C026D3', glow: '#F0ABFC' },
+        'toxic': { core: '#16A34A', glow: '#86EFAC' },
+        'gold': { core: '#CA8A04', glow: '#FDE047' }
+    };
+
+    const SHOP_ITEMS = [
+        { id: 'plasma', type: 'skin', name: 'Plasma Skin', cost: 20 },
+        { id: 'toxic', type: 'skin', name: 'Toxic Skin', cost: 20 },
+        { id: 'gold', type: 'skin', name: 'Gold Skin', cost: 50 },
+        { id: 'hex', type: 'floor', name: 'Hex Floor', cost: 30 },
+        { id: 'circuit', type: 'floor', name: 'Circuit Floor', cost: 30 },
+        { id: 'undo5', type: 'consumable', name: '+5 Undos', cost: 5, action: () => saveState.undos += 5 },
+        { id: 'hint3', type: 'consumable', name: '+3 Hints', cost: 10, action: () => saveState.hints += 3 }
+    ];
+
+    const STATE_MENU = 0, STATE_PLAYING = 1, STATE_SHOP = 2, STATE_COMPLETE = 3;
+    let gameState = STATE_MENU;
+
+    let canvas, ctx;
+    let TILE_SIZE = 60;
+    let GRID_W = 8, GRID_H = 8;
+    let offsetX = 0, offsetY = 0;
+    
+    let levelGrid = [];
+    let exitPos = {x: 0, y: 0};
+    let player = {x: 0, y: 0, px: 0, py: 0, isSliding: false, slideTarget: null};
+    let moveHistory = [];
+    let distMap = [];
+    let activeHint = null;
+
+    let particles = [];
+    let stars = [];
+    let trails = [];
+    let shakeTime = 0;
+    let shakeMag = 0;
+
+    let lastTime = 0;
+
+
+    /* =========================================================================
+       INITIALIZATION & UI LOGIC
+       ========================================================================= */
+    function initApp() {
+        document.getElementById('loadingOverlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }, 500);
+
+        canvas = document.getElementById('gameCanvas');
+        ctx = canvas.getContext('2d');
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        initStars();
+        buildShopUI();
+        showScreen('screenMenu');
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        calcLayout();
+    }
+
+    function calcLayout() {
+        let maxW = (canvas.width * 0.9) / GRID_W;
+        let maxH = (canvas.height * 0.8) / GRID_H;
+        TILE_SIZE = Math.floor(Math.min(maxW, maxH, 100)); // Cap size at 100
+        offsetX = (canvas.width - TILE_SIZE * GRID_W) / 2;
+        offsetY = (canvas.height - TILE_SIZE * GRID_H) / 2;
+    }
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if(screenId) document.getElementById(screenId).classList.add('active');
+        document.getElementById('hud').style.display = (screenId === null && gameState === STATE_PLAYING) ? 'flex' : 'none';
+    }
+
+    document.getElementById('btnPlay').onclick = () => {
+        startLevel(saveState.level);
+    };
+
+    document.getElementById('btnShop').onclick = () => {
+        gameState = STATE_SHOP;
+        buildShopUI();
+        showScreen('screenShop');
+    };
+
+    document.getElementById('btnShopBack').onclick = () => {
+        gameState = STATE_MENU;
+        showScreen('screenMenu');
+    };
+
+    document.getElementById('btnMenu').onclick = () => {
+        gameState = STATE_MENU;
+        showScreen('screenMenu');
+    };
+
+    document.getElementById('btnNextLevel').onclick = () => {
+        startLevel(saveState.level);
+    };
+
+    document.getElementById('btnUndo').onclick = () => {
+        if (gameState !== STATE_PLAYING || player.isSliding || moveHistory.length === 0) return;
+        if (saveState.undos > 0) {
+            saveState.undos--;
+            let prev = moveHistory.pop();
+            player.x = prev.x;
+            player.y = prev.y;
+            player.px = player.x * TILE_SIZE;
+            player.py = player.y * TILE_SIZE;
+            trails = []; // Clear trail on undo
+            updateHUD();
+            saveData();
+        } else {
+            shakeCamera(5, 0.2); // Error bump
+        }
+    };
+
+    document.getElementById('btnHint').onclick = () => {
+        if (gameState !== STATE_PLAYING || player.isSliding || activeHint) return;
+        if (saveState.hints > 0) {
+            saveState.hints--;
+            updateHUD();
+            saveData();
+            
+            // Calculate best move based on distance map
+            let bestTarget = null;
+            let minDist = distMap[player.x][player.y];
+            
+            const dirs = [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}];
+            dirs.forEach(d => {
+                let end = getSlideEnd(levelGrid, player.x, player.y, d.x, d.y, exitPos);
+                if(end.x !== player.x || end.y !== player.y) {
+                    if(distMap[end.x][end.y] < minDist) {
+                        minDist = distMap[end.x][end.y];
+                        bestTarget = end;
+                    }
+                }
+            });
+
+            if(bestTarget) {
+                activeHint = bestTarget;
+            }
+        } else {
+            shakeCamera(5, 0.2); // Error bump
+        }
+    };
+
+    function updateHUD() {
+        document.getElementById('levelDisplay').innerText = `LEVEL ${saveState.level}`;
+        document.getElementById('undoCount').innerText = saveState.undos;
+        document.getElementById('hintCount').innerText = saveState.hints;
+    }
+
+    function buildShopUI() {
+        const grid = document.getElementById('shopGrid');
+        grid.innerHTML = '';
+        SHOP_ITEMS.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let html = `<div class="shop-item-name">${item.name}</div>`;
+            
+            let isOwned = false;
+            let isEquipped = false;
+            
+            if (item.type === 'skin') {
+                isOwned = saveState.skins.includes(item.id);
+                isEquipped = saveState.currentSkin === item.id;
+            } else if (item.type === 'floor') {
+                isOwned = saveState.floors.includes(item.id);
+                isEquipped = saveState.currentFloor === item.id;
+            }
+
+            if (isEquipped) {
+                html += `<div class="shop-item-cost">EQUIPPED</div>
+                         <button class="shop-item-btn equipped">Equipped</button>`;
+            } else if (isOwned && item.type !== 'consumable') {
+                html += `<div class="shop-item-cost">OWNED</div>
+                         <button class="shop-item-btn">Equip</button>`;
+            } else {
+                html += `<div class="shop-item-cost">${item.cost} SB</div>
+                         <button class="shop-item-btn">Buy</button>`;
+            }
+            
+            div.innerHTML = html;
+            
+            const btn = div.querySelector('button');
+            btn.onclick = () => {
+                if (isEquipped) return;
+                
+                if (isOwned && item.type !== 'consumable') {
+                    if (item.type === 'skin') saveState.currentSkin = item.id;
+                    if (item.type === 'floor') saveState.currentFloor = item.id;
+                    saveData();
+                    buildShopUI();
+                } else {
+                    spendSimgaBucks(item.cost, () => {
+                        // Success
+                        if (item.type === 'skin') {
+                            saveState.skins.push(item.id);
+                            saveState.currentSkin = item.id;
+                        } else if (item.type === 'floor') {
+                            saveState.floors.push(item.id);
+                            saveState.currentFloor = item.id;
+                        } else if (item.type === 'consumable') {
+                            item.action();
+                        }
+                        saveData();
+                        buildShopUI();
+                    }, () => {
+                        // Fail is handled visually by platform or alert if needed, we just don't unlock
+                    });
+                }
+            };
+            
+            grid.appendChild(div);
+        });
+    }
+
+    /* =========================================================================
+       LEVEL GENERATION (BFS-based guarantees solvable puzzles)
+       ========================================================================= */
+    function getSlideEnd(grid, sx, sy, dx, dy, exit) {
+        let cx = sx, cy = sy;
+        while(true) {
+            let nx = cx + dx, ny = cy + dy;
+            // Out of bounds or wall
+            if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H || grid[nx][ny] === 1) {
+                return {x: cx, y: cy};
+            }
+            cx = nx; cy = ny;
+            // Captured by exit
+            if (cx === exit.x && cy === exit.y) {
+                return {x: cx, y: cy};
+            }
+        }
+    }
+
+    function computeDistances(grid, exit) {
+        let dist = Array(GRID_W).fill().map(() => Array(GRID_H).fill(Infinity));
+        dist[exit.x][exit.y] = 0;
+        let queue = [exit];
+        let reverseAdj = Array(GRID_W).fill().map(() => Array(GRID_H).fill().map(() => []));
+
+        // Build reverse edges: if sliding from A reaches B, add edge B -> A
+        for (let x = 0; x < GRID_W; x++) {
+            for (let y = 0; y < GRID_H; y++) {
+                if (grid[x][y] === 1) continue;
+                const dirs = [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}];
+                dirs.forEach(d => {
+                    let end = getSlideEnd(grid, x, y, d.x, d.y, exit);
+                    if (end.x !== x || end.y !== y) {
+                        reverseAdj[end.x][end.y].push({x: x, y: y});
+                    }
+                });
+            }
+        }
+
+        let head = 0;
+        while (head < queue.length) {
+            let curr = queue[head++];
+            let d = dist[curr.x][curr.y];
+            let neighbors = reverseAdj[curr.x][curr.y];
+            neighbors.forEach(n => {
+                if (dist[n.x][n.y] === Infinity) {
+                    dist[n.x][n.y] = d + 1;
+                    queue.push(n);
+                }
+            });
+        }
+        return dist;
+    }
+
+    function generateLevelData(difficulty) {
+        GRID_W = Math.min(5 + Math.floor(difficulty / 4), 10);
+        GRID_H = GRID_W;
+        calcLayout();
+
+        for (let attempt = 0; attempt < 500; attempt++) {
+            let grid = Array(GRID_W).fill().map(() => Array(GRID_H).fill(0));
+            let numWalls = Math.floor(GRID_W * GRID_H * (0.15 + Math.random() * 0.1));
+            
+            // Random walls
+            for (let i = 0; i < numWalls; i++) {
+                grid[Math.floor(Math.random()*GRID_W)][Math.floor(Math.random()*GRID_H)] = 1;
+            }
+
+            // Pick exit
+            let exit;
+            do {
+                exit = {x: Math.floor(Math.random()*GRID_W), y: Math.floor(Math.random()*GRID_H)};
+            } while (grid[exit.x][exit.y] === 1);
+
+            let dist = computeDistances(grid, exit);
+            
+            // Target moves
+            let targetDist = Math.min(2 + Math.floor(difficulty / 3), 8);
+            let bestStart = null;
+            let bestDist = 0;
+
+            for (let x = 0; x < GRID_W; x++) {
+                for (let y = 0; y < GRID_H; y++) {
+                    if (grid[x][y] === 0 && dist[x][y] !== Infinity && (x !== exit.x || y !== exit.y)) {
+                        if (dist[x][y] === targetDist) bestStart = {x, y};
+                        if (dist[x][y] > bestDist) bestDist = dist[x][y];
+                    }
+                }
+            }
+
+            if (bestStart) return { grid, exit, start: bestStart, distMap: dist };
+            if (bestDist >= targetDist - 1 && bestDist > 0) {
+                // Find highest possible
+                for (let x = 0; x < GRID_W; x++) {
+                    for (let y = 0; y < GRID_H; y++) {
+                        if (dist[x][y] === bestDist) return { grid, exit, start: {x,y}, distMap: dist };
+                    }
+                }
+            }
+        }
+        
+        // Failsafe absolute basic map
+        let fallbackGrid = Array(GRID_W).fill().map(() => Array(GRID_H).fill(0));
+        let exit = {x: 0, y: 0};
+        let start = {x: GRID_W-1, y: GRID_H-1};
+        let dist = computeDistances(fallbackGrid, exit);
+        return { grid: fallbackGrid, exit, start, distMap: dist };
+    }
+
+    function startLevel(levelNum) {
+        let levelData = generateLevelData(levelNum);
+        levelGrid = levelData.grid;
+        exitPos = levelData.exit;
+        distMap = levelData.distMap;
+        
+        player.x = levelData.start.x;
+        player.y = levelData.start.y;
+        player.px = player.x * TILE_SIZE;
+        player.py = player.y * TILE_SIZE;
+        player.isSliding = false;
+        
+        moveHistory = [];
+        trails = [];
+        particles = [];
+        activeHint = null;
+
+        gameState = STATE_PLAYING;
+        updateHUD();
+        showScreen(null);
+
+        // Burst at start
+        spawnParticles(offsetX + player.px + TILE_SIZE/2, offsetY + player.py + TILE_SIZE/2, '#fff', 20, 2);
+    }
+
+    /* =========================================================================
+       INPUT HANDLING
+       ========================================================================= */
+    let touchStartX = 0, touchStartY = 0;
+
+    window.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, {passive: false});
+
+    window.addEventListener('touchend', e => {
+        if (gameState !== STATE_PLAYING || player.isSliding) return;
+        let dx = e.changedTouches[0].screenX - touchStartX;
+        let dy = e.changedTouches[0].screenY - touchStartY;
+        
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (Math.abs(dx) > 30) attemptSlide(Math.sign(dx), 0);
+        } else {
+            if (Math.abs(dy) > 30) attemptSlide(0, Math.sign(dy));
+        }
+    });
+
+    window.addEventListener('keydown', e => {
+        if (gameState !== STATE_PLAYING || player.isSliding) return;
+        const key = e.key.toLowerCase();
+        if (e.key === 'ArrowUp' || key === 'w') attemptSlide(0, -1);
+        if (e.key === 'ArrowDown' || key === 's') attemptSlide(0, 1);
+        if (e.key === 'ArrowLeft' || key === 'a') attemptSlide(-1, 0);
+        if (e.key === 'ArrowRight' || key === 'd') attemptSlide(1, 0);
+        if (key === 'z') document.getElementById('btnUndo').click();
+    });
+
+    function attemptSlide(dx, dy) {
+        let target = getSlideEnd(levelGrid, player.x, player.y, dx, dy, exitPos);
+        if (target.x !== player.x || target.y !== player.y) {
+            moveHistory.push({x: player.x, y: player.y});
+            player.slideTarget = target;
+            player.isSliding = true;
+            activeHint = null; // Clear hint on move
+        } else {
+            // Bump wall animation
+            shakeCamera(3, 0.1);
+        }
+    }
+
+
+    /* =========================================================================
+       GAME LOOP & LOGIC
+       ========================================================================= */
+    function gameLoop(timestamp) {
+        let dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+        if (dt > 0.1) dt = 0.1;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+        // Update Stars
+        stars.forEach(s => {
+            s.y += s.vy * dt * 60;
+            if (s.y > canvas.height) { s.y = 0; s.x = Math.random() * canvas.width; }
+        });
+
+        // Update Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * dt * 60;
+            p.y += p.vy * dt * 60;
+            p.life -= dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Camera Shake
+        if (shakeTime > 0) {
+            shakeTime -= dt;
+            if (shakeTime <= 0) shakeMag = 0;
+        }
+
+        if (gameState === STATE_PLAYING) {
+            // Trail logic
+            trails.push({x: player.px, y: player.py, age: 0});
+            for(let i=trails.length-1; i>=0; i--) {
+                trails[i].age += dt;
+                if(trails[i].age > 0.5) trails.splice(i, 1);
+            }
+
+            if (player.isSliding) {
+                let tx = player.slideTarget.x * TILE_SIZE;
+                let ty = player.slideTarget.y * TILE_SIZE;
+                let dx = tx - player.px;
+                let dy = ty - player.py;
+                let dist = Math.hypot(dx, dy);
+                let speed = TILE_SIZE * 0.4; // Very fast slide (pixels per frame basically)
+                
+                if (dist <= speed) {
+                    // Arrived
+                    player.px = tx;
+                    player.py = ty;
+                    player.x = player.slideTarget.x;
+                    player.y = player.slideTarget.y;
+                    player.isSliding = false;
+                    
+                    let colors = SKINS[saveState.currentSkin];
+                    spawnParticles(offsetX + player.px + TILE_SIZE/2, offsetY + player.py + TILE_SIZE/2, colors.glow, 15, 1);
+                    shakeCamera(8, 0.2);
+
+                    if (player.x === exitPos.x && player.y === exitPos.y) {
+                        levelComplete();
+                    }
+                } else {
+                    player.px += (dx / dist) * speed;
+                    player.py += (dy / dist) * speed;
+                    
+                    if (Math.random() < 0.4) {
+                        let colors = SKINS[saveState.currentSkin];
+                        spawnParticles(offsetX + player.px + TILE_SIZE/2, offsetY + player.py + TILE_SIZE/2, colors.glow, 1, 0.5);
+                    }
+                }
+            }
+        }
+    }
+
+    function levelComplete() {
+        gameState = STATE_COMPLETE;
+        
+        let reward = 2; // Base reward
+        if (saveState.level === 1) reward += 3; // Fast early reward for 20-30s rule
+        if (saveState.level % 5 === 0) reward += 5; // Milestone
+
+        addSimgaBucks(reward);
+        
+        document.getElementById('rewardText').innerText = `+${reward} SimgaBucks`;
+        showScreen('screenComplete');
+        
+        saveState.level++;
+        saveData();
+    }
+
+
+    /* =========================================================================
+       RENDERING
+       ========================================================================= */
+    function shakeCamera(mag, time) {
+        shakeMag = mag;
+        shakeTime = time;
+    }
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 2 + 0.5,
+                vy: Math.random() * 0.5 + 0.1,
+                alpha: Math.random() * 0.5 + 0.1
+            });
+        }
+    }
+
+    function spawnParticles(x, y, color, count, speedMult=1) {
+        for (let i = 0; i < count; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let vel = (Math.random() * 4 + 1) * speedMult;
+            particles.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * vel,
+                vy: Math.sin(angle) * vel,
+                life: Math.random() * 0.5 + 0.2,
+                maxLife: 0.7,
+                color: color,
+                size: Math.random() * 4 + 2
+            });
+        }
+    }
+
+    function draw() {
+        // Clear
+        ctx.fillStyle = '#0B0C10';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background stars
+        ctx.save();
+        stars.forEach(s => {
+            ctx.globalAlpha = s.alpha;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+        ctx.restore();
+
+        if (gameState === STATE_MENU || gameState === STATE_SHOP) return; // Keep clean background for UI
+
+        // Apply Camera Shake
+        ctx.save();
+        if (shakeTime > 0) {
+            let sx = (Math.random() - 0.5) * shakeMag;
+            let sy = (Math.random() - 0.5) * shakeMag;
+            ctx.translate(sx, sy);
+        }
+
+        // Draw Board Area Background
+        ctx.fillStyle = 'rgba(11, 12, 16, 0.8)';
+        ctx.fillRect(offsetX, offsetY, GRID_W * TILE_SIZE, GRID_H * TILE_SIZE);
+
+        // Draw Floor based on unlocked texture
+        drawFloor();
+
+        // Draw Walls
+        for (let x = 0; x < GRID_W; x++) {
+            for (let y = 0; y < GRID_H; y++) {
+                if (levelGrid[x][y] === 1) {
+                    let wx = offsetX + x * TILE_SIZE;
+                    let wy = offsetY + y * TILE_SIZE;
+                    
+                    ctx.fillStyle = '#1F2833';
+                    ctx.fillRect(wx, wy, TILE_SIZE, TILE_SIZE);
+                    
+                    // Neon Border
+                    ctx.strokeStyle = '#66FCF1';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#66FCF1';
+                    ctx.shadowBlur = 10;
+                    ctx.strokeRect(wx+2, wy+2, TILE_SIZE-4, TILE_SIZE-4);
+                    ctx.shadowBlur = 0;
+                    
+                    // Inner geometric details
+                    ctx.strokeStyle = 'rgba(102, 252, 241, 0.3)';
+                    ctx.beginPath();
+                    ctx.moveTo(wx, wy); ctx.lineTo(wx+TILE_SIZE, wy+TILE_SIZE);
+                    ctx.moveTo(wx+TILE_SIZE, wy); ctx.lineTo(wx, wy+TILE_SIZE);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Draw Exit Portal
+        let ex = offsetX + exitPos.x * TILE_SIZE + TILE_SIZE / 2;
+        let ey = offsetY + exitPos.y * TILE_SIZE + TILE_SIZE / 2;
+        let time = performance.now() / 500;
+        
+        ctx.save();
+        ctx.translate(ex, ey);
+        ctx.rotate(time);
+        ctx.globalCompositeOperation = 'lighter';
+        
+        for (let i = 3; i > 0; i--) {
+            ctx.beginPath();
+            ctx.arc(0, 0, (TILE_SIZE * 0.4) * (i/3) + Math.sin(time*3)*2, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(192, 38, 211, ${0.3 / i})`;
+            ctx.shadowColor = '#C026D3';
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            
+            ctx.strokeStyle = '#F0ABFC';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Draw Hint Line
+        if (activeHint) {
+            let hx = offsetX + activeHint.x * TILE_SIZE + TILE_SIZE / 2;
+            let hy = offsetY + activeHint.y * TILE_SIZE + TILE_SIZE / 2;
+            let px = offsetX + player.x * TILE_SIZE + TILE_SIZE / 2;
+            let py = offsetY + player.y * TILE_SIZE + TILE_SIZE / 2;
+
+            ctx.save();
+            ctx.strokeStyle = '#FDE047';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 10]);
+            ctx.lineDashOffset = -performance.now() / 20;
+            ctx.shadowColor = '#FDE047';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(hx, hy);
+            ctx.stroke();
+            
+            // Pulse on target
+            ctx.fillStyle = '#FDE047';
+            ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 150);
+            ctx.beginPath();
+            ctx.arc(hx, hy, TILE_SIZE/4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Draw Trail
+        let skin = SKINS[saveState.currentSkin];
+        if (trails.length > 1) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.beginPath();
+            ctx.moveTo(offsetX + trails[0].x + TILE_SIZE/2, offsetY + trails[0].y + TILE_SIZE/2);
+            for(let i=1; i<trails.length; i++) {
+                ctx.lineTo(offsetX + trails[i].x + TILE_SIZE/2, offsetY + trails[i].y + TILE_SIZE/2);
+            }
+            ctx.lineTo(offsetX + player.px + TILE_SIZE/2, offsetY + player.py + TILE_SIZE/2);
+            
+            ctx.strokeStyle = skin.glow;
+            ctx.lineWidth = TILE_SIZE * 0.4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalAlpha = 0.4;
+            ctx.shadowColor = skin.glow;
+            ctx.shadowBlur = 15;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw Player Cube
+        let px = offsetX + player.px + TILE_SIZE * 0.15;
+        let py = offsetY + player.py + TILE_SIZE * 0.15;
+        let pw = TILE_SIZE * 0.7;
+        
+        ctx.fillStyle = skin.core;
+        ctx.shadowColor = skin.glow;
+        ctx.shadowBlur = 20;
+        ctx.fillRect(px, py, pw, pw);
+        
+        // Cube inner details
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 4, py + 4, pw - 8, pw - 8);
+
+        // Draw Particles
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
+        ctx.restore(); // end camera shake
+    }
+
+    function drawFloor() {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(102, 252, 241, 0.1)';
+        ctx.lineWidth = 1;
+
+        if (saveState.currentFloor === 'dark') {
+            // Simple Grid
+            for (let x = 0; x <= GRID_W; x++) {
+                ctx.beginPath(); ctx.moveTo(offsetX + x*TILE_SIZE, offsetY); ctx.lineTo(offsetX + x*TILE_SIZE, offsetY + GRID_H*TILE_SIZE); ctx.stroke();
+            }
+            for (let y = 0; y <= GRID_H; y++) {
+                ctx.beginPath(); ctx.moveTo(offsetX, offsetY + y*TILE_SIZE); ctx.lineTo(offsetX + GRID_W*TILE_SIZE, offsetY + y*TILE_SIZE); ctx.stroke();
+            }
+        } 
+        else if (saveState.currentFloor === 'hex') {
+            // Mock Hex pattern (staggered diamonds)
+            for (let x = 0; x < GRID_W; x++) {
+                for (let y = 0; y < GRID_H; y++) {
+                    let cx = offsetX + x * TILE_SIZE + TILE_SIZE/2;
+                    let cy = offsetY + y * TILE_SIZE + TILE_SIZE/2;
+                    let s = TILE_SIZE * 0.45;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - s);
+                    ctx.lineTo(cx + s*0.86, cy - s/2);
+                    ctx.lineTo(cx + s*0.86, cy + s/2);
+                    ctx.lineTo(cx, cy + s);
+                    ctx.lineTo(cx - s*0.86, cy + s/2);
+                    ctx.lineTo(cx - s*0.86, cy - s/2);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+        } 
+        else if (saveState.currentFloor === 'circuit') {
+            // Circuit Board Lines
+            for (let x = 0; x < GRID_W; x++) {
+                for (let y = 0; y < GRID_H; y++) {
+                    // pseudo random based on pos
+                    let n = (x * 7 + y * 13) % 4;
+                    let tx = offsetX + x*TILE_SIZE;
+                    let ty = offsetY + y*TILE_SIZE;
+                    ctx.beginPath();
+                    if(n === 0) { ctx.moveTo(tx, ty+TILE_SIZE/2); ctx.lineTo(tx+TILE_SIZE, ty+TILE_SIZE/2); }
+                    if(n === 1) { ctx.moveTo(tx+TILE_SIZE/2, ty); ctx.lineTo(tx+TILE_SIZE/2, ty+TILE_SIZE); }
+                    if(n === 2) { ctx.moveTo(tx, ty); ctx.lineTo(tx+TILE_SIZE/2, ty+TILE_SIZE/2); ctx.lineTo(tx+TILE_SIZE, ty); }
+                    if(n === 3) { ctx.moveTo(tx, ty+TILE_SIZE); ctx.lineTo(tx+TILE_SIZE/2, ty+TILE_SIZE/2); ctx.lineTo(tx+TILE_SIZE, ty+TILE_SIZE); }
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(102, 252, 241, 0.2)';
+                    ctx.fillRect(tx + TILE_SIZE/2 - 3, ty + TILE_SIZE/2 - 3, 6, 6);
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    // Start flow
+    loadData();
+
+</script>
+</body>
+</html>

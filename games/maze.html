@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Maze Builder</title>
+    <style>
+        :root {
+            --primary: #00e5ff;
+            --secondary: #ff0055;
+            --bg-color: #050510;
+            --panel-bg: rgba(10, 10, 25, 0.85);
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            touch-action: none; /* Prevent scroll on mobile */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 5, 16, 0.7);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            transition: opacity 0.3s;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        h1 {
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--primary);
+            text-shadow: 0 0 15px var(--primary);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .btn {
+            background: rgba(0, 229, 255, 0.1);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.2), inset 0 0 10px rgba(0, 229, 255, 0.1);
+            pointer-events: auto;
+        }
+
+        .btn:hover, .btn:active {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--primary);
+        }
+        
+        .btn:disabled {
+            border-color: #555;
+            color: #555;
+            background: transparent;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .level-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px #fff;
+        }
+
+        .ink-container {
+            width: 50%;
+            max-width: 300px;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+
+        #ink-bar {
+            height: 100%;
+            width: 100%;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            transition: width 0.1s linear;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            pointer-events: auto;
+        }
+
+        .msg-toast {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: var(--primary);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-weight: bold;
+        }
+
+        /* Shop */
+        .shop-container {
+            background: var(--panel-bg);
+            border: 2px solid #555;
+            border-radius: 15px;
+            padding: 20px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: auto;
+        }
+        
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .shop-item:last-child {
+            border-bottom: none;
+        }
+
+        .shop-item-info h3 { margin-bottom: 5px; color: var(--primary); }
+        .shop-item-info p { font-size: 0.9rem; color: #aaa; }
+        
+        .buy-btn {
+            background: transparent;
+            border: 1px solid #ffaa00;
+            color: #ffaa00;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .buy-btn:hover {
+            background: #ffaa00;
+            color: #000;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+
+        .buy-btn.maxed {
+            border-color: #555;
+            color: #555;
+            cursor: default;
+        }
+        .buy-btn.maxed:hover {
+            background: transparent;
+            color: #555;
+            box-shadow: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <div id="hud">
+            <div class="top-bar">
+                <div class="level-text" id="level-display">Level 1</div>
+                <div class="ink-container">
+                    <div id="ink-bar"></div>
+                </div>
+            </div>
+            <div class="controls" id="build-controls">
+                <button class="btn" id="btn-undo">Undo Line</button>
+                <button class="btn" id="btn-drop">Drop Ball</button>
+            </div>
+            <div class="controls" id="play-controls" style="display: none;">
+                <button class="btn" id="btn-retry" style="border-color: var(--secondary); color: var(--secondary); box-shadow: 0 0 10px rgba(255,0,85,0.2);">Restart</button>
+            </div>
+        </div>
+
+        <div id="toast" class="msg-toast">Game Saved!</div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen active">
+            <h1>Maze<br>Builder</h1>
+            <button class="btn" id="btn-start">Play Game</button>
+            <button class="btn" id="btn-shop">Shop & Upgrades</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen">
+            <div class="shop-container">
+                <h2 style="text-align:center; color: #ffaa00;">Simga Store</h2>
+                <div id="shop-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div style="text-align:center; margin-top: 20px;">
+                    <button class="btn" id="btn-close-shop">Back to Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Complete Screen -->
+        <div id="screen-win" class="screen">
+            <h1 style="color: #00ff88; text-shadow: 0 0 20px #00ff88;">Level Complete!</h1>
+            <h2 id="win-reward-text" style="color: #ffaa00;">+2 SimgaBucks</h2>
+            <button class="btn" id="btn-next-level">Next Level</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="screen-lose" class="screen">
+            <h1 style="color: var(--secondary); text-shadow: 0 0 20px var(--secondary);">Ball Destroyed</h1>
+            <button class="btn" id="btn-retry-lose">Try Again</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * MAZE BUILDER - SIMGA PLATFORM
+ * Visually polished canvas physics game.
+ */
+
+const GAME_ID = "mazeBuilder_neon";
+
+// --- PLATFORM API WRAPPER ---
+const Platform = {
+    callbacks: {},
+    
+    init() {
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (data.type === "spendResponse") {
+                if (this.callbacks[data.msgId]) {
+                    this.callbacks[data.msgId](data.success);
+                    delete this.callbacks[data.msgId];
+                }
+            } else if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+                if (this.callbacks['load']) {
+                    this.callbacks['load'](data.data);
+                    delete this.callbacks['load'];
+                }
+            }
+        });
+    },
+
+    addSimgaBucks(amount) {
+        window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+    },
+
+    spendSimgaBucks(amount, callback) {
+        const msgId = Math.random().toString(36).substring(2, 10);
+        this.callbacks[msgId] = callback;
+        window.parent.postMessage({ type: "spendSimgaBucks", amount: amount, msgId: msgId }, "*");
+    },
+
+    saveData(data) {
+        window.parent.postMessage({ type: "saveData", gameId: GAME_ID, data: data }, "*");
+        showToast("Progress Saved");
+    },
+
+    loadData(callback) {
+        const loadMsgId = "load_" + Date.now();
+        this.callbacks['load'] = callback;
+        window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+        
+        // Fallback for local testing outside iframe
+        setTimeout(() => {
+            if(this.callbacks['load']) {
+                console.log("Load timeout (Not in iframe). Using default save.");
+                this.callbacks['load'](null);
+                delete this.callbacks['load'];
+            }
+        }, 1000);
+    }
+};
+Platform.init();
+
+// --- GAME STATE & CONFIG ---
+let saveObject = {
+    level: 1,
+    highScore: 0,
+    upgrades: {
+        ink: 0,      // Max level 5
+        slow: 0,     // Max level 3
+        wallSkin: 0, // 0: Cyan, 1: Pink, 2: Rainbow
+        goalGlow: 0  // 0: Normal, 1: Intense, 2: Supernova
+    }
+};
+
+const SHOP_CATALOG = [
+    { id: 'ink', name: 'Expanded Ink Tank', desc: 'Draw longer lines', cost: 15, max: 5 },
+    { id: 'slow', name: 'Anti-Gravity Field', desc: 'Ball falls slower', cost: 20, max: 3 },
+    { id: 'skin_pink', name: 'Neon Pink Walls', desc: 'Cosmetic', cost: 25, max: 1 },
+    { id: 'skin_rain', name: 'Prismatic Walls', desc: 'Cosmetic', cost: 40, max: 1 },
+    { id: 'glow_1', name: 'Overclocked Portal', desc: 'Intense Goal Glow', cost: 25, max: 1 },
+    { id: 'glow_2', name: 'Supernova Portal', desc: 'Massive Goal Glow', cost: 50, max: 1 },
+];
+
+const STATE = {
+    MENU: 0,
+    SHOP: 1,
+    BUILD: 2,
+    PLAY: 3,
+    WIN: 4,
+    LOSE: 5
+};
+
+let currentState = STATE.MENU;
+let lastTime = 0;
+
+// Canvas setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let cw, ch;
+
+// Game Entities
+let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 10, trail: [] };
+let goal = { x: 0, y: 0, radius: 30, angle: 0 };
+let lines = [];
+let hazards = [];
+let stars = [];
+let particles = [];
+let floatingTexts = [];
+
+// Interaction
+let isDrawing = false;
+let currentLine = null;
+let maxInk = 1000;
+let inkLeft = maxInk;
+
+// Screen Shake
+let shakeMagnitude = 0;
+
+// --- INITIALIZATION ---
+function resize() {
+    cw = canvas.width = window.innerWidth;
+    ch = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Load Data on Startup
+Platform.loadData((data) => {
+    if (data) {
+        saveObject = Object.assign(saveObject, data);
+        if(!saveObject.upgrades) saveObject.upgrades = { ink:0, slow:0, wallSkin:0, goalGlow:0 };
+    }
+    showScreen('screen-menu');
+});
+
+// --- UI MANAGEMENT ---
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    if(screenId) document.getElementById(screenId).classList.add('active');
+    document.getElementById('hud').style.display = (screenId === null) ? 'block' : 'none';
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.opacity = 1;
+    setTimeout(() => { t.style.opacity = 0; }, 2000);
+}
+
+// --- BUTTON LISTENERS ---
+document.getElementById('btn-start').addEventListener('click', () => {
+    generateLevel(saveObject.level);
+    changeState(STATE.BUILD);
+});
+
+document.getElementById('btn-shop').addEventListener('click', () => {
+    renderShop();
+    showScreen('screen-shop');
+    currentState = STATE.SHOP;
+});
+
+document.getElementById('btn-close-shop').addEventListener('click', () => {
+    showScreen('screen-menu');
+    currentState = STATE.MENU;
+});
+
+document.getElementById('btn-drop').addEventListener('click', () => {
+    changeState(STATE.PLAY);
+});
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+    if (lines.length > 0) {
+        let l = lines.pop();
+        let len = Math.hypot(l.x2 - l.x1, l.y2 - l.y1);
+        inkLeft = Math.min(maxInk, inkLeft + len);
+        updateInkUI();
+    }
+});
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+    restartLevel();
+});
+document.getElementById('btn-retry-lose').addEventListener('click', () => {
+    restartLevel();
+});
+
+document.getElementById('btn-next-level').addEventListener('click', () => {
+    saveObject.level++;
+    saveProgress();
+    generateLevel(saveObject.level);
+    changeState(STATE.BUILD);
+});
+
+// --- STATE MANAGEMENT ---
+function changeState(newState) {
+    currentState = newState;
+    
+    if (newState === STATE.BUILD) {
+        showScreen(null);
+        document.getElementById('build-controls').style.display = 'flex';
+        document.getElementById('play-controls').style.display = 'none';
+        ball.vx = 0; ball.vy = 0;
+        ball.trail = [];
+    } 
+    else if (newState === STATE.PLAY) {
+        showScreen(null);
+        document.getElementById('build-controls').style.display = 'none';
+        document.getElementById('play-controls').style.display = 'flex';
+    }
+    else if (newState === STATE.WIN) {
+        showScreen('screen-win');
+        // Economy: Level complete reward
+        let reward = saveObject.level % 5 === 0 ? 5 : 2; // Boss levels give 5
+        document.getElementById('win-reward-text').innerText = `+${reward} SimgaBucks`;
+        Platform.addSimgaBucks(reward);
+    }
+    else if (newState === STATE.LOSE) {
+        showScreen('screen-lose');
+        shakeScreen(15);
+    }
+}
+
+function saveProgress() {
+    Platform.saveData(saveObject);
+}
+
+// --- LEVEL GENERATOR ---
+function generateLevel(lvl) {
+    lines = [];
+    particles = [];
+    floatingTexts = [];
+    
+    // Config based on upgrades
+    maxInk = 1000 + (saveObject.upgrades.ink * 300);
+    inkLeft = maxInk;
+    updateInkUI();
+    document.getElementById('level-display').innerText = `Level ${lvl}`;
+
+    // Ball spawn (Top center)
+    ball.x = cw / 2;
+    ball.y = ch * 0.15;
+    ball.radius = 12;
+    ball.trail = [];
+
+    // Goal spawn (Bottom random)
+    goal.x = cw * 0.2 + Math.random() * (cw * 0.6);
+    goal.y = ch * 0.85;
+
+    // Hazards & Stars logic
+    hazards = [];
+    stars = [];
+    
+    let numHazards = Math.min(10, Math.floor(lvl / 2));
+    let numStars = 1 + Math.floor(Math.random() * 2); // 1-2 stars per level
+    
+    if (lvl === 1) numHazards = 0; // Safe first level
+
+    // Spawn Hazards
+    for(let i=0; i<numHazards; i++) {
+        let hx, hy;
+        let valid = false;
+        let attempts = 0;
+        while(!valid && attempts < 50) {
+            hx = Math.random() * cw;
+            hy = ch * 0.3 + Math.random() * (ch * 0.45);
+            // Keep away from start and goal
+            let dStart = Math.hypot(hx - ball.x, hy - ball.y);
+            let dGoal = Math.hypot(hx - goal.x, hy - goal.y);
+            if (dStart > 150 && dGoal > 150) valid = true;
+            attempts++;
+        }
+        if(valid) {
+            hazards.push({ x: hx, y: hy, radius: 25 + Math.random()*20, angle: Math.random()*Math.PI });
+        }
+    }
+
+    // Spawn Stars
+    for(let i=0; i<numStars; i++) {
+        let sx, sy;
+        let valid = false;
+        let attempts = 0;
+        while(!valid && attempts < 50) {
+            sx = cw * 0.1 + Math.random() * (cw * 0.8);
+            sy = ch * 0.2 + Math.random() * (ch * 0.6);
+            
+            // Keep away from hazards
+            let hitHazard = false;
+            for(let h of hazards) {
+                if(Math.hypot(sx-h.x, sy-h.y) < h.radius + 40) hitHazard = true;
+            }
+            if(!hitHazard) valid = true;
+            attempts++;
+        }
+        if(valid) {
+            stars.push({ x: sx, y: sy, collected: false, angle: 0 });
+        }
+    }
+}
+
+function restartLevel() {
+    // Keep lines, reset ball and stars
+    ball.x = cw / 2;
+    ball.y = ch * 0.15;
+    ball.vx = 0;
+    ball.vy = 0;
+    ball.trail = [];
+    stars.forEach(s => s.collected = false);
+    changeState(STATE.BUILD);
+}
+
+// --- INPUT HANDLING (DRAWING) ---
+function getPointerPos(e) {
+    if(e.touches) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+}
+
+function startDraw(e) {
+    if (currentState !== STATE.BUILD) return;
+    if (e.target.tagName === 'BUTTON') return; // Don't draw over buttons
+    
+    let pos = getPointerPos(e);
+    isDrawing = true;
+    currentLine = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
+}
+
+function doDraw(e) {
+    if (!isDrawing || currentState !== STATE.BUILD) return;
+    let pos = getPointerPos(e);
+    
+    // Calculate potential length
+    let dx = pos.x - currentLine.x1;
+    let dy = pos.y - currentLine.y1;
+    let len = Math.hypot(dx, dy);
+    
+    if (len > inkLeft) {
+        // Cap length
+        let ratio = inkLeft / len;
+        currentLine.x2 = currentLine.x1 + dx * ratio;
+        currentLine.y2 = currentLine.y1 + dy * ratio;
+    } else {
+        currentLine.x2 = pos.x;
+        currentLine.y2 = pos.y;
+    }
+}
+
+function endDraw(e) {
+    if (!isDrawing || currentState !== STATE.BUILD) return;
+    isDrawing = false;
+    
+    let len = Math.hypot(currentLine.x2 - currentLine.x1, currentLine.y2 - currentLine.y1);
+    if (len > 5) { // Minimum line length
+        lines.push({ ...currentLine, length: len });
+        inkLeft -= len;
+        updateInkUI();
+    }
+    currentLine = null;
+}
+
+window.addEventListener('mousedown', startDraw);
+window.addEventListener('mousemove', doDraw);
+window.addEventListener('mouseup', endDraw);
+window.addEventListener('touchstart', startDraw, {passive: false});
+window.addEventListener('touchmove', (e) => { if(isDrawing) e.preventDefault(); doDraw(e); }, {passive: false});
+window.addEventListener('touchend', endDraw);
+
+function updateInkUI() {
+    let pct = Math.max(0, (inkLeft / maxInk) * 100);
+    document.getElementById('ink-bar').style.width = pct + '%';
+}
+
+// --- PHYSICS ENGINE ---
+function updatePhysics(dt) {
+    if (currentState !== STATE.PLAY) return;
+
+    // Gravity based on upgrades
+    let gravity = 600 - (saveObject.upgrades.slow * 100); 
+    ball.vy += gravity * dt;
+
+    // Terminal velocity
+    let speed = Math.hypot(ball.vx, ball.vy);
+    let maxSpeed = 1000;
+    if (speed > maxSpeed) {
+        ball.vx = (ball.vx / speed) * maxSpeed;
+        ball.vy = (ball.vy / speed) * maxSpeed;
+    }
+
+    // Move ball
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // Trail logic
+    if (Math.random() < 0.5) {
+        ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
+        if(ball.trail.length > 15) ball.trail.shift();
+    }
+    ball.trail.forEach(t => t.alpha -= dt * 2);
+
+    // Screen Bounds Collision
+    if (ball.x - ball.radius < 0) { ball.x = ball.radius; ball.vx *= -0.7; }
+    if (ball.x + ball.radius > cw) { ball.x = cw - ball.radius; ball.vx *= -0.7; }
+    if (ball.y - ball.radius < 0) { ball.y = ball.radius; ball.vy *= -0.7; }
+    
+    // Death by falling off screen
+    if (ball.y > ch + 50) {
+        triggerDeath();
+        return;
+    }
+
+    // Line Collision
+    for (let line of lines) {
+        let v1 = { x: line.x2 - line.x1, y: line.y2 - line.y1 };
+        let v2 = { x: ball.x - line.x1, y: ball.y - line.y1 };
+        
+        let lenSq = v1.x*v1.x + v1.y*v1.y;
+        let t = Math.max(0, Math.min(1, (v1.x*v2.x + v1.y*v2.y) / lenSq));
+        
+        let proj = { x: line.x1 + t * v1.x, y: line.y1 + t * v1.y };
+        let distSq = Math.pow(ball.x - proj.x, 2) + Math.pow(ball.y - proj.y, 2);
+        
+        if (distSq < ball.radius * ball.radius) {
+            let dist = Math.sqrt(distSq);
+            let overlap = ball.radius - dist;
+            
+            // Normal
+            let nx = (ball.x - proj.x) / dist;
+            let ny = (ball.y - proj.y) / dist;
+            
+            // Resolve position
+            ball.x += nx * overlap;
+            ball.y += ny * overlap;
+            
+            // Bounce velocity (restitution)
+            let dot = ball.vx * nx + ball.vy * ny;
+            if (dot < 0) {
+                let bounce = 0.7; // Bounciness
+                ball.vx -= (1 + bounce) * dot * nx;
+                ball.vy -= (1 + bounce) * dot * ny;
+                
+                // Add friction
+                ball.vx *= 0.98;
+                ball.vy *= 0.98;
+
+                spawnParticles(proj.x, proj.y, getWallColor(), 5);
+                if (Math.abs(dot) > 300) shakeScreen(Math.min(10, Math.abs(dot)*0.01));
+            }
+        }
+    }
+
+    // Hazards Collision
+    for(let h of hazards) {
+        let d = Math.hypot(ball.x - h.x, ball.y - h.y);
+        if (d < ball.radius + h.radius - 5) {
+            triggerDeath();
+            return;
+        }
+    }
+
+    // Star Collision
+    for(let s of stars) {
+        if (!s.collected) {
+            let d = Math.hypot(ball.x - s.x, ball.y - s.y);
+            if (d < ball.radius + 15) {
+                s.collected = true;
+                Platform.addSimgaBucks(1);
+                spawnParticles(s.x, s.y, '#ffaa00', 15);
+                floatingTexts.push({ x: s.x, y: s.y, text: "+1 SB", life: 1, maxLife: 1 });
+            }
+        }
+    }
+
+    // Goal Collision
+    let dGoal = Math.hypot(ball.x - goal.x, ball.y - goal.y);
+    if (dGoal < goal.radius) {
+        // WIN!
+        ball.vx = 0; ball.vy = 0;
+        ball.x = goal.x; ball.y = goal.y;
+        spawnParticles(goal.x, goal.y, '#00e5ff', 30);
+        shakeScreen(10);
+        changeState(STATE.WIN);
+    }
+}
+
+function triggerDeath() {
+    spawnParticles(ball.x, ball.y, '#ff0055', 30);
+    ball.vy = 0; ball.vx = 0;
+    ball.x = -1000; // hide
+    changeState(STATE.LOSE);
+}
+
+// --- VISUALS & RENDERING ---
+function shakeScreen(amount) {
+    shakeMagnitude = amount;
+}
+
+function spawnParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 150 + 50;
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+            life: 1, color: color, size: Math.random()*3 + 1
+        });
+    }
+}
+
+function getWallColor() {
+    let skin = saveObject.upgrades.wallSkin;
+    if (skin === 1) return '#ff00aa'; // Pink
+    if (skin === 2) return `hsl(${(Date.now()/10)%360}, 100%, 70%)`; // Prismatic
+    return '#00e5ff'; // Default Cyan
+}
+
+function drawBackground(time) {
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Scrolling Grid
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.05)';
+    ctx.lineWidth = 1;
+    let gridSize = 50;
+    let offset = (time * 20) % gridSize;
+
+    ctx.beginPath();
+    for (let x = 0; x <= cw; x += gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, ch);
+    }
+    for (let y = offset; y <= ch; y += gridSize) {
+        ctx.moveTo(0, y); ctx.lineTo(cw, y);
+    }
+    ctx.stroke();
+    
+    // Ambient floating dust (using sine waves based on time)
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    for(let i=0; i<20; i++) {
+        let px = (Math.sin(time*0.1 + i)*0.5 + 0.5) * cw;
+        let py = (Math.cos(time*0.15 + i*2)*0.5 + 0.5) * ch;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+function drawLines() {
+    let color = getWallColor();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = color;
+
+    ctx.beginPath();
+    for (let l of lines) {
+        ctx.moveTo(l.x1, l.y1);
+        ctx.lineTo(l.x2, l.y2);
+    }
+    if (currentLine) {
+        ctx.moveTo(currentLine.x1, currentLine.y1);
+        ctx.lineTo(currentLine.x2, currentLine.y2);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0; // reset
+}
+
+function drawGoal(time) {
+    let gGlow = saveObject.upgrades.goalGlow;
+    let pulse = Math.sin(time * 3) * 5;
+    let radius = goal.radius + pulse;
+    
+    let colorInner = '#ffffff';
+    let colorOuter = '#aa00ff';
+    if(gGlow === 1) { colorOuter = '#ff00aa'; radius += 5; }
+    if(gGlow === 2) { colorOuter = '#ffaa00'; colorInner = '#ffff00'; radius += 15; }
+
+    ctx.save();
+    ctx.translate(goal.x, goal.y);
+    goal.angle += 0.02;
+    ctx.rotate(goal.angle);
+
+    ctx.shadowBlur = 30 + (gGlow*20);
+    ctx.shadowColor = colorOuter;
+
+    // Portal Vortex
+    for(let i=0; i<3; i++) {
+        ctx.beginPath();
+        ctx.strokeStyle = (i===0) ? colorInner : colorOuter;
+        ctx.lineWidth = 4 - i;
+        ctx.ellipse(0, 0, radius - i*5, radius/2 - i*2, i*Math.PI/3, 0, Math.PI*2);
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
+function drawHazards(time) {
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#ff0055';
+    ctx.fillStyle = '#ff0055';
+    ctx.strokeStyle = '#ffaaaa';
+    ctx.lineWidth = 2;
+
+    for (let h of hazards) {
+        ctx.save();
+        ctx.translate(h.x, h.y);
+        h.angle -= 0.03; // Rotate backwards
+        ctx.rotate(h.angle);
+        
+        ctx.beginPath();
+        // Draw spiky gear
+        let spikes = 8;
+        for(let i=0; i<spikes*2; i++) {
+            let r = i % 2 === 0 ? h.radius : h.radius * 0.6;
+            let a = (Math.PI / spikes) * i;
+            let px = Math.cos(a) * r;
+            let py = Math.sin(a) * r;
+            if(i===0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner core
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(0,0, h.radius*0.3, 0, Math.PI*2); ctx.fill();
+        
+        ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+}
+
+function drawStars(time) {
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ffaa00';
+    ctx.fillStyle = '#ffcc00';
+
+    for(let s of stars) {
+        if(s.collected) continue;
+        ctx.save();
+        ctx.translate(s.x, s.y + Math.sin(time*4 + s.x)*5); // hover
+        s.angle += 0.02;
+        ctx.rotate(s.angle);
+        
+        // Draw 5 point star
+        ctx.beginPath();
+        for(let i=0; i<10; i++) {
+            let r = i%2 === 0 ? 12 : 5;
+            let a = (Math.PI/5)*i - Math.PI/2;
+            ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+}
+
+function drawBall() {
+    if (ball.x < 0) return; // Dead
+
+    // Trail
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00e5ff';
+    for(let i=0; i<ball.trail.length; i++) {
+        let t = ball.trail[i];
+        if (t.alpha > 0) {
+            ctx.fillStyle = `rgba(0, 229, 255, ${t.alpha * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, ball.radius * (i/ball.trail.length), 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    // Ball
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function drawParticles(dt) {
+    for(let i=particles.length-1; i>=0; i--) {
+        let p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt * 1.5;
+        
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Floating text
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "center";
+    for(let i=floatingTexts.length-1; i>=0; i--) {
+        let ft = floatingTexts[i];
+        ft.y -= 50 * dt; // float up
+        ft.life -= dt;
+        
+        if(ft.life <= 0) {
+            floatingTexts.splice(i, 1);
+            continue;
+        }
+        
+        ctx.fillStyle = `rgba(255, 170, 0, ${ft.life/ft.maxLife})`;
+        ctx.fillText(ft.text, ft.x, ft.y);
+    }
+}
+
+// --- SHOP LOGIC ---
+function renderShop() {
+    const list = document.getElementById('shop-list');
+    list.innerHTML = '';
+
+    SHOP_CATALOG.forEach(item => {
+        let currentLvl = saveObject.upgrades[item.id.split('_')[0]]; 
+        if (item.id === 'skin_pink' && saveObject.upgrades.wallSkin >= 1) currentLvl = 1;
+        if (item.id === 'skin_rain' && saveObject.upgrades.wallSkin >= 2) currentLvl = 1;
+        if (item.id === 'glow_1' && saveObject.upgrades.goalGlow >= 1) currentLvl = 1;
+        if (item.id === 'glow_2' && saveObject.upgrades.goalGlow >= 2) currentLvl = 1;
+
+        let isMaxed = currentLvl >= item.max;
+        let cost = item.cost + (currentLvl * 10); // scale cost if multiple levels
+        if (item.max === 1) cost = item.cost; // flat cost for cosmetics
+
+        let btnHTML = isMaxed ? 
+            `<button class="buy-btn maxed" disabled>MAXED</button>` : 
+            `<button class="buy-btn" onclick="buyItem('${item.id}', ${cost})">Buy ${cost} SB</button>`;
+
+        let div = document.createElement('div');
+        div.className = 'shop-item';
+        div.innerHTML = `
+            <div class="shop-item-info">
+                <h3>${item.name} ${item.max > 1 ? `(Lvl ${currentLvl}/${item.max})` : ''}</h3>
+                <p>${item.desc}</p>
+            </div>
+            ${btnHTML}
+        `;
+        list.appendChild(div);
+    });
+}
+
+function buyItem(id, cost) {
+    let btn = event.target;
+    let oldText = btn.innerText;
+    btn.innerText = "Purchasing...";
+    btn.disabled = true;
+
+    Platform.spendSimgaBucks(cost, (success) => {
+        if (success) {
+            // Apply upgrade
+            if (id === 'ink') saveObject.upgrades.ink++;
+            if (id === 'slow') saveObject.upgrades.slow++;
+            if (id === 'skin_pink') saveObject.upgrades.wallSkin = 1;
+            if (id === 'skin_rain') saveObject.upgrades.wallSkin = 2;
+            if (id === 'glow_1') saveObject.upgrades.goalGlow = 1;
+            if (id === 'glow_2') saveObject.upgrades.goalGlow = 2;
+            
+            saveProgress();
+            renderShop(); // Refresh UI
+            showToast("Upgrade Applied!");
+        } else {
+            alert("Transaction Failed. Not enough SimgaBucks or error.");
+            btn.innerText = oldText;
+            btn.disabled = false;
+        }
+    });
+}
+
+// --- MAIN GAME LOOP ---
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    let dt = (timestamp - lastTime) / 1000;
+    // Cap dt to prevent physics explosions on lag
+    if (dt > 0.05) dt = 0.05; 
+    lastTime = timestamp;
+    let time = timestamp / 1000;
+
+    // Shake transform
+    ctx.save();
+    if (shakeMagnitude > 0) {
+        let dx = (Math.random() - 0.5) * shakeMagnitude;
+        let dy = (Math.random() - 0.5) * shakeMagnitude;
+        ctx.translate(dx, dy);
+        shakeMagnitude -= dt * 30;
+        if(shakeMagnitude < 0) shakeMagnitude = 0;
+    }
+
+    drawBackground(time);
+
+    if (currentState === STATE.BUILD || currentState === STATE.PLAY || currentState === STATE.WIN || currentState === STATE.LOSE) {
+        if (currentState === STATE.PLAY) {
+            updatePhysics(dt);
+        }
+        
+        drawGoal(time);
+        drawHazards(time);
+        drawStars(time);
+        drawLines();
+        drawBall();
+        drawParticles(dt);
+        
+        // Build mode overlay hint
+        if (currentState === STATE.BUILD) {
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.font = "16px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Draw lines to guide the ball. Avoid Red.", cw/2, ch*0.25);
+        }
+    }
+
+    ctx.restore(); // Restore shake
+    requestAnimationFrame(loop);
+}
+
+// Start loop
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

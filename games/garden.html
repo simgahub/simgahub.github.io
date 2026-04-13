@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Garden Patch</title>
+    <style>
+        :root {
+            --ui-bg: rgba(20, 30, 20, 0.75);
+            --ui-border: rgba(100, 200, 100, 0.4);
+            --text-main: #e8f5e9;
+            --text-highlight: #69f0ae;
+            --btn-bg: linear-gradient(145deg, #2e7d32, #1b5e20);
+            --btn-hover: linear-gradient(145deg, #388e3c, #2e7d32);
+            --btn-disabled: linear-gradient(145deg, #555, #333);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(6px);
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--ui-bg);
+            border: 2px solid var(--ui-border);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            color: var(--text-main);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(100,255,100,0.1);
+            max-width: 90%;
+            width: 400px;
+            animation: floatUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5rem;
+            color: var(--text-highlight);
+            text-shadow: 0 0 10px rgba(105, 240, 174, 0.5);
+            letter-spacing: 2px;
+        }
+
+        p {
+            margin: 10px 0 20px 0;
+            font-size: 1.1rem;
+            color: #ccc;
+            line-height: 1.5;
+        }
+
+        button {
+            background: var(--btn-bg);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            margin: 8px;
+            width: 80%;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 125, 50, 0.6);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: var(--btn-disabled);
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--ui-border);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .shop-item h3 {
+            margin: 0 0 5px 0;
+            font-size: 1rem;
+            color: #fff;
+        }
+
+        .shop-item p {
+            margin: 0 0 10px 0;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .shop-btn {
+            font-size: 1rem;
+            padding: 8px 12px;
+            width: 100%;
+            margin: 0;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: none;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .hud-right {
+            text-align: right;
+            color: #ffd54f; /* SimgaBucks color */
+        }
+
+        .sb-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: radial-gradient(circle, #ffe082, #ff8f00);
+            border-radius: 50%;
+            border: 1px solid #fff;
+            box-shadow: 0 0 5px #ffb300;
+            margin-right: 5px;
+            vertical-align: text-top;
+        }
+
+        /* Floating Text Container */
+        #floating-texts {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .floating-text {
+            position: absolute;
+            color: #69f0ae;
+            font-weight: bold;
+            font-size: 1.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            animation: floatUpFade 1.2s forwards ease-out;
+            pointer-events: none;
+        }
+
+        .floating-text.sb {
+            color: #ffd54f;
+            font-size: 1.8rem;
+            text-shadow: 0 0 8px #ff8f00, 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .floating-text.bad {
+            color: #ff5252;
+        }
+
+        @keyframes floatUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes floatUpFade {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="hud-left">
+            <div id="hud-day">Day: 1</div>
+            <div id="hud-score">Score: 0</div>
+            <div id="hud-lives" style="color: #ff5252;">Plants Lost: 0/3</div>
+        </div>
+        <div class="hud-right">
+            <div id="hud-sb"><span class="sb-icon"></span><span id="sb-amount">0</span></div>
+        </div>
+    </div>
+
+    <div id="floating-texts"></div>
+
+    <!-- Main Menu -->
+    <div id="menu-overlay" class="overlay active">
+        <div class="panel">
+            <h1>Garden Patch</h1>
+            <p>Water the soil before it dries out.<br>Keep your plants alive as long as possible!</p>
+            <button onclick="startGame()">Play</button>
+            <button onclick="showShop()">Shop</button>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="shop-overlay" class="overlay">
+        <div class="panel" style="width: 600px;">
+            <h1 style="font-size: 2rem;">Garden Shop</h1>
+            <div style="margin-bottom: 15px; color: #ffd54f; font-weight:bold;">
+                <span class="sb-icon"></span> <span id="shop-sb-balance">0</span> SimgaBucks
+            </div>
+            
+            <div class="shop-grid">
+                <!-- Items populated by JS -->
+            </div>
+
+            <button onclick="hideShop()" style="width: 50%; margin-top: 10px;">Back</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameover-overlay" class="overlay">
+        <div class="panel">
+            <h1 style="color: #ff5252; text-shadow: 0 0 10px rgba(255, 82, 82, 0.5);">Withered</h1>
+            <p>Your garden dried up.</p>
+            <h2 id="go-score" style="color: white;">Score: 0</h2>
+            <p id="go-high" style="color: #69f0ae; margin-top: -10px;">High Score: 0</p>
+            <button onclick="startGame()">Play Again</button>
+            <button onclick="showMenu()">Main Menu</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * PLATFORM INTEGRATION & CONSTANTS
+ */
+const GAME_ID = "garden";
+
+// Engine Constants
+const FPS = 60;
+const MS_PER_FRAME = 1000 / FPS;
+
+// Game State Enum
+const STATE = {
+    MENU: 0,
+    PLAYING: 1,
+    SHOP: 2,
+    GAMEOVER: 3
+};
+
+/**
+ * GLOBAL VARIABLES
+ */
+let canvas, ctx;
+let cw, ch;
+let currentState = STATE.MENU;
+let lastTime = 0;
+let accumulator = 0;
+let cameraShake = 0;
+
+// Game Data
+let grid = [];
+let gridSize = 3; // 3x3 initially
+let cellSize = 0;
+let gridOffsetX = 0;
+let gridOffsetY = 0;
+
+let currentDay = 1;
+let dayTimer = 0;
+const DAY_DURATION = 30; // Seconds per day
+let score = 0;
+let deadPlants = 0;
+const MAX_DEAD_PLANTS = 3;
+
+// Particles
+let particles = [];
+let weatherParticles = [];
+
+// Economy & Save Data
+let sessionSimgaBucks = 0; // Local tracking
+let pendingPurchases = {}; // { msgId: itemKey }
+
+let saveData = {
+    upgrades: {
+        slowerDrying: 0, // Level 0-5
+        largeSplash: 0   // Level 0-1
+    },
+    unlocked: {
+        skin_gold: false,
+        skin_neon: false,
+        theme_autumn: false,
+        theme_night: false
+    },
+    equipped: {
+        skin: "default",
+        theme: "spring"
+    },
+    highScore: 0
+};
+
+// Shop Configuration
+const SHOP_ITEMS = [
+    { key: "slowerDrying", name: "Better Soil", desc: "Reduces drying speed.", type: "upgrade", maxLevel: 5, costs: [10, 25, 50, 100, 200] },
+    { key: "largeSplash", name: "Splash Can", desc: "Watering affects adjacent tiles slightly.", type: "upgrade", maxLevel: 1, costs: [50] },
+    { key: "skin_gold", name: "Golden Can", desc: "A prestigious watering can.", type: "unlock", cost: 30, equipType: "skin" },
+    { key: "skin_neon", name: "Neon Can", desc: "Cyberpunk gardening.", type: "unlock", cost: 60, equipType: "skin" },
+    { key: "theme_autumn", name: "Autumn Garden", desc: "Crisp air and falling leaves.", type: "unlock", cost: 100, equipType: "theme" },
+    { key: "theme_night", name: "Night Garden", desc: "Peaceful nights and fireflies.", type: "unlock", cost: 150, equipType: "theme" }
+];
+
+/**
+ * PLATFORM COMMUNICATION
+ */
+function earnSimgaBucks(amount, reason = "") {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    
+    // Update local display immediately for snappiness
+    sessionSimgaBucks += amount;
+    updateHUD();
+    spawnFloatingText(`+${amount} SB`, cw/2 + (Math.random()*100-50), ch/2 - 100, 'sb');
+}
+
+function requestPurchase(itemKey, cost) {
+    const msgId = Math.random().toString(36).substring(2);
+    pendingPurchases[msgId] = itemKey;
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+
+    // Visual feedback that we are processing
+    const btns = document.querySelectorAll('.shop-btn');
+    btns.forEach(b => b.disabled = true);
+}
+
+function saveGame() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function loadGame() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+    return loadMsgId;
+}
+
+let activeLoadId = "";
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+
+    if (data.type === "loadResponse" && data.msgId === activeLoadId) {
+        if (data.data) {
+            // Merge loaded data with defaults
+            saveData = {
+                upgrades: { ...saveData.upgrades, ...(data.data.upgrades || {}) },
+                unlocked: { ...saveData.unlocked, ...(data.data.unlocked || {}) },
+                equipped: { ...saveData.equipped, ...(data.data.equipped || {}) },
+                highScore: data.data.highScore || 0
+            };
+        }
+        initWeather(); // Re-init weather based on loaded theme
+    }
+
+    if (data.type === "spendResponse") {
+        const itemKey = pendingPurchases[data.msgId];
+        if (itemKey) {
+            if (data.success) {
+                applyPurchase(itemKey);
+            } else {
+                alert("Not enough SimgaBucks!");
+            }
+            delete pendingPurchases[data.msgId];
+            populateShop(); // Refresh UI
+        }
+    }
+});
+
+function applyPurchase(itemKey) {
+    const item = SHOP_ITEMS.find(i => i.key === itemKey);
+    if (!item) return;
+
+    if (item.type === "upgrade") {
+        saveData.upgrades[item.key]++;
+    } else if (item.type === "unlock") {
+        saveData.unlocked[item.key] = true;
+        saveData.equipped[item.equipType] = item.key.replace(item.equipType + "_", "");
+    }
+    
+    saveGame();
+    initWeather(); // Re-apply themes
+    spawnFloatingText("Purchase Successful!", cw/2, ch/2, 'sb');
+}
+
+function equipItem(type, key) {
+    saveData.equipped[type] = key;
+    saveGame();
+    initWeather();
+    populateShop();
+}
+
+/**
+ * INITIALIZATION & ENGINE
+ */
+window.onload = () => {
+    canvas = document.getElementById("gameCanvas");
+    ctx = canvas.getContext("2d");
+    
+    resize();
+    window.addEventListener("resize", resize);
+    
+    // Input mapping
+    canvas.addEventListener("mousedown", handleInput);
+    canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        handleInput(e.touches[0]);
+    }, {passive: false});
+
+    activeLoadId = loadGame();
+    initWeather();
+
+    // Start Loop
+    requestAnimationFrame(gameLoop);
+};
+
+function resize() {
+    cw = window.innerWidth;
+    ch = window.innerHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+    calculateGrid();
+    initWeather(); // Reset weather boundaries
+}
+
+function gameLoop(timestamp) {
+    let dt = timestamp - lastTime;
+    if (dt > 100) dt = 100; // Cap delta to prevent large jumps
+    lastTime = timestamp;
+    
+    accumulator += dt;
+    while (accumulator >= MS_PER_FRAME) {
+        update(MS_PER_FRAME / 1000);
+        accumulator -= MS_PER_FRAME;
+    }
+    
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * GAMEPLAY CLASSES & LOGIC
+ */
+class Tile {
+    constructor(c, r) {
+        this.c = c;
+        this.r = r;
+        this.moisture = 100; // 0 to 100
+        
+        // Plant: 0=Seed, 1=Sprout, 2=Adult
+        this.plantState = 0; 
+        this.growth = 0; // 0 to 100
+        this.health = 100;
+        
+        this.isDead = false;
+        
+        // Visual
+        this.swayOffset = Math.random() * Math.PI * 2;
+    }
+
+    update(dt, globalDryingRate) {
+        if (this.isDead) return;
+
+        // Drying
+        this.moisture -= globalDryingRate * dt;
+        if (this.moisture < 0) this.moisture = 0;
+
+        // Plant Logic
+        if (this.moisture > 20) {
+            // Grow
+            this.growth += 8 * dt; // approx 12 seconds to grow
+            if (this.growth >= 100) {
+                this.growth = 0;
+                if (this.plantState < 2) {
+                    this.plantState++;
+                    // Minor score for growing a stage
+                    addScore(5);
+                } else {
+                    // Harvest! Adult cycle complete
+                    earnSimgaBucks(1, "Harvest");
+                    spawnFloatingText("+1 SB", gridOffsetX + this.c*cellSize + cellSize/2, gridOffsetY + this.r*cellSize);
+                    this.plantState = 0; // Reset to seed
+                    createParticles(gridOffsetX + this.c*cellSize + cellSize/2, gridOffsetY + this.r*cellSize + cellSize/2, '#69f0ae', 15);
+                }
+            }
+            
+            // Heal if wet
+            if (this.health < 100) this.health += 5 * dt;
+            
+        } else if (this.moisture === 0) {
+            // Wither
+            this.health -= 15 * dt;
+            if (this.health <= 0) {
+                this.die();
+            }
+        }
+    }
+
+    die() {
+        this.isDead = true;
+        this.plantState = 0;
+        deadPlants++;
+        updateHUD();
+        cameraShake = 15;
+        createParticles(gridOffsetX + this.c*cellSize + cellSize/2, gridOffsetY + this.r*cellSize + cellSize/2, '#ff5252', 20);
+        
+        if (deadPlants >= MAX_DEAD_PLANTS) {
+            gameOver();
+        }
+    }
+
+    water(amount) {
+        if (this.isDead) return;
+        this.moisture += amount;
+        if (this.moisture > 100) this.moisture = 100;
+    }
+
+    draw(ctx, x, y, size) {
+        // Draw Soil Base
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // Moisture Color Interpolation
+        // Wet: #3e2723 (Dark Brown) -> Dry: #d7ccc8 (Sand)
+        let mRatio = Math.max(0, this.moisture) / 100;
+        if (this.isDead) mRatio = 0;
+
+        let r = Math.floor(62 + (215 - 62) * (1 - mRatio));
+        let g = Math.floor(39 + (204 - 39) * (1 - mRatio));
+        let b = Math.floor(35 + (200 - 35) * (1 - mRatio));
+        
+        // Base rounded rect
+        const radius = size * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(size - radius, 0);
+        ctx.quadraticCurveTo(size, 0, size, radius);
+        ctx.lineTo(size, size - radius);
+        ctx.quadraticCurveTo(size, size, size - radius, size);
+        ctx.lineTo(radius, size);
+        ctx.quadraticCurveTo(0, size, 0, size - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+
+        // Style
+        let grad = ctx.createLinearGradient(0, 0, 0, size);
+        if (this.isDead) {
+            grad.addColorStop(0, '#757575');
+            grad.addColorStop(1, '#424242');
+        } else {
+            grad.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+            grad.addColorStop(1, `rgb(${r-20}, ${g-20}, ${b-20})`);
+        }
+
+        ctx.fillStyle = grad;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 5;
+        ctx.fill();
+        ctx.shadowColor = 'transparent'; // Reset shadow
+
+        // Inner border/texture
+        ctx.strokeStyle = `rgba(0,0,0,0.2)`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Cracks if very dry
+        if (this.moisture < 20 && !this.isDead) {
+            ctx.beginPath();
+            ctx.moveTo(size*0.2, size*0.1);
+            ctx.lineTo(size*0.3, size*0.4);
+            ctx.lineTo(size*0.5, size*0.5);
+            ctx.lineTo(size*0.4, size*0.8);
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.stroke();
+        }
+
+        // Draw Plant
+        if (!this.isDead) {
+            ctx.translate(size/2, size - size*0.1); // Move to bottom center of tile
+            
+            // Swaying
+            let sway = Math.sin(Date.now() / 500 + this.swayOffset) * 0.1;
+            ctx.rotate(sway);
+
+            let plantHealthColor = this.health < 50 ? '#cddc39' : '#69f0ae'; // Yellowish if dying
+            if (this.health < 20) plantHealthColor = '#ffb74d';
+
+            if (this.plantState === 0) {
+                // Seed / Small sprout
+                let h = (this.growth / 100) * (size * 0.2);
+                ctx.fillStyle = plantHealthColor;
+                ctx.beginPath();
+                ctx.ellipse(0, -h, size*0.05, h, 0, 0, Math.PI*2);
+                ctx.fill();
+            } else if (this.plantState === 1) {
+                // Sprout with leaves
+                let h = size * 0.2 + (this.growth / 100) * (size * 0.3);
+                
+                // Stem
+                ctx.strokeStyle = plantHealthColor;
+                ctx.lineWidth = size * 0.04;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.quadraticCurveTo(size*0.1, -h/2, 0, -h);
+                ctx.stroke();
+
+                // Leaves
+                ctx.fillStyle = plantHealthColor;
+                ctx.beginPath();
+                ctx.ellipse(-size*0.1, -h*0.5, size*0.1, size*0.05, -Math.PI/4, 0, Math.PI*2);
+                ctx.ellipse(size*0.1, -h*0.7, size*0.1, size*0.05, Math.PI/4, 0, Math.PI*2);
+                ctx.fill();
+            } else if (this.plantState === 2) {
+                // Adult Flower
+                let h = size * 0.5;
+                
+                // Stem
+                ctx.strokeStyle = plantHealthColor;
+                ctx.lineWidth = size * 0.04;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.quadraticCurveTo(-size*0.1, -h/2, 0, -h);
+                ctx.stroke();
+
+                // Flower Head
+                ctx.translate(0, -h);
+                
+                // Petals
+                ctx.fillStyle = '#ff80ab'; // Pink petals
+                let pCount = 6;
+                for(let i=0; i<pCount; i++) {
+                    ctx.rotate((Math.PI*2)/pCount);
+                    ctx.beginPath();
+                    ctx.ellipse(size*0.15, 0, size*0.15, size*0.06, 0, 0, Math.PI*2);
+                    ctx.fill();
+                }
+
+                // Center
+                ctx.fillStyle = '#ffee58';
+                ctx.beginPath();
+                ctx.arc(0, 0, size*0.1, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Progress ring for harvest
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, size*0.15, -Math.PI/2, -Math.PI/2 + (this.growth/100) * Math.PI*2);
+                ctx.stroke();
+            }
+        } else {
+            // Draw dead stub
+            ctx.translate(size/2, size - size*0.1);
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineWidth = size * 0.05;
+            ctx.beginPath();
+            ctx.moveTo(0,0);
+            ctx.lineTo(size*0.05, -size*0.1);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 4;
+        this.vy = (Math.random() - 0.5) * 4 - 2;
+        this.life = 1.0;
+        this.color = color;
+        this.size = Math.random() * 4 + 2;
+    }
+    update(dt) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 9.8 * dt; // Gravity
+        this.life -= dt * 1.5;
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class WeatherParticle {
+    constructor(theme) {
+        this.theme = theme;
+        this.reset();
+        this.y = Math.random() * ch; // Initial random spread
+    }
+    reset() {
+        this.x = Math.random() * cw;
+        this.y = -10;
+        this.life = Math.random() * Math.PI * 2;
+        
+        if (this.theme === 'spring') {
+            this.size = Math.random() * 3 + 1;
+            this.vy = Math.random() * 20 + 10;
+            this.color = 'rgba(255, 255, 255, 0.6)';
+        } else if (this.theme === 'autumn') {
+            this.size = Math.random() * 6 + 4;
+            this.vy = Math.random() * 40 + 20;
+            let colors = ['#ff8a65', '#ffb74d', '#e57373'];
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.rot = Math.random() * Math.PI;
+            this.vrot = (Math.random() - 0.5) * 0.1;
+        } else if (this.theme === 'night') {
+            this.y = Math.random() * ch; // Fireflies start anywhere
+            this.size = Math.random() * 2 + 1;
+            this.vy = (Math.random() - 0.5) * 10;
+            this.vx = (Math.random() - 0.5) * 10;
+            this.color = '#cddc39';
+        }
+    }
+    update(dt) {
+        this.life += dt;
+        if (this.theme === 'spring') {
+            this.y += this.vy * dt;
+            this.x += Math.sin(this.life) * 0.5;
+            if (this.y > ch + 10) this.reset();
+        } else if (this.theme === 'autumn') {
+            this.y += this.vy * dt;
+            this.x += Math.sin(this.life) * 1.5;
+            this.rot += this.vrot;
+            if (this.y > ch + 10) this.reset();
+        } else if (this.theme === 'night') {
+            this.y += this.vy * dt + Math.sin(this.life)*0.5;
+            this.x += this.vx * dt + Math.cos(this.life)*0.5;
+            if (this.y < -10 || this.y > ch+10 || this.x < -10 || this.x > cw+10) this.reset();
+        }
+    }
+    draw(ctx) {
+        if (this.theme === 'autumn') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rot);
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.size, this.size*0.5, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        } else if (this.theme === 'night') {
+            // Glow
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            let alpha = (Math.sin(this.life * 2) + 1) / 2; // Pulsing
+            ctx.globalAlpha = 0.2 + alpha * 0.8;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+}
+
+/**
+ * GAMEPLAY METHODS
+ */
+function initGame() {
+    grid = [];
+    gridSize = 3;
+    currentDay = 1;
+    dayTimer = 0;
+    score = 0;
+    deadPlants = 0;
+    particles = [];
+    
+    calculateGrid();
+
+    // Populate grid
+    for(let r=0; r<gridSize; r++) {
+        let row = [];
+        for(let c=0; c<gridSize; c++) {
+            row.push(new Tile(c, r));
+        }
+        grid.push(row);
+    }
+
+    updateHUD();
+}
+
+function calculateGrid() {
+    const minDim = Math.min(cw, ch);
+    // Grid should occupy roughly 80% of the smallest screen dimension
+    const totalGridSize = minDim * 0.8;
+    cellSize = totalGridSize / gridSize;
+    
+    gridOffsetX = (cw - totalGridSize) / 2;
+    gridOffsetY = (ch - totalGridSize) / 2 + 30; // Offset down slightly for HUD
+}
+
+function createParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function initWeather() {
+    weatherParticles = [];
+    let theme = saveData.equipped.theme || 'spring';
+    let count = theme === 'autumn' ? 30 : 50;
+    for(let i=0; i<count; i++) {
+        weatherParticles.push(new WeatherParticle(theme));
+    }
+}
+
+function handleInput(e) {
+    if (currentState !== STATE.PLAYING) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check Grid Intersection
+    const col = Math.floor((x - gridOffsetX) / cellSize);
+    const row = Math.floor((y - gridOffsetY) / cellSize);
+
+    if (col >= 0 && col < gridSize && row >= 0 && row < gridSize) {
+        waterTile(col, row);
+    }
+}
+
+function waterTile(c, r) {
+    const tile = grid[r][c];
+    if (tile.isDead) return;
+
+    tile.water(100);
+    addScore(1);
+    
+    // Determine water color based on skin
+    let wColor = '#4fc3f7';
+    if (saveData.equipped.skin === 'gold') wColor = '#ffd54f';
+    if (saveData.equipped.skin === 'neon') wColor = '#e040fb';
+
+    // Splash Particles
+    createParticles(gridOffsetX + c*cellSize + cellSize/2, gridOffsetY + r*cellSize + cellSize/2, wColor, 15);
+
+    // Splash Upgrade Logic
+    if (saveData.upgrades.largeSplash > 0) {
+        const neighbors = [
+            [c-1, r], [c+1, r], [c, r-1], [c, r+1]
+        ];
+        neighbors.forEach(n => {
+            if (n[0] >= 0 && n[0] < gridSize && n[1] >= 0 && n[1] < gridSize) {
+                grid[n[1]][n[0]].water(30);
+                createParticles(gridOffsetX + n[0]*cellSize + cellSize/2, gridOffsetY + n[1]*cellSize + cellSize/2, wColor, 3);
+            }
+        });
+    }
+}
+
+function addScore(pts) {
+    score += pts;
+    document.getElementById("hud-score").innerText = `Score: ${score}`;
+}
+
+function updateHUD() {
+    document.getElementById("hud-day").innerText = `Day: ${currentDay}`;
+    document.getElementById("hud-score").innerText = `Score: ${score}`;
+    document.getElementById("hud-lives").innerText = `Plants Lost: ${deadPlants}/${MAX_DEAD_PLANTS}`;
+    document.getElementById("sb-amount").innerText = sessionSimgaBucks;
+}
+
+function spawnFloatingText(text, x, y, extraClass = "") {
+    const container = document.getElementById("floating-texts");
+    const el = document.createElement("div");
+    el.className = `floating-text ${extraClass}`;
+    el.innerText = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    container.appendChild(el);
+    setTimeout(() => { el.remove(); }, 1200);
+}
+
+/**
+ * MAIN UPDATE & DRAW
+ */
+function update(dt) {
+    if (currentState !== STATE.PLAYING) return;
+
+    // Camera Shake decay
+    if (cameraShake > 0) {
+        cameraShake -= dt * 60;
+        if (cameraShake < 0) cameraShake = 0;
+    }
+
+    // Weather
+    weatherParticles.forEach(p => p.update(dt));
+
+    // Base drying rate increases with day, decreases with upgrade
+    let upgradeReduction = saveData.upgrades.slowerDrying * 1.5;
+    let baseDrying = 4 + (currentDay * 1.2) - upgradeReduction;
+    if (baseDrying < 1) baseDrying = 1; // Min speed
+
+    // Update Tiles
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            grid[r][c].update(dt, baseDrying);
+        }
+    }
+
+    // Update Particles
+    for(let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt);
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    // Day Progress
+    dayTimer += dt;
+    if (dayTimer >= DAY_DURATION) {
+        dayTimer = 0;
+        currentDay++;
+        
+        // Major Reward for surviving a day
+        earnSimgaBucks(3, "Day Complete");
+        spawnFloatingText("Day Survived! +3 SB", cw/2 - 100, ch/2 - 50, 'sb');
+        
+        // Expand grid occasionally
+        if (currentDay % 3 === 0 && gridSize < 6) {
+            expandGrid();
+        }
+
+        updateHUD();
+    }
+}
+
+function expandGrid() {
+    let newGrid = [];
+    gridSize++;
+    calculateGrid(); // Recalc cell size
+
+    for(let r=0; r<gridSize; r++) {
+        let row = [];
+        for(let c=0; c<gridSize; c++) {
+            // Copy old tile or create new
+            if (r < gridSize-1 && c < gridSize-1) {
+                row.push(grid[r][c]);
+            } else {
+                row.push(new Tile(c, r));
+            }
+        }
+        newGrid.push(row);
+    }
+    grid = newGrid;
+    spawnFloatingText("Garden Expanded!", cw/2 - 100, ch/2, 'sb');
+}
+
+function draw() {
+    // Background based on theme
+    let theme = saveData.equipped.theme || 'spring';
+    let grad = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, Math.max(cw, ch));
+    
+    if (theme === 'spring') {
+        grad.addColorStop(0, '#2e7d32');
+        grad.addColorStop(1, '#1b5e20');
+    } else if (theme === 'autumn') {
+        grad.addColorStop(0, '#795548');
+        grad.addColorStop(1, '#3e2723');
+    } else if (theme === 'night') {
+        grad.addColorStop(0, '#1a237e');
+        grad.addColorStop(1, '#000000');
+    }
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Weather behind grid
+    weatherParticles.forEach(p => p.draw(ctx));
+
+    if (currentState === STATE.MENU || currentState === STATE.SHOP) return;
+
+    ctx.save();
+    
+    // Apply Shake
+    if (cameraShake > 0) {
+        let dx = (Math.random() - 0.5) * cameraShake;
+        let dy = (Math.random() - 0.5) * cameraShake;
+        ctx.translate(dx, dy);
+    }
+
+    // Draw Grid Shadow/Base board
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.roundRect(gridOffsetX - 10, gridOffsetY - 10, gridSize*cellSize + 20, gridSize*cellSize + 20, 20);
+    ctx.fill();
+
+    // Draw Tiles
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            grid[r][c].draw(ctx, gridOffsetX + c*cellSize, gridOffsetY + r*cellSize, cellSize);
+        }
+    }
+
+    // Draw Particles
+    particles.forEach(p => p.draw(ctx));
+
+    ctx.restore();
+}
+
+/**
+ * STATE MANAGEMENT & UI
+ */
+function startGame() {
+    document.getElementById("menu-overlay").classList.remove("active");
+    document.getElementById("gameover-overlay").classList.remove("active");
+    document.getElementById("hud").style.display = "flex";
+    initGame();
+    currentState = STATE.PLAYING;
+}
+
+function gameOver() {
+    currentState = STATE.GAMEOVER;
+    document.getElementById("hud").style.display = "none";
+    
+    // Update Highscore
+    if (score > saveData.highScore) {
+        saveData.highScore = score;
+        saveGame();
+    }
+
+    document.getElementById("go-score").innerText = `Score: ${score}`;
+    document.getElementById("go-high").innerText = `High Score: ${saveData.highScore}`;
+    document.getElementById("gameover-overlay").classList.add("active");
+}
+
+function showMenu() {
+    currentState = STATE.MENU;
+    document.getElementById("gameover-overlay").classList.remove("active");
+    document.getElementById("shop-overlay").classList.remove("active");
+    document.getElementById("menu-overlay").classList.add("active");
+}
+
+function showShop() {
+    currentState = STATE.SHOP;
+    document.getElementById("menu-overlay").classList.remove("active");
+    populateShop();
+    document.getElementById("shop-overlay").classList.add("active");
+}
+
+function hideShop() {
+    document.getElementById("shop-overlay").classList.remove("active");
+    showMenu();
+}
+
+function populateShop() {
+    document.getElementById("shop-sb-balance").innerText = sessionSimgaBucks;
+    const container = document.querySelector(".shop-grid");
+    container.innerHTML = "";
+
+    SHOP_ITEMS.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "shop-item";
+
+        let title = `<h3>${item.name}</h3>`;
+        let desc = `<p>${item.desc}</p>`;
+        let actionBtn = "";
+
+        if (item.type === "upgrade") {
+            let currentLevel = saveData.upgrades[item.key] || 0;
+            if (currentLevel >= item.maxLevel) {
+                actionBtn = `<button class="shop-btn" disabled>Max Level</button>`;
+            } else {
+                let cost = item.costs[currentLevel];
+                actionBtn = `<button class="shop-btn" onclick="requestPurchase('${item.key}', ${cost})">Buy (${cost} SB)</button>`;
+            }
+            title = `<h3>${item.name} (Lvl ${currentLevel}/${item.maxLevel})</h3>`;
+        } else if (item.type === "unlock") {
+            let isUnlocked = saveData.unlocked[item.key];
+            let rawKey = item.key.replace(item.equipType + "_", "");
+            let isEquipped = saveData.equipped[item.equipType] === rawKey;
+
+            if (!isUnlocked) {
+                actionBtn = `<button class="shop-btn" onclick="requestPurchase('${item.key}', ${item.cost})">Unlock (${item.cost} SB)</button>`;
+            } else if (isEquipped) {
+                actionBtn = `<button class="shop-btn" disabled>Equipped</button>`;
+            } else {
+                actionBtn = `<button class="shop-btn" onclick="equipItem('${item.equipType}', '${rawKey}')">Equip</button>`;
+            }
+        }
+
+        div.innerHTML = title + desc + actionBtn;
+        container.appendChild(div);
+    });
+}
+
+</script>
+</body>
+</html>

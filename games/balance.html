@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Balance Bridge</title>
+    <style>
+        :root {
+            --primary: #00f0ff;
+            --primary-glow: rgba(0, 240, 255, 0.6);
+            --bg-overlay: rgba(10, 15, 30, 0.85);
+            --text-main: #ffffff;
+            --text-muted: #8892b0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            touch-action: none; /* Prevent scroll on touch */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen {
+            background: var(--bg-overlay);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 20px rgba(0, 240, 255, 0.1);
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1 {
+            color: var(--text-main);
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        h2 {
+            color: var(--text-main);
+            font-size: 2rem;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .highlight {
+            color: var(--primary);
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--primary-glow);
+        }
+
+        button {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 100, 255, 0.2));
+            border: 1px solid var(--primary);
+            color: var(--text-main);
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(0, 100, 255, 0.4));
+            box-shadow: 0 0 20px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+            border-color: #555;
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+        }
+
+        #hud.active {
+            display: block;
+        }
+
+        .hud-top {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+
+        .hud-stat {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .hud-controls {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1rem;
+            letter-spacing: 2px;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+        }
+
+        .item-title {
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .item-desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            flex-grow: 1;
+        }
+
+        .item-cost {
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+
+        .shop-item button {
+            padding: 10px;
+            font-size: 1rem;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #050510;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 240, 255, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Floating Notifications */
+        .notification-container {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .notification {
+            background: rgba(0, 240, 255, 0.2);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            animation: slideUpFade 2.5s forwards;
+            text-shadow: 0 0 5px var(--primary-glow);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+            10% { opacity: 1; transform: translateY(0) scale(1.1); }
+            20% { transform: scale(1); }
+            80% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 2rem; }
+            .screen { padding: 20px; width: 95%; }
+            .hud-top { padding: 0 15px; }
+            .hud-stat { font-size: 1rem; padding: 8px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Loading Screen -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <h2>Syncing Data...</h2>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-top">
+            <div class="hud-stat">Score: <span id="hud-score">0</span></div>
+            <div class="hud-stat" style="color: #ffd700; border-color: rgba(255, 215, 0, 0.3);">Session SB: <span id="hud-sb">0</span></div>
+        </div>
+        <div class="hud-controls" id="hud-controls-text">
+            [Left Arrow] / [Right Arrow] or Tap screen sides to Balance
+        </div>
+    </div>
+
+    <!-- UI Overlay Layer -->
+    <div class="ui-layer" id="ui-layer">
+        
+        <!-- Main Menu -->
+        <div class="screen active" id="screen-menu">
+            <h1>Balance Bridge</h1>
+            <p>Keep the bridge steady.<br>Don't let the objects fall off!</p>
+            <p>High Score: <span class="highlight" id="menu-highscore">0</span></p>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px;">
+                <button onclick="Game.startGame()">Play Now</button>
+                <button onclick="Game.showScreen('shop')" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3);">Shop</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div class="screen" id="screen-gameover">
+            <h1 style="color: #ff3366; text-shadow: 0 0 10px rgba(255, 51, 102, 0.6); border-color: #ff3366;">Game Over</h1>
+            <p>You survived for <span class="highlight" id="go-score">0</span> seconds.</p>
+            <p>SimgaBucks Earned: <span style="color: #ffd700; font-weight: bold;" id="go-sb">0</span></p>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px;">
+                <button onclick="Game.startGame()">Play Again</button>
+                <button onclick="Game.showScreen('menu')" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3);">Menu</button>
+            </div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div class="screen" id="screen-shop" style="max-width: 900px; padding: 30px;">
+            <h2>SimgaBucks Shop</h2>
+            <p>Upgrade your bridge and customize your experience.</p>
+            <div class="shop-grid" id="shop-container">
+                <!-- Shop items injected via JS -->
+            </div>
+            <button onclick="Game.showScreen('menu')" style="margin-top: 20px; width: 200px; align-self: center;">Back to Menu</button>
+        </div>
+
+    </div>
+
+    <!-- Notifications Container -->
+    <div class="notification-container" id="notif-container"></div>
+</div>
+
+<script>
+/**
+ * BALANCE BRIDGE - Core Game Logic
+ * A self-contained, high-performance HTML5 Canvas physics game.
+ */
+
+// --- 1. CONFIGURATION & CONSTANTS ---
+const GAME_ID = "balance";
+
+const CONFIG = {
+    gravity: 400, // Pixels per second squared
+    bridgeLength: 600,
+    bridgeThickness: 20,
+    maxAngle: Math.PI / 3, // 60 degrees max tilt before objects just fall
+    playerTorque: 2000000, // Greatly increased for much stronger and faster balancing control
+    damping: 0.92, // Bridge angular damping
+    bridgeInertia: 500000
+};
+
+// Shop definitions
+const SHOP_ITEMS = {
+    'stab1': { id: 'stab1', type: 'upgrade', category: 'stability', level: 1, cost: 20, name: 'Stabilizer Mk I', desc: 'Reduces object weight impact by 20%' },
+    'stab2': { id: 'stab2', type: 'upgrade', category: 'stability', level: 2, cost: 50, name: 'Stabilizer Mk II', desc: 'Reduces object weight impact by 40%', requires: 'stab1' },
+    'fric1': { id: 'fric1', type: 'upgrade', category: 'friction', level: 1, cost: 20, name: 'Grip Tape', desc: 'Objects roll 20% slower' },
+    'fric2': { id: 'fric2', type: 'upgrade', category: 'friction', level: 2, cost: 50, name: 'Magnetic Surface', desc: 'Objects roll 40% slower', requires: 'fric1' },
+    'skin_wood': { id: 'skin_wood', type: 'unlock', category: 'skin', cost: 30, name: 'Oak Bridge', desc: 'Classic wooden plank design' },
+    'skin_metal': { id: 'skin_metal', type: 'unlock', category: 'skin', cost: 60, name: 'Alloy Truss', desc: 'Heavy industrial metal bridge' },
+    'bg_forest': { id: 'bg_forest', type: 'unlock', category: 'bg', cost: 40, name: 'Mystic Forest', desc: 'Glowing fireflies and deep woods' },
+    'bg_cyber': { id: 'bg_cyber', type: 'unlock', category: 'bg', cost: 80, name: 'Cyber City', desc: 'Neon grid and synthwave horizons' }
+};
+
+// --- 2. PLATFORM INTEGRATION (SAVE/LOAD/ECONOMY) ---
+const PlatformAPI = {
+    pendingPurchases: {},
+    loadResolve: null,
+
+    init() {
+        window.addEventListener("message", this.handleMessage.bind(this));
+    },
+
+    handleMessage(event) {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse") {
+            if (this.loadResolve) {
+                this.loadResolve(data.data);
+                this.loadResolve = null;
+            }
+        } else if (data.type === "spendResponse") {
+            const itemKey = this.pendingPurchases[data.msgId];
+            if (itemKey) {
+                if (data.success) {
+                    Game.onPurchaseSuccess(itemKey);
+                } else {
+                    Game.onPurchaseFail(itemKey);
+                }
+                delete this.pendingPurchases[data.msgId];
+            }
+        }
+    },
+
+    loadData() {
+        return new Promise((resolve) => {
+            const loadMsgId = "load_" + Date.now();
+            this.loadResolve = resolve;
+
+            // Timeout fallback if platform doesn't respond (e.g., running locally)
+            setTimeout(() => {
+                if (this.loadResolve) {
+                    console.log("Load timeout, using default data.");
+                    this.loadResolve(null);
+                    this.loadResolve = null;
+                }
+            }, 1500);
+
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+        });
+    },
+
+    saveData(saveObject) {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveObject
+        }, "*");
+    },
+
+    addSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+    },
+
+    spendSimgaBucks(cost, itemKey) {
+        const msgId = Math.random().toString(36);
+        this.pendingPurchases[msgId] = itemKey;
+        
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+    }
+};
+
+// --- 3. GAME ENGINE & LOGIC ---
+
+// Utility math
+const MathUtils = {
+    clamp: (val, min, max) => Math.max(min, Math.min(max, val)),
+    rand: (min, max) => Math.random() * (max - min) + min,
+    lerp: (a, b, t) => a + (b - a) * t
+};
+
+class ParticleSystem {
+    constructor() {
+        this.particles = [];
+    }
+    
+    emit(x, y, count, color, speedBase = 100, isSquare = false) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * speedBase;
+            this.particles.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0,
+                decay: MathUtils.rand(0.02, 0.05),
+                color: color,
+                size: MathUtils.rand(2, 6),
+                isSquare: isSquare
+            });
+        }
+    }
+
+    emitText(x, y, text, color) {
+        this.particles.push({
+            type: 'text',
+            text: text,
+            x: x, y: y,
+            vx: 0, vy: -50,
+            life: 1.0, decay: 0.015,
+            color: color
+        });
+    }
+
+    update(dt) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            let p = this.particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= p.decay;
+            
+            if (p.type !== 'text') {
+                p.vy += 100 * dt; // Gravity for particles
+            }
+
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        for (let p of this.particles) {
+            ctx.globalAlpha = Math.max(0, p.life);
+            
+            if (p.type === 'text') {
+                ctx.fillStyle = p.color;
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.fillText(p.text, p.x, p.y);
+            } else {
+                ctx.fillStyle = p.color;
+                if (p.isSquare) {
+                    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        ctx.restore();
+    }
+}
+
+class BackgroundRenderer {
+    constructor() {
+        this.stars = [];
+        this.fireflies = [];
+        this.time = 0;
+        
+        // Init stars
+        for(let i=0; i<100; i++) {
+            this.stars.push({
+                x: Math.random() * 2000 - 500,
+                y: Math.random() * 1500 - 500,
+                size: Math.random() * 2 + 0.5,
+                twinkle: Math.random() * Math.PI
+            });
+        }
+        
+        // Init fireflies
+        for(let i=0; i<40; i++) {
+            this.fireflies.push({
+                x: Math.random() * 2000 - 500,
+                y: Math.random() * 1000,
+                offset: Math.random() * 100,
+                speed: Math.random() * 0.5 + 0.2
+            });
+        }
+    }
+
+    draw(ctx, w, h, bgType) {
+        this.time += 0.016;
+        ctx.save();
+        
+        if (bgType === 'bg_space' || bgType === 'default') {
+            // Space / Neon default
+            let grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#020010');
+            grad.addColorStop(1, '#0a1030');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+            
+            // Draw Stars
+            ctx.fillStyle = 'white';
+            for(let s of this.stars) {
+                let alpha = 0.5 + 0.5 * Math.sin(this.time * 2 + s.twinkle);
+                ctx.globalAlpha = alpha;
+                let sx = (s.x + w) % w;
+                let sy = (s.y + h) % h;
+                ctx.beginPath();
+                ctx.arc(sx, sy, s.size, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Draw glowing nebula clouds softly
+            ctx.globalAlpha = 0.05;
+            ctx.fillStyle = 'cyan';
+            ctx.beginPath(); ctx.arc(w*0.2, h*0.3, w*0.3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'magenta';
+            ctx.beginPath(); ctx.arc(w*0.8, h*0.7, w*0.4, 0, Math.PI*2); ctx.fill();
+
+        } else if (bgType === 'bg_forest') {
+            // Mystic Forest
+            let grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#001a1a');
+            grad.addColorStop(1, '#003322');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Fireflies
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#aaff00';
+            ctx.fillStyle = '#ccff66';
+            for(let f of this.fireflies) {
+                f.y -= f.speed;
+                f.x += Math.sin(this.time + f.offset) * 0.5;
+                if(f.y < -50) f.y = h + 50;
+                
+                let fx = (f.x + w) % w;
+                ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.time*5 + f.offset);
+                ctx.beginPath();
+                ctx.arc(fx, f.y, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // Silhouetted trees (procedural)
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#000c0c';
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            for(let x=0; x<=w; x+=20) {
+                let y = h - 100 + Math.sin(x*0.01)*30 + Math.sin(x*0.03)*15;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(w, h);
+            ctx.fill();
+
+        } else if (bgType === 'bg_cyber') {
+            // Cyberpunk
+            let grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#0b001a');
+            grad.addColorStop(0.6, '#330033');
+            grad.addColorStop(1, '#00001a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Sun/Moon
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#ff0066';
+            let sgrad = ctx.createLinearGradient(0, h*0.2, 0, h*0.6);
+            sgrad.addColorStop(0, '#ffcc00');
+            sgrad.addColorStop(1, '#ff0066');
+            ctx.fillStyle = sgrad;
+            ctx.beginPath();
+            ctx.arc(w/2, h*0.5, 100, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Grid floor
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            let horizon = h * 0.65;
+            
+            // Horizon block
+            ctx.fillStyle = '#050010';
+            ctx.fillRect(0, horizon, w, h - horizon);
+
+            // Perspective lines
+            for(let i=-10; i<=10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(w/2 + i*20, horizon);
+                ctx.lineTo(w/2 + i*200, h);
+                ctx.stroke();
+            }
+            // Horizontal moving lines
+            let gridY = (this.time * 50) % 30;
+            for(let i=0; i<15; i++) {
+                let py = horizon + Math.pow((i*30 + gridY)/200, 2) * 200;
+                if (py > horizon && py < h) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, py);
+                    ctx.lineTo(w, py);
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        ctx.restore();
+    }
+}
+
+const Game = {
+    canvas: null,
+    ctx: null,
+    state: 'loading', // loading, menu, shop, playing, gameover
+    width: 0,
+    height: 0,
+    lastTime: 0,
+    animFrame: null,
+    
+    // Save Data
+    data: {
+        upgrades: { stability: 0, friction: 0 },
+        unlocked: ['skin_neon', 'bg_space'],
+        equipped: { skin: 'skin_neon', bg: 'bg_space' },
+        highScore: 0
+    },
+
+    // Session Data
+    sessionSB: 0,
+    score: 0,
+    timeSurvived: 0,
+    nextRewardTime: 20, // seconds
+    rewardScale: 1,
+
+    // Physics State
+    bridge: { angle: 0, omega: 0, targetTorque: 0 },
+    objects: [],
+    particles: new ParticleSystem(),
+    bgRenderer: new BackgroundRenderer(),
+    shake: 0,
+
+    // Input
+    keys: { left: false, right: false },
+    touchArea: 0, // -1 left, 1 right, 0 none
+
+    async init() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        
+        this.resize();
+        window.addEventListener('resize', this.resize.bind(this));
+
+        // Input Listeners
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = false;
+        });
+
+        // Touch Listeners
+        this.canvas.addEventListener('touchstart', this.handleTouch.bind(this), {passive: false});
+        this.canvas.addEventListener('touchmove', this.handleTouch.bind(this), {passive: false});
+        this.canvas.addEventListener('touchend', () => { this.touchArea = 0; }, {passive: false});
+
+        PlatformAPI.init();
+        
+        // Load data
+        const savedData = await PlatformAPI.loadData();
+        if (savedData) {
+            // Merge defaults safely
+            this.data.upgrades = savedData.upgrades || this.data.upgrades;
+            this.data.unlocked = savedData.unlocked || this.data.unlocked;
+            this.data.equipped = savedData.equipped || this.data.equipped;
+            this.data.highScore = savedData.highScore || 0;
+        }
+
+        document.getElementById('loading-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('loading-overlay').style.display = 'none';
+            this.showScreen('menu');
+            this.lastTime = performance.now();
+            this.loop(this.lastTime);
+        }, 500);
+
+        this.updateShopUI();
+    },
+
+    resize() {
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        CONFIG.bridgeLength = Math.min(800, this.width * 0.85);
+    },
+
+    handleTouch(e) {
+        e.preventDefault();
+        if (e.touches.length > 0) {
+            let x = e.touches[0].clientX;
+            if (x < this.width / 2) this.touchArea = -1;
+            else this.touchArea = 1;
+        } else {
+            this.touchArea = 0;
+        }
+    },
+
+    showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('hud').classList.remove('active');
+        
+        if (screenId === 'menu') {
+            document.getElementById('menu-highscore').innerText = Math.floor(this.data.highScore);
+            document.getElementById('screen-menu').classList.add('active');
+            this.state = 'menu';
+        } else if (screenId === 'shop') {
+            this.updateShopUI();
+            document.getElementById('screen-shop').classList.add('active');
+            this.state = 'shop';
+        } else if (screenId === 'playing') {
+            document.getElementById('hud').classList.add('active');
+            this.state = 'playing';
+        } else if (screenId === 'gameover') {
+            document.getElementById('go-score').innerText = Math.floor(this.timeSurvived);
+            document.getElementById('go-sb').innerText = this.sessionSB;
+            document.getElementById('screen-gameover').classList.add('active');
+            this.state = 'gameover';
+        }
+    },
+
+    startGame() {
+        this.score = 0;
+        this.timeSurvived = 0;
+        this.sessionSB = 0;
+        this.nextRewardTime = 20; // 1st reward at 20s
+        this.rewardScale = 1;
+        
+        this.bridge.angle = 0;
+        this.bridge.omega = 0;
+        this.objects = [];
+        this.particles.particles = [];
+        this.shake = 0;
+
+        document.getElementById('hud-score').innerText = '0';
+        document.getElementById('hud-sb').innerText = '0';
+
+        this.showScreen('playing');
+
+        // Initial drop
+        this.spawnObject();
+    },
+
+    spawnObject() {
+        // Difficulty scaling
+        let massMin = 10 + this.timeSurvived * 0.5;
+        let massMax = 20 + this.timeSurvived * 1.2;
+        let mass = MathUtils.rand(massMin, massMax);
+        let radius = Math.max(15, Math.min(40, mass * 0.8));
+        
+        // Spawn within central 60% of bridge width
+        let spawnW = CONFIG.bridgeLength * 0.6;
+        let p = MathUtils.rand(-spawnW/2, spawnW/2);
+        
+        // Colors based on mass
+        let hue = MathUtils.clamp(200 - mass, 0, 360);
+        let color = `hsl(${hue}, 100%, 60%)`;
+
+        this.objects.push({
+            id: Math.random(),
+            state: 'falling', // falling, rolling
+            x: this.width/2 + p, // Starting absolute x
+            y: -50, // Above screen
+            vy: 0,
+            p: 0, // Position along bridge line
+            v: 0, // Velocity along bridge line
+            mass: mass,
+            radius: radius,
+            color: color
+        });
+    },
+
+    endGame() {
+        if (this.timeSurvived > this.data.highScore) {
+            this.data.highScore = this.timeSurvived;
+        }
+        
+        // Save progress
+        PlatformAPI.saveData(this.data);
+        
+        // Show screen
+        this.showScreen('gameover');
+    },
+
+    giveReward(amount, reasonText) {
+        this.sessionSB += amount;
+        PlatformAPI.addSimgaBucks(amount);
+        document.getElementById('hud-sb').innerText = this.sessionSB;
+        this.showNotification(`+${amount} SimgaBucks!`);
+        
+        // Confetti effect from center top
+        this.particles.emit(this.width/2, 100, 30, '#ffd700', 300, true);
+    },
+
+    showNotification(text) {
+        const container = document.getElementById('notif-container');
+        const div = document.createElement('div');
+        div.className = 'notification';
+        div.innerText = text;
+        container.appendChild(div);
+        setTimeout(() => {
+            if(div.parentNode) div.parentNode.removeChild(div);
+        }, 2500);
+    },
+
+    // --- PHYSICS & LOGIC UPDATE ---
+    update(dt) {
+        if (dt > 0.1) dt = 0.1; // Cap dt for physics stability
+
+        this.particles.update(dt);
+        if (this.shake > 0) this.shake -= dt * 50;
+        if (this.shake < 0) this.shake = 0;
+
+        if (this.state !== 'playing') {
+            // Idle bridge animation for menu
+            this.bridge.angle = Math.sin(performance.now() * 0.001) * 0.1;
+            return;
+        }
+
+        this.timeSurvived += dt;
+        document.getElementById('hud-score').innerText = Math.floor(this.timeSurvived);
+
+        // Economy progression
+        if (this.timeSurvived >= this.nextRewardTime) {
+            let amount = 1 + Math.floor(this.rewardScale);
+            this.giveReward(amount, "Wave Cleared!");
+            
+            // Next reward calculation
+            // E.g. 20s(+2), 45s(+3), 75s(+4), 110s(+5)
+            this.nextRewardTime += 20 + this.rewardScale * 5; 
+            this.rewardScale += 0.5;
+        }
+
+        // Spawn logic
+        let spawnRate = Math.max(1.5, 5.0 - this.timeSurvived * 0.05); // Drops every X seconds
+        if (Math.random() < (dt / spawnRate)) {
+            this.spawnObject();
+        }
+
+        // Apply Upgrade Modifiers
+        let stabMod = 1.0;
+        if (this.data.upgrades.stability >= 1) stabMod = 0.8;
+        if (this.data.upgrades.stability >= 2) stabMod = 0.6;
+
+        let fricMod = 1.0;
+        if (this.data.upgrades.friction >= 1) fricMod = 0.8;
+        if (this.data.upgrades.friction >= 2) fricMod = 0.6;
+
+        // Bridge Input
+        let inputDir = 0;
+        if (this.keys.left || this.touchArea === -1) inputDir = -1;
+        if (this.keys.right || this.touchArea === 1) inputDir = 1;
+
+        let playerTorque = inputDir * CONFIG.playerTorque;
+        let objectsTorque = 0;
+
+        const cx = this.width / 2;
+        const cy = this.height / 2 + 50;
+
+        // Process Objects
+        for (let i = this.objects.length - 1; i >= 0; i--) {
+            let obj = this.objects[i];
+
+            if (obj.state === 'falling') {
+                obj.vy += CONFIG.gravity * dt;
+                obj.y += obj.vy * dt;
+
+                // Check collision with rotated bridge line
+                // Line equation: y - cy = tan(angle) * (x - cx)
+                let bridgeYAtX = cy + Math.tan(this.bridge.angle) * (obj.x - cx);
+                
+                // If it passes the line and is within width bounds
+                if (obj.y + obj.radius >= bridgeYAtX) {
+                    let distFromCenterX = obj.x - cx;
+                    let pPos = distFromCenterX / Math.cos(this.bridge.angle);
+
+                    if (Math.abs(pPos) <= CONFIG.bridgeLength / 2) {
+                        // Landed on bridge
+                        obj.state = 'rolling';
+                        obj.p = pPos;
+                        obj.v = obj.vy * Math.sin(this.bridge.angle); // Transfer momentum along slope
+                        
+                        // Impact effect
+                        this.shake += obj.mass * 0.2;
+                        this.bridge.omega += (obj.mass * pPos * 2) / CONFIG.bridgeInertia; // Direct impulse
+                        this.particles.emit(obj.x, bridgeYAtX, 10, 'white', 150);
+                    } else {
+                        // Missed bridge, keep falling off screen
+                        if (obj.y > this.height + 100) {
+                            // If it completely misses and falls off screen, you lose
+                            this.endGame();
+                            return;
+                        }
+                    }
+                }
+            } else if (obj.state === 'rolling') {
+                // Calculate torque
+                let forceDown = obj.mass * CONFIG.gravity;
+                let t = forceDown * obj.p * Math.cos(this.bridge.angle) * stabMod;
+                objectsTorque += t;
+
+                // Acceleration along slope
+                let acc = CONFIG.gravity * Math.sin(this.bridge.angle) * fricMod;
+                obj.v += acc * dt;
+                
+                // Apply drag
+                obj.v *= 0.99; 
+                
+                obj.p += obj.v * dt;
+
+                // Update absolute coords for rendering
+                obj.x = cx + obj.p * Math.cos(this.bridge.angle);
+                obj.y = cy + obj.p * Math.sin(this.bridge.angle) - obj.radius - (CONFIG.bridgeThickness/2);
+
+                // Fall off check
+                if (Math.abs(obj.p) > CONFIG.bridgeLength / 2) {
+                    // Fell off edge!
+                    this.particles.emit(obj.x, obj.y, 30, obj.color, 200);
+                    this.endGame();
+                    return;
+                }
+            }
+        }
+
+        // 1D Collisions between rolling objects
+        let rollingObjs = this.objects.filter(o => o.state === 'rolling');
+        // Simple iterative separation
+        for(let iter=0; iter<3; iter++) {
+            for (let i = 0; i < rollingObjs.length; i++) {
+                for (let j = i + 1; j < rollingObjs.length; j++) {
+                    let o1 = rollingObjs[i];
+                    let o2 = rollingObjs[j];
+                    let diff = o1.p - o2.p;
+                    let dist = Math.abs(diff);
+                    let minDist = o1.radius + o2.radius;
+
+                    if (dist < minDist) {
+                        let overlap = minDist - dist;
+                        let dir = diff > 0 ? 1 : -1;
+                        
+                        // Separate
+                        let totalMass = o1.mass + o2.mass;
+                        let m1Ratio = o2.mass / totalMass;
+                        let m2Ratio = o1.mass / totalMass;
+
+                        o1.p += dir * overlap * m1Ratio;
+                        o2.p -= dir * overlap * m2Ratio;
+
+                        // Exchange velocity (elastic collision)
+                        let v1 = o1.v;
+                        let v2 = o2.v;
+                        o1.v = ((o1.mass - o2.mass)*v1 + 2*o2.mass*v2) / totalMass;
+                        o2.v = ((o2.mass - o1.mass)*v2 + 2*o1.mass*v1) / totalMass;
+
+                        // Visual bump
+                        if (iter === 0 && Math.abs(v1-v2) > 50) {
+                            let cx = (o1.x + o2.x)/2;
+                            let cy = (o1.y + o2.y)/2;
+                            this.particles.emit(cx, cy, 5, 'white', 50);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update Bridge Physics
+        let netTorque = playerTorque + objectsTorque;
+        let alpha = netTorque / CONFIG.bridgeInertia;
+        
+        this.bridge.omega += alpha * dt;
+        this.bridge.omega *= CONFIG.damping;
+        this.bridge.angle += this.bridge.omega * dt;
+
+        // Terminal limits
+        if (Math.abs(this.bridge.angle) > CONFIG.maxAngle) {
+            this.bridge.angle = Math.sign(this.bridge.angle) * CONFIG.maxAngle;
+            this.bridge.omega = 0;
+            // Objects slide off very fast
+        }
+    },
+
+    // --- RENDERING ---
+    draw() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.width, this.height);
+
+        // Pre-shake
+        ctx.save();
+        if (this.shake > 0) {
+            let dx = (Math.random() - 0.5) * this.shake;
+            let dy = (Math.random() - 0.5) * this.shake;
+            ctx.translate(dx, dy);
+        }
+
+        // Background
+        this.bgRenderer.draw(ctx, this.width, this.height, this.data.equipped.bg || 'default');
+
+        const cx = this.width / 2;
+        const cy = this.height / 2 + 50;
+
+        // Fulcrum Base
+        ctx.fillStyle = '#112233';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx - 30, cy + 100);
+        ctx.lineTo(cx + 30, cy + 100);
+        ctx.fill();
+        
+        // Pivot glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'cyan';
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Bridge Transformation
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(this.bridge.angle);
+
+        let bw = CONFIG.bridgeLength;
+        let bh = CONFIG.bridgeThickness;
+
+        // Draw Bridge based on skin
+        let skin = this.data.equipped.skin;
+        if (skin === 'skin_wood') {
+            ctx.fillStyle = '#8B5A2B';
+            ctx.fillRect(-bw/2, -bh/2, bw, bh);
+            ctx.strokeStyle = '#5c3a18';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-bw/2, -bh/2+5); ctx.lineTo(bw/2, -bh/2+5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-bw/2, bh/2-5); ctx.lineTo(bw/2, bh/2-5); ctx.stroke();
+        } else if (skin === 'skin_metal') {
+            let bgrad = ctx.createLinearGradient(-bw/2, -bh/2, -bw/2, bh/2);
+            bgrad.addColorStop(0, '#ccc');
+            bgrad.addColorStop(0.5, '#666');
+            bgrad.addColorStop(1, '#333');
+            ctx.fillStyle = bgrad;
+            ctx.fillRect(-bw/2, -bh/2, bw, bh);
+            // Cross hatches
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for(let i = -bw/2; i < bw/2; i+=40) {
+                ctx.beginPath(); ctx.moveTo(i, -bh/2); ctx.lineTo(i+20, bh/2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(i+20, -bh/2); ctx.lineTo(i, bh/2); ctx.stroke();
+            }
+        } else {
+            // Neon (default)
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'cyan';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.fillRect(-bw/2, -bh/2, bw, bh);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'cyan';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-bw/2, -bh/2, bw, bh);
+        }
+
+        ctx.restore(); // Restore from rotation
+
+        // Draw Objects
+        for (let obj of this.objects) {
+            ctx.save();
+            ctx.translate(obj.x, obj.y);
+
+            // Rotate visually based on rolling
+            if (obj.state === 'rolling') {
+                let rot = obj.p / obj.radius;
+                ctx.rotate(rot);
+            } else {
+                ctx.rotate(this.timeSurvived * 5); // spin while falling
+            }
+
+            // Glow
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = obj.color;
+
+            // Radial gradient for 3D sphere look
+            let rgrad = ctx.createRadialGradient(-obj.radius*0.3, -obj.radius*0.3, obj.radius*0.1, 0, 0, obj.radius);
+            rgrad.addColorStop(0, 'white');
+            rgrad.addColorStop(0.2, obj.color);
+            rgrad.addColorStop(1, '#111');
+            
+            ctx.fillStyle = rgrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, obj.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner markings to show rotation
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath(); ctx.arc(0, obj.radius*0.5, obj.radius*0.1, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, -obj.radius*0.5, obj.radius*0.1, 0, Math.PI*2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Draw Particles
+        this.particles.draw(ctx);
+
+        // Post-shake restore
+        ctx.restore();
+    },
+
+    loop(timestamp) {
+        let dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+
+        this.update(dt);
+        this.draw();
+
+        this.animFrame = requestAnimationFrame(this.loop.bind(this));
+    },
+
+    // --- SHOP & ECONOMY SYSTEM ---
+    updateShopUI() {
+        const container = document.getElementById('shop-container');
+        container.innerHTML = '';
+
+        for (const [key, item] of Object.entries(SHOP_ITEMS)) {
+            const card = document.createElement('div');
+            card.className = 'shop-item';
+            
+            let statusHtml = '';
+            let isOwned = false;
+            let isEquipped = false;
+            let isLocked = false;
+
+            // Check progression
+            if (item.type === 'upgrade') {
+                let currentLevel = this.data.upgrades[item.category] || 0;
+                if (currentLevel >= item.level) isOwned = true;
+                if (item.requires) {
+                    let reqItem = SHOP_ITEMS[item.requires];
+                    if ((this.data.upgrades[reqItem.category]||0) < reqItem.level) isLocked = true;
+                }
+            } else if (item.type === 'unlock') {
+                if (this.data.unlocked.includes(item.id)) isOwned = true;
+                if (this.data.equipped.skin === item.id || this.data.equipped.bg === item.id) isEquipped = true;
+            }
+
+            // HTML Construction
+            let content = `
+                <div class="item-title">${item.name}</div>
+                <div class="item-desc">${item.desc}</div>
+            `;
+
+            if (isEquipped) {
+                content += `<button disabled style="border-color: #00ff00; color: #00ff00;">Equipped</button>`;
+            } else if (isOwned) {
+                if (item.type === 'unlock') {
+                    content += `<button onclick="Game.equipItem('${item.id}', '${item.category}')">Equip</button>`;
+                } else {
+                    content += `<button disabled>Max Level</button>`;
+                }
+            } else if (isLocked) {
+                content += `<button disabled style="color:#555;">Requires previous tier</button>`;
+            } else {
+                content += `<div class="item-cost">${item.cost} SB</div>
+                            <button onclick="Game.buyItem('${item.id}', ${item.cost})" id="btn-${item.id}">Purchase</button>`;
+            }
+
+            card.innerHTML = content;
+            container.appendChild(card);
+        }
+    },
+
+    buyItem(itemId, cost) {
+        // Change button to spinner state
+        const btn = document.getElementById(`btn-${itemId}`);
+        if(btn) {
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+        }
+        
+        PlatformAPI.spendSimgaBucks(cost, itemId);
+    },
+
+    onPurchaseSuccess(itemId) {
+        const item = SHOP_ITEMS[itemId];
+        if (!item) return;
+
+        if (item.type === 'upgrade') {
+            this.data.upgrades[item.category] = item.level;
+        } else if (item.type === 'unlock') {
+            if (!this.data.unlocked.includes(itemId)) {
+                this.data.unlocked.push(itemId);
+            }
+            // Auto equip
+            this.equipItem(itemId, item.category);
+        }
+
+        PlatformAPI.saveData(this.data);
+        this.updateShopUI();
+        this.showNotification("Purchase Successful!");
+    },
+
+    onPurchaseFail(itemId) {
+        this.updateShopUI(); // Reset button states
+        this.showNotification("Not enough SimgaBucks!");
+    },
+
+    equipItem(itemId, category) {
+        if (category === 'skin') this.data.equipped.skin = itemId;
+        if (category === 'bg') this.data.equipped.bg = itemId;
+        
+        PlatformAPI.saveData(this.data);
+        this.updateShopUI();
+    }
+};
+
+// Boot
+window.onload = () => {
+    Game.init();
+};
+
+</script>
+</body>
+</html>

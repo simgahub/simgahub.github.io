@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Star Collector</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --primary: #00f3ff;
+            --secondary: #bc13fe;
+            --bg: #050510;
+            --panel: rgba(10, 10, 25, 0.85);
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg);
+            font-family: 'Orbitron', sans-serif;
+            color: var(--text);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* Let clicks pass to canvas when needed */
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Typography & Layout */
+        h1 {
+            font-size: clamp(3rem, 8vw, 5rem);
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px var(--primary), 0 0 40px var(--secondary);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--secondary);
+            text-shadow: 0 0 10px var(--secondary);
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(45deg, transparent 5%, var(--primary) 5%);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 6px 0px 0px #00e6f2;
+            transition: all 0.2s ease;
+            margin: 10px;
+            min-width: 200px;
+        }
+
+        .btn:hover {
+            box-shadow: 6px 0px 0px var(--secondary);
+            background: linear-gradient(45deg, transparent 5%, var(--secondary) 5%);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 2px 0px 0px var(--secondary);
+        }
+
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        #hud-freeze-btn {
+            pointer-events: auto;
+            background: rgba(188, 19, 254, 0.2);
+            border: 2px solid var(--secondary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(188, 19, 254, 0.5);
+            transition: background 0.2s;
+            display: none;
+        }
+
+        #hud-freeze-btn:active { background: rgba(188, 19, 254, 0.6); }
+
+        /* Shop UI */
+        .shop-container {
+            background: var(--panel);
+            border: 2px solid var(--secondary);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 900px;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(188, 19, 254, 0.3);
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+            padding-right: 10px;
+        }
+
+        .shop-grid::-webkit-scrollbar { width: 8px; }
+        .shop-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        .shop-grid::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .shop-item:hover {
+            transform: scale(1.02);
+            border-color: var(--primary);
+        }
+
+        .item-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; color: var(--primary); }
+        .item-desc { font-size: 0.9rem; color: #ccc; margin-bottom: 15px; flex-grow: 1; }
+        
+        .item-action {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-cost { font-weight: bold; color: #0df046; }
+        
+        .buy-btn {
+            background: var(--primary);
+            color: black;
+            border: none;
+            padding: 8px 15px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .buy-btn:hover { background: white; box-shadow: 0 0 10px white; }
+        .buy-btn:disabled { background: #555; color: #222; cursor: not-allowed; box-shadow: none; }
+        .buy-btn.equip { background: var(--secondary); color: white; }
+        .buy-btn.equipped { background: #222; color: #0df046; border: 1px solid #0df046; }
+
+        /* Floating Messages */
+        .floating-msg {
+            position: absolute;
+            color: #0df046;
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 1.5s forwards ease-out;
+            text-shadow: 0 0 10px rgba(13, 240, 70, 0.8);
+            z-index: 100;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+        }
+
+        /* Loading overlay */
+        #loading-screen {
+            background: var(--bg);
+            z-index: 1000;
+            color: var(--primary);
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid rgba(0, 243, 255, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="ui-layer screen active">
+        <div class="spinner"></div>
+        <h2>SYNCING DATABANKS...</h2>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu-screen" class="ui-layer screen">
+        <h1>Star<br>Collector</h1>
+        <p class="subtitle">Gather cosmic energy. Avoid the void anomalies. <br>Move your mouse or drag to pilot your ship.</p>
+        <button class="btn" id="btn-play">Launch Mission</button>
+        <button class="btn" id="btn-shop">Upgrades</button>
+        <div style="margin-top: 30px; color: var(--primary); font-size: 1.2rem;">High Score: <span id="menu-highscore">0</span></div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="ui-layer" style="display: none;">
+        <div class="hud">
+            <div class="hud-box">Score: <span id="hud-score">0</span></div>
+            <button id="hud-freeze-btn">FREEZE (SPACE)</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameover-screen" class="ui-layer screen">
+        <h1 style="color: #ff3366; text-shadow: 0 0 20px #ff3366;">Hull Breach!</h1>
+        <h2 style="color: white;">Score: <span id="go-score">0</span></h2>
+        <div style="color: #0df046; font-size: 1.2rem; margin-bottom: 30px;" id="go-bucks"></div>
+        <button class="btn" id="btn-restart">Play Again</button>
+        <button class="btn" id="btn-menu">Main Menu</button>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shop-screen" class="ui-layer screen">
+        <div class="shop-container">
+            <div class="shop-header">
+                <h2>Upgrades & Skins</h2>
+                <button class="btn" id="btn-close-shop" style="min-width: auto; padding: 10px 20px; font-size: 1rem;">Back</button>
+            </div>
+            <div class="shop-grid" id="shop-grid">
+                <!-- Items injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /*******************************************************
+         * 1. CONSTANTS & PLATFORM INTEGRATION
+         *******************************************************/
+        const GAME_ID = "starCollectorSimga";
+        const BUCKS_PER_REWARD = 1; 
+        const STARS_PER_REWARD = 5; // Earn 1 SimgaBuck every 5 stars (Fast early rewards)
+
+        let pendingPurchaseId = null;
+        let pendingPurchaseKey = null;
+
+        // Save Data Structure
+        let saveData = {
+            highScore: 0,
+            unlocked: { 'skin_plasma': true, 'fx_sparkle': true },
+            equippedSkin: 'skin_plasma',
+            equippedFx: 'fx_sparkle',
+            magnetLevel: 0,
+            freezeCount: 0
+        };
+
+        // Shop Definition
+        const SHOP_ITEMS = {
+            skin_plasma: { id: 'skin_plasma', type: 'skin', name: 'Plasma Core', desc: 'Standard glowing energy orb.', cost: 0, default: true },
+            skin_neon: { id: 'skin_neon', type: 'skin', name: 'Neon Striker', desc: 'Aggressive pink and cyan geometric ship.', cost: 20 },
+            skin_void: { id: 'skin_void', type: 'skin', name: 'Void Walker', desc: 'Dark matter entity with a white core.', cost: 50 },
+            
+            fx_sparkle: { id: 'fx_sparkle', type: 'fx', name: 'Sparkle', desc: 'Standard star collection dust.', cost: 0, default: true },
+            fx_supernova: { id: 'fx_supernova', type: 'fx', name: 'Supernova', desc: 'Massive, colorful explosions on collect.', cost: 30 },
+            
+            magnet_1: { id: 'magnet_1', type: 'magnet', name: 'Gravity Tether I', desc: 'Slightly pulls nearby stars to you.', cost: 15, level: 1 },
+            magnet_2: { id: 'magnet_2', type: 'magnet', name: 'Gravity Tether II', desc: 'Stronger, wider star attraction.', cost: 40, level: 2, requires: 'magnet_1' },
+            
+            freeze_1: { id: 'freeze_1', type: 'consumable', name: 'Temporal Freeze x1', desc: 'Freezes anomalies for 3 seconds.', cost: 10, consumable: true }
+        };
+
+        // API Wrappers
+        function saveGame() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function loadGame() {
+            const loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+            
+            // Timeout failsafe: if platform doesn't respond in 1.5s, start anyway
+            setTimeout(() => {
+                if (document.getElementById('loading-screen').classList.contains('active')) {
+                    showScreen('menu-screen');
+                    updateMenuStats();
+                }
+            }, 1500);
+        }
+
+        function earnSimgaBucks(amount) {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+            showFloatingMessage(`+${amount} SimgaBucks!`, player.x, player.y - 40);
+        }
+
+        function spendSimgaBucks(cost, itemKey) {
+            pendingPurchaseKey = itemKey;
+            pendingPurchaseId = Math.random().toString(36);
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: pendingPurchaseId
+            }, "*");
+        }
+
+        // Platform Message Listener
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse") {
+                if (data.data) {
+                    saveData = { ...saveData, ...data.data };
+                    // Ensure defaults exist
+                    if (!saveData.unlocked) saveData.unlocked = { 'skin_plasma': true, 'fx_sparkle': true };
+                }
+                showScreen('menu-screen');
+                updateMenuStats();
+            }
+
+            if (data.type === "spendResponse" && pendingPurchaseKey) {
+                if (data.success) {
+                    const item = SHOP_ITEMS[pendingPurchaseKey];
+                    if (item.consumable) {
+                        saveData.freezeCount = (saveData.freezeCount || 0) + 1;
+                    } else if (item.type === 'magnet') {
+                        saveData.magnetLevel = item.level;
+                    } else {
+                        saveData.unlocked[pendingPurchaseKey] = true;
+                        if (item.type === 'skin') saveData.equippedSkin = pendingPurchaseKey;
+                        if (item.type === 'fx') saveData.equippedFx = pendingPurchaseKey;
+                    }
+                    saveGame();
+                    renderShop(); // Refresh UI
+                } else {
+                    alert("Not enough SimgaBucks to purchase this item!");
+                }
+                pendingPurchaseKey = null;
+                pendingPurchaseId = null;
+            }
+        });
+
+        /*******************************************************
+         * 2. GAME ENGINE & CANVAS SETUP
+         *******************************************************/
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let gameState = 'LOADING'; // LOADING, MENU, PLAYING, GAMEOVER, SHOP
+        let lastTime = 0;
+
+        // Input
+        const mouse = { x: 0, y: 0, isDown: false };
+        const keys = {};
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Event Listeners for Input
+        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', () => mouse.isDown = true);
+        window.addEventListener('mouseup', () => mouse.isDown = false);
+        window.addEventListener('touchstart', (e) => { 
+            mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; mouse.isDown = true; 
+        }, {passive: false});
+        window.addEventListener('touchmove', (e) => { 
+            mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; 
+        }, {passive: false});
+        window.addEventListener('touchend', () => mouse.isDown = false);
+        
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space' && gameState === 'PLAYING') activateFreeze();
+        });
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // UI Management
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            
+            if (id && id !== 'NONE') {
+                const screenElement = document.getElementById(id);
+                if (screenElement) {
+                    screenElement.classList.add('active');
+                }
+            }
+            
+            document.getElementById('hud').style.display = id === 'NONE' ? 'block' : 'none';
+            gameState = id === 'NONE' ? 'PLAYING' : 
+                        id === 'menu-screen' ? 'MENU' : 
+                        id === 'gameover-screen' ? 'GAMEOVER' : 
+                        id === 'shop-screen' ? 'SHOP' : 'LOADING';
+        }
+
+        /*******************************************************
+         * 3. GAME ENTITIES & LOGIC
+         *******************************************************/
+        
+        let score = 0;
+        let sessionBucksEarned = 0;
+        let starsSinceLastReward = 0;
+        
+        let player, stars, holes, particles, floatingTexts, bgElements;
+        let difficultyTimer = 0;
+        let freezeTimer = 0; // If > 0, holes stop moving
+
+        class BackgroundElement {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.z = Math.random() * 2 + 0.1; // Parallax depth
+                this.radius = Math.random() * 1.5;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+            update(dx, dy) {
+                // Move opposite to player for parallax
+                this.x -= dx * this.z * 0.1;
+                this.y -= dy * this.z * 0.1;
+
+                if (this.x < 0) this.x += width;
+                if (this.x > width) this.x -= width;
+                if (this.y < 0) this.y += height;
+                if (this.y > height) this.y -= height;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class Player {
+            constructor() {
+                this.x = width / 2;
+                this.y = height / 2;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 15;
+                this.trail = [];
+                this.speed = 0.12; // Lerp speed towards mouse
+            }
+            update() {
+                // Move towards mouse/touch
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                
+                // If using WASD fallback
+                if (keys['KeyW']) dy = -200;
+                if (keys['KeyS']) dy = 200;
+                if (keys['KeyA']) dx = -200;
+                if (keys['KeyD']) dx = 200;
+
+                this.vx = dx * this.speed;
+                this.vy = dy * this.speed;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounds
+                this.x = Math.max(this.radius, Math.min(width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(height - this.radius, this.y));
+
+                // Trail
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > 15) this.trail.shift();
+            }
+            draw(ctx) {
+                // Draw trail
+                if (this.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                    ctx.strokeStyle = getSkinColor(saveData.equippedSkin, 0.5);
+                    ctx.lineWidth = this.radius;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = getSkinColor(saveData.equippedSkin, 1);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // Draw ship based on skin
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Rotation based on velocity
+                let angle = Math.atan2(this.vy, this.vx);
+                ctx.rotate(angle);
+
+                if (saveData.equippedSkin === 'skin_neon') {
+                    // Geometric Pink/Cyan shape
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#ff00aa';
+                    ctx.fillStyle = '#00ffff';
+                    ctx.beginPath();
+                    ctx.moveTo(20, 0);
+                    ctx.lineTo(-15, 15);
+                    ctx.lineTo(-5, 0);
+                    ctx.lineTo(-15, -15);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#ff00aa';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } 
+                else if (saveData.equippedSkin === 'skin_void') {
+                    // Dark matter with white core
+                    ctx.shadowBlur = 25;
+                    ctx.shadowColor = '#6600cc';
+                    
+                    ctx.fillStyle = '#110022';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius + Math.sin(Date.now()*0.01)*2, 0, Math.PI*2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                else {
+                    // Default Plasma
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#00f3ff';
+                    let grad = ctx.createRadialGradient(0,0, 0, 0,0, this.radius);
+                    grad.addColorStop(0, '#ffffff');
+                    grad.addColorStop(0.3, '#00f3ff');
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius*1.5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        class Star {
+            constructor() {
+                this.x = Math.random() * (width - 60) + 30;
+                this.y = Math.random() * (height - 60) + 30;
+                this.radius = 8;
+                this.pulse = Math.random() * Math.PI;
+                this.color = '#ffdd00';
+            }
+            update() {
+                this.pulse += 0.05;
+
+                // Magnet logic
+                if (saveData.magnetLevel > 0) {
+                    let dist = Math.hypot(player.x - this.x, player.y - this.y);
+                    let range = saveData.magnetLevel === 1 ? 150 : 300;
+                    let strength = saveData.magnetLevel === 1 ? 2 : 4;
+                    if (dist < range) {
+                        this.x += (player.x - this.x) / dist * strength;
+                        this.y += (player.y - this.y) / dist * strength;
+                    }
+                }
+            }
+            draw(ctx) {
+                let r = this.radius + Math.sin(this.pulse) * 2;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.pulse * 0.5);
+                ctx.shadowBlur = 15 + Math.sin(this.pulse)*5;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = '#ffffff';
+
+                // Draw 4-point star shape
+                ctx.beginPath();
+                for (let i = 0; i < 4; i++) {
+                    ctx.lineTo(0, -r);
+                    ctx.rotate(Math.PI / 4);
+                    ctx.lineTo(0, -r/3);
+                    ctx.rotate(Math.PI / 4);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class BlackHole {
+            constructor(baseSpeed) {
+                // Spawn on edges
+                if (Math.random() > 0.5) {
+                    this.x = Math.random() > 0.5 ? -30 : width + 30;
+                    this.y = Math.random() * height;
+                } else {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() > 0.5 ? -30 : height + 30;
+                }
+                this.radius = 25;
+                this.speed = baseSpeed + Math.random() * 0.5;
+                this.angle = 0;
+            }
+            update() {
+                if (freezeTimer > 0) return; // Frozen
+
+                let dx = player.x - this.x;
+                let dy = player.y - this.y;
+                let dist = Math.hypot(dx, dy);
+                
+                if (dist > 0) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+                this.angle -= 0.1;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                let isFrozen = freezeTimer > 0;
+                let coreColor = isFrozen ? '#00f3ff' : '#000000';
+                let auraColor = isFrozen ? 'rgba(0, 243, 255, 0.5)' : 'rgba(255, 0, 50, 0.6)';
+                let glowColor = isFrozen ? '#00f3ff' : '#ff0033';
+
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = glowColor;
+
+                // Swirl
+                let grad = ctx.createRadialGradient(0,0, this.radius*0.2, 0,0, this.radius*1.5);
+                grad.addColorStop(0, coreColor);
+                grad.addColorStop(0.5, auraColor);
+                grad.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI*2);
+                ctx.fill();
+
+                // Swirl lines
+                ctx.strokeStyle = auraColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius*0.8, 0, Math.PI, false);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius*1.2, Math.PI, Math.PI*2, false);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, style) {
+                this.x = x;
+                this.y = y;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.02;
+                this.color = color;
+                this.style = style; // 'sparkle' or 'supernova'
+                
+                let angle = Math.random() * Math.PI * 2;
+                let speed = this.style === 'supernova' ? Math.random() * 5 + 2 : Math.random() * 3 + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.radius = this.style === 'supernova' ? Math.random() * 4 + 2 : Math.random() * 2 + 1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // Helpers
+        function getSkinColor(skin, alpha=1) {
+            if (skin === 'skin_neon') return `rgba(0, 255, 255, ${alpha})`;
+            if (skin === 'skin_void') return `rgba(102, 0, 204, ${alpha})`;
+            return `rgba(0, 243, 255, ${alpha})`;
+        }
+
+        function createExplosion(x, y, count, color, style) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color, style));
+            }
+        }
+
+        function showFloatingMessage(text, x, y) {
+            const el = document.createElement('div');
+            el.className = 'floating-msg';
+            el.innerText = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+        }
+
+        /*******************************************************
+         * 4. GAME FLOW & LOOP
+         *******************************************************/
+        
+        function initGame() {
+            player = new Player();
+            stars = [];
+            holes = [];
+            particles = [];
+            bgElements = [];
+            
+            for(let i=0; i<100; i++) bgElements.push(new BackgroundElement());
+            
+            score = 0;
+            sessionBucksEarned = 0;
+            starsSinceLastReward = 0;
+            difficultyTimer = 0;
+            freezeTimer = 0;
+            
+            document.getElementById('hud-score').innerText = score;
+            updateFreezeButton();
+
+            // Initial spawns
+            spawnStar();
+            spawnStar();
+            spawnHole();
+
+            showScreen('NONE');
+        }
+
+        function spawnStar() {
+            stars.push(new Star());
+        }
+
+        function spawnHole() {
+            // Base speed increases with score
+            let baseSpeed = 1 + (score * 0.05);
+            holes.push(new BlackHole(baseSpeed));
+        }
+
+        function activateFreeze() {
+            if (saveData.freezeCount > 0 && freezeTimer <= 0) {
+                saveData.freezeCount--;
+                freezeTimer = 180; // ~3 seconds at 60fps
+                saveGame();
+                updateFreezeButton();
+                showFloatingMessage("FREEZE!", player.x, player.y - 30);
+            }
+        }
+
+        function updateFreezeButton() {
+            const btn = document.getElementById('hud-freeze-btn');
+            if (saveData.freezeCount > 0) {
+                btn.style.display = 'block';
+                btn.innerText = `FREEZE (${saveData.freezeCount})`;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        function gameOver() {
+            if (score > saveData.highScore) {
+                saveData.highScore = score;
+                saveGame();
+            }
+            document.getElementById('go-score').innerText = score;
+            document.getElementById('go-bucks').innerText = sessionBucksEarned > 0 ? `Earned ${sessionBucksEarned} SimgaBucks this run!` : '';
+            showScreen('gameover-screen');
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            player.update();
+
+            // Update Background
+            bgElements.forEach(bg => bg.update(player.vx, player.vy));
+
+            // Timers
+            if (freezeTimer > 0) freezeTimer--;
+            
+            difficultyTimer++;
+            // Spawn new hole periodically based on score. Cap at max holes.
+            let spawnRate = Math.max(120, 300 - (score * 5)); // frames
+            let maxHoles = Math.min(10, 2 + Math.floor(score / 10));
+            if (difficultyTimer > spawnRate && holes.length < maxHoles) {
+                spawnHole();
+                difficultyTimer = 0;
+            }
+
+            // Stars
+            for (let i = stars.length - 1; i >= 0; i--) {
+                let s = stars[i];
+                s.update();
+                
+                // Collision with player
+                let dist = Math.hypot(player.x - s.x, player.y - s.y);
+                if (dist < player.radius + s.radius) {
+                    score += 1;
+                    starsSinceLastReward += 1;
+                    document.getElementById('hud-score').innerText = score;
+                    
+                    // Economy: Earn SimgaBucks
+                    if (starsSinceLastReward >= STARS_PER_REWARD) {
+                        earnSimgaBucks(BUCKS_PER_REWARD);
+                        sessionBucksEarned += BUCKS_PER_REWARD;
+                        starsSinceLastReward = 0;
+                    }
+
+                    // Visuals
+                    let fxStyle = saveData.equippedFx === 'fx_supernova' ? 'supernova' : 'sparkle';
+                    let fxColor = fxStyle === 'supernova' ? `hsl(${Math.random()*360}, 100%, 60%)` : '#ffdd00';
+                    let count = fxStyle === 'supernova' ? 30 : 10;
+                    createExplosion(s.x, s.y, count, fxColor, fxStyle);
+
+                    stars.splice(i, 1);
+                    
+                    // Spawn 1 or 2 new stars
+                    spawnStar();
+                    if (Math.random() > 0.7) spawnStar();
+                }
+            }
+
+            // Holes
+            for (let i = holes.length - 1; i >= 0; i--) {
+                let h = holes[i];
+                h.update();
+                
+                // Collision
+                let dist = Math.hypot(player.x - h.x, player.y - h.y);
+                if (dist < player.radius + h.radius - 5) { // generous hitbox
+                    createExplosion(player.x, player.y, 50, '#ff0033', 'supernova');
+                    gameOver();
+                }
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            // Deep space gradient background
+            let bgGrad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width);
+            bgGrad.addColorStop(0, '#0a0a2a');
+            bgGrad.addColorStop(1, '#02020a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            if (gameState === 'MENU' || gameState === 'SHOP') {
+                // Just draw background and some ambient stars for menu
+                if(!bgElements) {
+                    bgElements = [];
+                    for(let i=0; i<50; i++) bgElements.push(new BackgroundElement());
+                }
+                bgElements.forEach(bg => { bg.update(0.5, 0.2); bg.draw(ctx); });
+                return;
+            }
+
+            // Game rendering
+            bgElements.forEach(bg => bg.draw(ctx));
+            
+            // Draw Nebulas (ambient glow)
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = 'rgba(188, 19, 254, 0.05)';
+            ctx.beginPath();
+            ctx.arc(width*0.2, height*0.2, 300, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.05)';
+            ctx.beginPath();
+            ctx.arc(width*0.8, height*0.8, 400, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+
+            // Entities
+            if (gameState === 'PLAYING') player.draw(ctx);
+            stars.forEach(s => s.draw(ctx));
+            holes.forEach(h => h.draw(ctx));
+            particles.forEach(p => p.draw(ctx));
+            
+            // Screen freeze tint
+            if (freezeTimer > 0) {
+                ctx.fillStyle = `rgba(0, 243, 255, ${0.1 + Math.sin(Date.now()*0.01)*0.05})`;
+                ctx.fillRect(0, 0, width, height);
+            }
+        }
+
+        function loop(timestamp) {
+            requestAnimationFrame(loop);
+            // Throttle to roughly 60fps for consistency across high Hz monitors
+            if (timestamp - lastTime < 16) return;
+            lastTime = timestamp;
+
+            update();
+            draw();
+        }
+
+        /*******************************************************
+         * 5. UI & SHOP LOGIC
+         *******************************************************/
+        
+        function updateMenuStats() {
+            document.getElementById('menu-highscore').innerText = saveData.highScore || 0;
+        }
+
+        function renderShop() {
+            const grid = document.getElementById('shop-grid');
+            grid.innerHTML = '';
+
+            Object.values(SHOP_ITEMS).forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'shop-item';
+                
+                let isUnlocked = saveData.unlocked[item.id];
+                let isEquipped = (item.type === 'skin' && saveData.equippedSkin === item.id) || 
+                                 (item.type === 'fx' && saveData.equippedFx === item.id);
+                let canBuy = true;
+                let btnText = "BUY";
+                let btnClass = "buy-btn";
+                
+                if (item.consumable) {
+                    btnText = "BUY (" + (saveData.freezeCount || 0) + " owned)";
+                } else if (item.type === 'magnet') {
+                    if (saveData.magnetLevel >= item.level) {
+                        btnText = "OWNED";
+                        btnClass += " equipped";
+                        canBuy = false;
+                    } else if (item.requires && saveData.magnetLevel < SHOP_ITEMS[item.requires].level) {
+                        btnText = "LOCKED";
+                        canBuy = false;
+                    }
+                } else {
+                    if (isEquipped) {
+                        btnText = "EQUIPPED";
+                        btnClass += " equipped";
+                        canBuy = false;
+                    } else if (isUnlocked) {
+                        btnText = "EQUIP";
+                        btnClass += " equip";
+                    }
+                }
+
+                el.innerHTML = `
+                    <div>
+                        <div class="item-title">${item.name}</div>
+                        <div class="item-desc">${item.desc}</div>
+                    </div>
+                    <div class="item-action">
+                        <span class="item-cost">${item.cost > 0 ? item.cost + ' SB' : 'FREE'}</span>
+                        <button class="${btnClass}" ${!canBuy && btnText==='LOCKED' ? 'disabled' : ''}>${btnText}</button>
+                    </div>
+                `;
+
+                const btn = el.querySelector('button');
+                btn.addEventListener('click', () => {
+                    if (btnText === "EQUIP") {
+                        if (item.type === 'skin') saveData.equippedSkin = item.id;
+                        if (item.type === 'fx') saveData.equippedFx = item.id;
+                        saveGame();
+                        renderShop();
+                    } else if (btnText.startsWith("BUY")) {
+                        if (item.cost === 0) {
+                            // Free item
+                            saveData.unlocked[item.id] = true;
+                            saveGame();
+                            renderShop();
+                        } else {
+                            // Needs SimgaBucks
+                            spendSimgaBucks(item.cost, item.id);
+                        }
+                    }
+                });
+
+                grid.appendChild(el);
+            });
+        }
+
+        // Button Listeners
+        document.getElementById('btn-play').addEventListener('click', initGame);
+        document.getElementById('btn-restart').addEventListener('click', initGame);
+        document.getElementById('btn-menu').addEventListener('click', () => {
+            showScreen('menu-screen');
+            updateMenuStats();
+        });
+        document.getElementById('btn-shop').addEventListener('click', () => {
+            renderShop();
+            showScreen('shop-screen');
+        });
+        document.getElementById('btn-close-shop').addEventListener('click', () => {
+            showScreen('menu-screen');
+        });
+        document.getElementById('hud-freeze-btn').addEventListener('click', activateFreeze);
+
+        // Boot
+        window.onload = () => {
+            // Start load sequence
+            loadGame();
+            requestAnimationFrame(loop);
+        };
+
+    </script>
+</body>
+</html>

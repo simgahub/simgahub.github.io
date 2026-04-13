@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chain Builder</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff00ea;
+            --dark: #0a0a1a;
+            --panel: rgba(15, 15, 30, 0.85);
+            --text: #e0e0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            transform: scale(0.95);
+            opacity: 0;
+            transition: all 0.3s ease;
+            position: absolute;
+            display: none;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            transform: scale(1);
+            opacity: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.4));
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        p {
+            margin-bottom: 25px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #aaa;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #0055ff, #00f3ff);
+            border: none;
+            color: white;
+            padding: 20px 40px;
+            min-height: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 35px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 15px rgba(0, 243, 255, 0.3);
+            transition: all 0.2s;
+            margin: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: all 0.5s;
+        }
+
+        .btn:hover::after {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 243, 255, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 10px rgba(0, 243, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #333, #555);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Shop Grid */
+        .shop-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 0, 234, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .shop-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .shop-item.equipped {
+            border-color: #00ff2a;
+            box-shadow: 0 0 15px rgba(0, 255, 42, 0.2);
+        }
+
+        .shop-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .shop-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--text);
+        }
+
+        .shop-desc {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 15px;
+            height: 40px;
+        }
+
+        .shop-btn {
+            padding: 12px 20px;
+            min-height: 45px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 10px;
+            padding: 10px 20px;
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .hud-value {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin-left: 5px;
+        }
+
+        /* Recycle Zone */
+        #recycle-zone {
+            position: absolute;
+            bottom: 140px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px dashed rgba(255, 0, 0, 0.5);
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 0, 0, 0.7);
+            font-size: 2rem;
+            pointer-events: none;
+            transition: all 0.2s;
+        }
+
+        #recycle-zone.highlight {
+            background: rgba(255, 0, 0, 0.3);
+            border-color: #ff0000;
+            color: #ff0000;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            transform: scale(1.1);
+        }
+
+        /* Notifications */
+        #notifications {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .floating-text {
+            position: absolute;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.5rem;
+            white-space: nowrap;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8), 0 0 20px var(--primary);
+            animation: floatUp 1.5s ease-out forwards;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -20px) scale(1.2); opacity: 1; }
+            80% { transform: translate(-50%, -60px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -80px) scale(0.9); opacity: 0; }
+        }
+
+        /* Custom Modal (Replacing Alert) */
+        #custom-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #111;
+            border: 2px solid var(--secondary);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 0, 234, 0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-box" id="hud-level">Level: <span class="hud-value" id="val-level">1</span></div>
+            <div class="hud-box" id="hud-chain">Chain: <span class="hud-value" id="val-chain">1/5</span></div>
+            <div class="hud-box" id="hud-pieces">Pieces: <span class="hud-value" id="val-pieces">7</span></div>
+        </div>
+
+        <div id="recycle-zone">🗑️</div>
+        <div id="notifications"></div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen active">
+            <h1>Chain Builder</h1>
+            <p>Connect matching energy nodes. Build the longest chain.</p>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div>High Score</div>
+                    <div class="stat-value" id="menu-highscore">0</div>
+                </div>
+                <div class="stat-box">
+                    <div>Highest Level</div>
+                    <div class="stat-value" id="menu-highlevel">1</div>
+                </div>
+            </div>
+            <button class="btn" onclick="startGame()">Start Building</button>
+            <button class="btn btn-secondary" onclick="showScreen('screen-shop')">Upgrades & Shop</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen">
+            <h2>Simga Shop</h2>
+            <div class="shop-container" id="shop-items-container">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn btn-secondary" onclick="showScreen('screen-menu')">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="screen-gameover" class="screen">
+            <h1 style="color: #ff0055;">Link Failed</h1>
+            <p id="gameover-reason">You ran out of pieces!</p>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div>Final Chain</div>
+                    <div class="stat-value" id="go-chain">0</div>
+                </div>
+                <div class="stat-box">
+                    <div>Level Reached</div>
+                    <div class="stat-value" id="go-level">1</div>
+                </div>
+            </div>
+            <button class="btn" onclick="startGame()">Play Again</button>
+            <button class="btn btn-secondary" onclick="showScreen('screen-menu')">Menu</button>
+        </div>
+
+        <!-- Level Complete Screen -->
+        <div id="screen-levelcomplete" class="screen">
+            <h1 style="color: #00ff2a;">Sector Cleared</h1>
+            <p>Chain length target reached. Prepare for increased complexity.</p>
+            <button class="btn" onclick="nextLevel()">Continue</button>
+        </div>
+
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div id="custom-modal">
+        <div class="modal-content">
+            <h3 id="modal-title" style="color: var(--secondary); margin-bottom: 15px; font-size: 1.5rem;">Notice</h3>
+            <p id="modal-msg" style="margin-bottom: 20px;">Message goes here</p>
+            <button class="btn" onclick="closeModal()" style="padding: 10px 30px; font-size: 1rem;">OK</button>
+        </div>
+    </div>
+
+<script>
+    /**
+     * CHAIN BUILDER
+     * A visually polished HTML5 Canvas puzzle game.
+     */
+
+    const GAME_ID = "chainBuilder2026";
+    
+    // --- Engine & Canvas Setup ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for solid background
+    let dpr = window.devicePixelRatio || 1;
+    let width, height;
+    
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Colors & Palettes ---
+    const PALETTE = [
+        '#00f3ff', // Cyan
+        '#ff00ea', // Magenta
+        '#ffea00', // Yellow
+        '#00ff2a', // Lime
+        '#ff7300', // Orange
+        '#9d00ff', // Purple
+    ];
+
+    // --- Save Data Structure ---
+    let saveData = {
+        upgrades: {
+            extraPieces: 0,
+            rotationAssist: false
+        },
+        unlocks: {
+            skin: [0],
+            bgTexture: [0]
+        },
+        equipped: {
+            skin: 0,
+            bgTexture: 0
+        },
+        highScore: 0,
+        highestLevel: 1
+    };
+
+    // --- Shop Configuration ---
+    const SHOP_ITEMS = [
+        { id: 'rotateAssist', type: 'upgrade', title: 'Rotation Assist', desc: 'Tap pieces in hand to flip them.', cost: 20, icon: '🔄' },
+        { id: 'extraPieces', type: 'upgrade', title: 'Extra Piece', desc: 'Start with +1 piece (Max 5).', cost: 40, icon: '➕', maxLevel: 5 },
+        { id: 'skin_1', type: 'skin', index: 1, title: 'Neon Skin', desc: 'Cyberpunk wireframe style.', cost: 50, icon: '✨' },
+        { id: 'skin_2', type: 'skin', index: 2, title: 'Plasma Skin', desc: 'Volatile energy links.', cost: 100, icon: '⚡' },
+        { id: 'bg_1', type: 'bg', index: 1, title: 'Nebula Space', desc: 'Deep cosmic background.', cost: 40, icon: '🌌' },
+        { id: 'bg_2', type: 'bg', index: 2, title: 'Quantum Grid', desc: 'Digital hex matrix.', cost: 80, icon: '⬡' }
+    ];
+
+    // --- Platform Communication (SimgaBucks & Save) ---
+    let pendingPurchase = null;
+    let loadMsgId = null;
+
+    function initPlatformConnection() {
+        // Request Load
+        loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    // Deep merge saved data to preserve structure if new fields were added
+                    saveData = { ...saveData, ...data.data };
+                    if (!saveData.equipped) saveData.equipped = { skin: 0, bgTexture: 0 };
+                    if (!saveData.unlocks) saveData.unlocks = { skin: [0], bgTexture: [0] };
+                    if (!saveData.upgrades) saveData.upgrades = { extraPieces: 0, rotationAssist: false };
+                }
+                updateMenuStats();
+                renderShop();
+            }
+
+            if (data.type === "spendResponse") {
+                if (data.success && pendingPurchase && data.msgId === pendingPurchase.msgId) {
+                    applyPurchase(pendingPurchase.item);
+                    showModal("Purchase Successful!", `Unlocked: ${pendingPurchase.item.title}`);
+                } else if (!data.success) {
+                    showModal("Transaction Failed", "Not enough SimgaBucks.");
+                }
+                pendingPurchase = null;
+                renderShop(); // Refresh buttons
+            }
+        });
+    }
+
+    function saveGame() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    function addSimgaBucks(amount, reason = "Reward") {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        
+        // Visual feedback
+        spawnFloatingText(`+${amount} SB`, width/2, height/2 - 100, '#ffea00');
+    }
+
+    function requestPurchase(item) {
+        if (pendingPurchase) return; // Prevent spam
+
+        const msgId = Math.random().toString(36);
+        pendingPurchase = { item: item, msgId: msgId };
+
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: item.cost,
+            msgId: msgId
+        }, "*");
+    }
+
+    // --- UI Modals & Screens ---
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (id) {
+            const screenEl = document.getElementById(id);
+            if (screenEl) screenEl.classList.add('active');
+        }
+        if(id === 'screen-shop') renderShop();
+    }
+
+    function showModal(title, msg) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-msg').innerText = msg;
+        document.getElementById('custom-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('custom-modal').style.display = 'none';
+    }
+
+    function updateMenuStats() {
+        document.getElementById('menu-highscore').innerText = saveData.highScore;
+        document.getElementById('menu-highlevel').innerText = saveData.highestLevel;
+    }
+
+    function renderShop() {
+        const container = document.getElementById('shop-items-container');
+        container.innerHTML = '';
+
+        SHOP_ITEMS.forEach(item => {
+            const el = document.createElement('div');
+            el.className = 'shop-item';
+            
+            let isUnlocked = false;
+            let isEquipped = false;
+            let level = 0;
+
+            if (item.type === 'upgrade') {
+                if (item.id === 'extraPieces') {
+                    level = saveData.upgrades.extraPieces || 0;
+                    isUnlocked = level >= item.maxLevel;
+                } else {
+                    isUnlocked = saveData.upgrades[item.id];
+                }
+            } else if (item.type === 'skin') {
+                isUnlocked = saveData.unlocks.skin.includes(item.index);
+                isEquipped = saveData.equipped.skin === item.index;
+            } else if (item.type === 'bg') {
+                isUnlocked = saveData.unlocks.bgTexture.includes(item.index);
+                isEquipped = saveData.equipped.bgTexture === item.index;
+            }
+
+            if (isEquipped) el.classList.add('equipped');
+
+            let btnHTML = '';
+            if (isEquipped) {
+                btnHTML = `<button class="btn btn-secondary shop-btn" disabled>Equipped</button>`;
+            } else if (isUnlocked && (item.type === 'skin' || item.type === 'bg')) {
+                btnHTML = `<button class="btn shop-btn" onclick="equipItem('${item.type}', ${item.index})">Equip</button>`;
+            } else if (item.id === 'extraPieces' && !isUnlocked) {
+                btnHTML = `<button class="btn shop-btn" onclick="buyItem('${item.id}')">Upgrade (${item.cost} SB) Lvl ${level}/${item.maxLevel}</button>`;
+            } else if (!isUnlocked) {
+                btnHTML = `<button class="btn shop-btn" onclick="buyItem('${item.id}')">Buy (${item.cost} SB)</button>`;
+            } else {
+                btnHTML = `<button class="btn btn-secondary shop-btn" disabled>Maxed/Unlocked</button>`;
+            }
+
+            el.innerHTML = `
+                <div class="shop-icon">${item.icon}</div>
+                <div class="shop-title">${item.title}</div>
+                <div class="shop-desc">${item.desc}</div>
+                ${btnHTML}
+            `;
+            container.appendChild(el);
+        });
+
+        // Add default equips if missing
+        addDefaultEquips(container);
+    }
+
+    function addDefaultEquips(container) {
+        // Default Skin
+        const defSkin = document.createElement('div');
+        defSkin.className = `shop-item ${saveData.equipped.skin === 0 ? 'equipped' : ''}`;
+        defSkin.innerHTML = `
+            <div class="shop-icon">⛓️</div>
+            <div class="shop-title">Standard Skin</div>
+            <div class="shop-desc">Factory default.</div>
+            ${saveData.equipped.skin === 0 ? 
+                `<button class="btn btn-secondary shop-btn" disabled>Equipped</button>` : 
+                `<button class="btn shop-btn" onclick="equipItem('skin', 0)">Equip</button>`}
+        `;
+        container.appendChild(defSkin);
+
+        // Default BG
+        const defBg = document.createElement('div');
+        defBg.className = `shop-item ${saveData.equipped.bgTexture === 0 ? 'equipped' : ''}`;
+        defBg.innerHTML = `
+            <div class="shop-icon">⬛</div>
+            <div class="shop-title">Standard Grid</div>
+            <div class="shop-desc">Clean tactical grid.</div>
+            ${saveData.equipped.bgTexture === 0 ? 
+                `<button class="btn btn-secondary shop-btn" disabled>Equipped</button>` : 
+                `<button class="btn shop-btn" onclick="equipItem('bg', 0)">Equip</button>`}
+        `;
+        container.appendChild(defBg);
+    }
+
+    window.buyItem = function(id) {
+        const item = SHOP_ITEMS.find(i => i.id === id);
+        if(item) requestPurchase(item);
+    };
+
+    window.equipItem = function(type, index) {
+        if (type === 'skin') saveData.equipped.skin = index;
+        if (type === 'bg') saveData.equipped.bgTexture = index;
+        saveGame();
+        renderShop();
+    };
+
+    function applyPurchase(item) {
+        if (item.type === 'upgrade') {
+            if (item.id === 'extraPieces') {
+                saveData.upgrades.extraPieces = (saveData.upgrades.extraPieces || 0) + 1;
+            } else {
+                saveData.upgrades[item.id] = true;
+            }
+        } else if (item.type === 'skin') {
+            saveData.unlocks.skin.push(item.index);
+            saveData.equipped.skin = item.index;
+        } else if (item.type === 'bg') {
+            saveData.unlocks.bgTexture.push(item.index);
+            saveData.equipped.bgTexture = item.index;
+        }
+        saveGame();
+    }
+
+    // --- Game Logic & State ---
+    const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2, LEVELCOMPLETE: 3 };
+    let currentState = STATE.MENU;
+    
+    let currentLevel = 1;
+    let score = 0; // Total chain length across session
+    let targetLength = 0;
+    let piecesLeft = 0;
+    
+    let linksPlacedThisSession = 0;
+
+    let chain = []; // Array of placed links
+    let hand = [];  // Array of available pieces
+
+    // Constants for visuals
+    const LINK_LENGTH = 80;
+    const NODE_RADIUS = 16;
+    const HAND_Y_OFFSET = 120;
+
+    // Camera
+    let camera = { x: 0, y: 0, zoom: 1 };
+    let targetCamera = { x: 0, y: 0, zoom: 1 };
+
+    // Input
+    let pointer = { x: 0, y: 0, isDown: false, worldX: 0, worldY: 0 };
+    let draggedPieceIndex = -1;
+    let dragOffset = { x: 0, y: 0 };
+    let previewSnap = null; // { attachIndex, isHead, angle, x, y }
+    
+    let dragStartTime = 0;
+    let dragStartPos = {x:0, y:0};
+
+    // Effects
+    let particles = [];
+    let screenShake = 0;
+    let time = 0;
+
+    class Link {
+        constructor(x, y, angle, c1, c2) {
+            this.x = x;
+            this.y = y;
+            this.angle = angle;
+            this.c1 = c1; // Color index 1 (Left/Tail node)
+            this.c2 = c2; // Color index 2 (Right/Head node)
+            this.updateNodes();
+        }
+
+        updateNodes() {
+            const dx = Math.cos(this.angle) * (LINK_LENGTH / 2);
+            const dy = Math.sin(this.angle) * (LINK_LENGTH / 2);
+            this.n1 = { x: this.x - dx, y: this.y - dy }; // Node 1 coords
+            this.n2 = { x: this.x + dx, y: this.y + dy }; // Node 2 coords
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 10;
+            this.vy = (Math.random() - 0.5) * 10;
+            this.life = 1.0;
+            this.decay = 0.02 + Math.random() * 0.03;
+            this.color = color;
+            this.size = 2 + Math.random() * 4;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vx *= 0.95; // friction
+            this.vy *= 0.95;
+            this.life -= this.decay;
+        }
+        draw(ctx) {
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function spawnExplosion(x, y, color, count=15) {
+        for(let i=0; i<count; i++) {
+            particles.push(new Particle(x, y, color));
+        }
+    }
+
+    // --- Main Game Functions ---
+
+    window.startGame = function() {
+        currentLevel = 1;
+        score = 0;
+        linksPlacedThisSession = 0;
+        document.querySelectorAll('.hud-box').forEach(el => el.style.display = 'block');
+        initLevel();
+        currentState = STATE.PLAYING;
+        showScreen(''); // Hide screens
+    };
+
+    window.nextLevel = function() {
+        currentLevel++;
+        if (currentLevel > saveData.highestLevel) {
+            saveData.highestLevel = currentLevel;
+            saveGame();
+        }
+        // Give bonus SB for level clear
+        addSimgaBucks(Math.min(10, 2 + Math.floor(currentLevel/2)), "Level Clear");
+        
+        // --- Restore HUD Visibility ---
+        document.querySelectorAll('.hud-box').forEach(el => el.style.display = 'block');
+
+        initLevel();
+        currentState = STATE.PLAYING;
+        showScreen('');
+    };
+
+    function initLevel() {
+        targetLength = 5 + currentLevel * 3;
+        piecesLeft = 7 + (saveData.upgrades.extraPieces || 0) + Math.floor(currentLevel/2);
+        
+        chain = [];
+        // First link is random, placed at 0,0 horizontally
+        const maxColors = Math.min(PALETTE.length, 2 + Math.floor(currentLevel/2));
+        const c1 = Math.floor(Math.random() * maxColors);
+        const c2 = Math.floor(Math.random() * maxColors);
+        chain.push(new Link(0, 0, 0, c1, c2));
+
+        camera = { x: 0, y: 0, zoom: 1 };
+        targetCamera = { x: 0, y: 0, zoom: 1 };
+        particles = [];
+        
+        generateHand();
+        updateHUD();
+    }
+
+    function generateHand() {
+        hand = [];
+        const maxColors = Math.min(PALETTE.length, 2 + Math.floor(currentLevel/2));
+        
+        // Calculate open ends to ensure playability
+        let openColors = getOpenEnds().map(e => e.color);
+
+        for(let i=0; i<5; i++) {
+            if (piecesLeft - i <= 0) break; // Don't generate more than we have
+            
+            let c1 = Math.floor(Math.random() * maxColors);
+            let c2 = Math.floor(Math.random() * maxColors);
+            
+            // 40% chance to force a matching piece to prevent frustrating RNG
+            if (Math.random() < 0.4 && openColors.length > 0) {
+                c1 = openColors[Math.floor(Math.random() * openColors.length)];
+            }
+
+            hand.push({
+                c1: c1,
+                c2: c2,
+                screenX: 0, // Calculated during draw
+                screenY: 0,
+                baseAngle: 0,
+                animY: 0 // For floating effect
+            });
+        }
+    }
+
+    function getOpenEnds() {
+        if (chain.length === 0) return [];
+        // Chain is sequential. 
+        // The tail is chain[0].n1 (c1)
+        // The head is chain[chain.length-1].n2 (c2)
+        return [
+            { pos: chain[0].n1, color: chain[0].c1, isHead: false, linkIndex: 0 },
+            { pos: chain[chain.length-1].n2, color: chain[chain.length-1].c2, isHead: true, linkIndex: chain.length-1 }
+        ];
+    }
+
+    function updateHUD() {
+        document.getElementById('val-level').innerText = currentLevel;
+        document.getElementById('val-chain').innerText = `${chain.length}/${targetLength}`;
+        document.getElementById('val-pieces').innerText = piecesLeft;
+    }
+
+    function gameOver() {
+        currentState = STATE.GAMEOVER;
+        if (chain.length > saveData.highScore) {
+            saveData.highScore = chain.length;
+            saveGame();
+        }
+        document.getElementById('go-chain').innerText = chain.length;
+        document.getElementById('go-level').innerText = currentLevel;
+        document.querySelectorAll('.hud-box').forEach(el => el.style.display = 'none');
+        document.getElementById('recycle-zone').style.display = 'none';
+        showScreen('screen-gameover');
+    }
+
+    function checkWinCondition() {
+        if (chain.length >= targetLength) {
+            currentState = STATE.LEVELCOMPLETE;
+            document.querySelectorAll('.hud-box').forEach(el => el.style.display = 'none');
+            document.getElementById('recycle-zone').style.display = 'none';
+            setTimeout(() => {
+                showScreen('screen-levelcomplete');
+            }, 1000);
+            return true;
+        }
+        return false;
+    }
+
+    function spawnFloatingText(text, x, y, color) {
+        const el = document.createElement('div');
+        el.className = 'floating-text';
+        el.innerText = text;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        if(color) el.style.color = color;
+        document.getElementById('notifications').appendChild(el);
+        setTimeout(() => el.remove(), 1500);
+    }
+
+    // --- Input Handling ---
+    
+    function getHandItemPositions() {
+        const positions = [];
+        const spacing = 100;
+        const startX = width/2 - (hand.length * spacing) / 2 + spacing/2;
+        const y = height - HAND_Y_OFFSET;
+        for(let i=0; i<hand.length; i++) {
+            positions.push({ x: startX + i * spacing, y: y });
+        }
+        return positions;
+    }
+
+    function handlePointerDown(e) {
+        if (currentState !== STATE.PLAYING) return;
+        pointer.isDown = true;
+        updatePointerPos(e);
+        
+        dragStartTime = Date.now();
+        dragStartPos = { x: pointer.x, y: pointer.y };
+
+        // Check hand intersection
+        const handPositions = getHandItemPositions();
+        // Check in reverse order to grab top element if overlapping
+        for(let i=hand.length-1; i>=0; i--) {
+            const pos = handPositions[i];
+            const dx = pointer.x - pos.x;
+            const dy = pointer.y - pos.y;
+            
+            // Rectangular pill hitbox (much more reliable on mobile than circular)
+            if (Math.abs(dx) < (LINK_LENGTH/2) + (NODE_RADIUS*2) && 
+                Math.abs(dy) < (NODE_RADIUS*3)) {
+                
+                draggedPieceIndex = i;
+                dragOffset = { x: dx, y: dy }; // Remember exactly where we grabbed it
+                // Hide float anim
+                hand[i].animY = 0;
+                document.getElementById('recycle-zone').style.display = 'flex';
+                break;
+            }
+        }
+    }
+
+    function handlePointerMove(e) {
+        updatePointerPos(e);
+        if (!pointer.isDown || draggedPieceIndex === -1) return;
+
+        // Check recycle zone
+        const rz = document.getElementById('recycle-zone');
+        const rect = rz.getBoundingClientRect();
+        const centerX = rect.left + rect.width/2;
+        const centerY = rect.top + rect.height/2;
+        const distToRecycle = Math.hypot(pointer.x - centerX, pointer.y - centerY);
+        
+        if (distToRecycle < 60) {
+            rz.classList.add('highlight');
+            previewSnap = null;
+        } else {
+            rz.classList.remove('highlight');
+            
+            // Check snap logic
+            checkSnapLogic();
+        }
+    }
+
+    function handlePointerUp(e) {
+        pointer.isDown = false;
+        document.getElementById('recycle-zone').style.display = 'none';
+        document.getElementById('recycle-zone').classList.remove('highlight');
+
+        if (draggedPieceIndex !== -1) {
+            const dragDuration = Date.now() - dragStartTime;
+            const dragDist = Math.hypot(pointer.x - dragStartPos.x, pointer.y - dragStartPos.y);
+
+            // Handle Tap to Rotate (if unlocked)
+            if (dragDuration < 200 && dragDist < 20 && saveData.upgrades.rotationAssist) {
+                // Swap colors
+                const p = hand[draggedPieceIndex];
+                const temp = p.c1;
+                p.c1 = p.c2;
+                p.c2 = temp;
+                spawnExplosion(pointer.x, pointer.y, '#fff', 5);
+                draggedPieceIndex = -1;
+                previewSnap = null;
+                return;
+            }
+
+            // Check Recycle
+            const rz = document.getElementById('recycle-zone');
+            const rect = rz.getBoundingClientRect();
+            const centerX = rect.left + rect.width/2;
+            const centerY = rect.top + rect.height/2;
+            if (Math.hypot(pointer.x - centerX, pointer.y - centerY) < 60) {
+                // Recycle piece
+                hand.splice(draggedPieceIndex, 1);
+                piecesLeft--;
+                updateHUD();
+                spawnExplosion(pointer.x, pointer.y, '#ff0000', 10);
+                if (hand.length === 0 && piecesLeft > 0) generateHand();
+                checkRoundOver();
+                draggedPieceIndex = -1;
+                previewSnap = null;
+                return;
+            }
+
+            // Handle Snap
+            if (previewSnap) {
+                executeSnap();
+            }
+
+            draggedPieceIndex = -1;
+            previewSnap = null;
+        }
+    }
+
+    function checkSnapLogic() {
+        previewSnap = null;
+        const piece = hand[draggedPieceIndex];
+        const openEnds = getOpenEnds();
+        const snapRadius = 80 / camera.zoom; // slightly larger, more forgiving snap area
+
+        let closestDist = snapRadius;
+        let bestSnap = null;
+
+        for (const end of openEnds) {
+            const dist = Math.hypot(pointer.worldX - end.pos.x, pointer.worldY - end.pos.y);
+            if (dist < closestDist) {
+                // Check color match
+                let matchC1 = (piece.c1 === end.color);
+                let matchC2 = (piece.c2 === end.color);
+
+                if (matchC1 || matchC2) {
+                    closestDist = dist;
+                    
+                    let cx, cy, angle, finalC1, finalC2;
+                    // Exact direction from the open node to the player's cursor
+                    let dirAngle = Math.atan2(pointer.worldY - end.pos.y, pointer.worldX - end.pos.x);
+
+                    if (end.isHead) {
+                        // Attaching to the right/end of the chain (n2).
+                        // We must place the new link's n1 exactly on end.pos.
+                        finalC1 = end.color;
+                        finalC2 = matchC1 ? piece.c2 : piece.c1; 
+                        
+                        angle = dirAngle;
+                        cx = end.pos.x + Math.cos(angle) * (LINK_LENGTH/2);
+                        cy = end.pos.y + Math.sin(angle) * (LINK_LENGTH/2);
+                    } else {
+                        // Attaching to the left/start of the chain (n1).
+                        // We must place the new link's n2 exactly on end.pos.
+                        finalC2 = end.color;
+                        finalC1 = matchC1 ? piece.c2 : piece.c1;
+                        
+                        angle = dirAngle + Math.PI; // Flip angle so the link extends outward
+                        cx = end.pos.x - Math.cos(angle) * (LINK_LENGTH/2);
+                        cy = end.pos.y - Math.sin(angle) * (LINK_LENGTH/2);
+                    }
+
+                    bestSnap = {
+                        isHead: end.isHead,
+                        x: cx,
+                        y: cy,
+                        angle: angle,
+                        c1: finalC1,
+                        c2: finalC2
+                    };
+                }
+            }
+        }
+
+        if (bestSnap) {
+            previewSnap = bestSnap;
+        }
+    }
+
+    function executeSnap() {
+        const newLink = new Link(previewSnap.x, previewSnap.y, previewSnap.angle, previewSnap.c1, previewSnap.c2);
+        
+        if (previewSnap.isHead) {
+            chain.push(newLink);
+        } else {
+            chain.unshift(newLink);
+        }
+
+        // VFX
+        screenShake = 5; // Reduced screen shake for smoother feeling
+        const wPos = getScreenPos(previewSnap.isHead ? newLink.n1.x : newLink.n2.x, previewSnap.isHead ? newLink.n1.y : newLink.n2.y);
+        spawnExplosion(wPos.x, wPos.y, PALETTE[previewSnap.c1], 20);
+
+        // Update State
+        hand.splice(draggedPieceIndex, 1);
+        piecesLeft--;
+        score++;
+        linksPlacedThisSession++;
+        
+        // SimgaBucks Reward
+        if (linksPlacedThisSession % 3 === 0) {
+            addSimgaBucks(1);
+        }
+
+        updateHUD();
+        updateCameraTarget();
+
+        if (!checkWinCondition()) {
+            if (hand.length === 0 && piecesLeft > 0) {
+                generateHand();
+            }
+            checkRoundOver();
+        }
+    }
+
+    function checkRoundOver() {
+        if (piecesLeft === 0 && hand.length === 0) {
+            if (chain.length < targetLength) {
+                setTimeout(gameOver, 1000);
+            }
+        }
+    }
+
+    function updatePointerPos(e) {
+        if (e.touches && e.touches.length > 0) {
+            pointer.x = e.touches[0].clientX;
+            pointer.y = e.touches[0].clientY;
+        } else {
+            pointer.x = e.clientX;
+            pointer.y = e.clientY;
+        }
+
+        // Convert to world space
+        pointer.worldX = (pointer.x - width/2) / camera.zoom + camera.x;
+        pointer.worldY = (pointer.y - height/2) / camera.zoom + camera.y;
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchstart', handlePointerDown, {passive: false});
+    window.addEventListener('touchmove', handlePointerMove, {passive: false});
+    window.addEventListener('touchend', handlePointerUp);
+
+    // --- Core Update & Render ---
+
+    function updateCameraTarget() {
+        if (chain.length === 0) return;
+        
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        chain.forEach(link => {
+            minX = Math.min(minX, link.n1.x, link.n2.x);
+            maxX = Math.max(maxX, link.n1.x, link.n2.x);
+            minY = Math.min(minY, link.n1.y, link.n2.y);
+            maxY = Math.max(maxY, link.n1.y, link.n2.y);
+        });
+
+        const padding = 200;
+        const cWidth = (maxX - minX) + padding;
+        const cHeight = (maxY - minY) + padding;
+
+        targetCamera.x = (minX + maxX) / 2;
+        targetCamera.y = (minY + maxY) / 2;
+        
+        // Target zoom to fit all
+        let targetZ = Math.min(width / cWidth, (height - 200) / cHeight);
+        targetCamera.zoom = Math.max(0.3, Math.min(1.5, targetZ));
+    }
+
+    function update() {
+        time += 0.05;
+
+        // Camera lerp
+        camera.x += (targetCamera.x - camera.x) * 0.1;
+        camera.y += (targetCamera.y - camera.y) * 0.1;
+        camera.zoom += (targetCamera.zoom - camera.zoom) * 0.05;
+
+        // Screen shake
+        if (screenShake > 0.1) screenShake *= 0.8;
+        else screenShake = 0;
+
+        // Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+
+        // Floating hand anim
+        hand.forEach((h, i) => {
+            if (draggedPieceIndex !== i) {
+                h.animY = Math.sin(time + i) * 10;
+            }
+        });
+    }
+
+    function drawLink(ctx, x, y, angle, c1, c2, style = 0, isGhost = false) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        const l = LINK_LENGTH;
+        const r = NODE_RADIUS;
+
+        ctx.globalAlpha = isGhost ? 0.5 : 1.0;
+
+        if (style === 1) {
+            // Neon Skin
+            ctx.shadowBlur = isGhost ? 0 : 15;
+            ctx.shadowColor = PALETTE[c1];
+            ctx.strokeStyle = PALETTE[c1];
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-l/2, -r/2);
+            ctx.lineTo(0, -r/4);
+            ctx.lineTo(l/2, -r/2);
+            ctx.stroke();
+
+            ctx.shadowColor = PALETTE[c2];
+            ctx.strokeStyle = PALETTE[c2];
+            ctx.beginPath();
+            ctx.moveTo(-l/2, r/2);
+            ctx.lineTo(0, r/4);
+            ctx.lineTo(l/2, r/2);
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0;
+
+        } else if (style === 2) {
+            // Plasma Skin
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-l/2, 0);
+            // Jagged line
+            for(let i=-l/2; i<=l/2; i+=10) {
+                ctx.lineTo(i, (Math.random()-0.5)*10);
+            }
+            ctx.stroke();
+
+        } else {
+            // Default Skin
+            ctx.fillStyle = '#222';
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 4;
+            
+            ctx.beginPath();
+            ctx.roundRect(-l/2 - r, -r, l + r*2, r*2, r);
+            ctx.fill();
+            ctx.stroke();
+
+            // Connecting wire
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-l/4, -r/4, l/2, r/2);
+        }
+
+        // Draw Nodes
+        ctx.shadowBlur = isGhost ? 0 : 20;
+        
+        // Left Node
+        ctx.shadowColor = PALETTE[c1];
+        ctx.fillStyle = PALETTE[c1];
+        ctx.beginPath();
+        ctx.arc(-l/2, 0, r * 0.7, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(-l/2, 0, r * 0.3, 0, Math.PI*2);
+        ctx.fill();
+
+        // Right Node
+        ctx.shadowColor = PALETTE[c2];
+        ctx.fillStyle = PALETTE[c2];
+        ctx.beginPath();
+        ctx.arc(l/2, 0, r * 0.7, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(l/2, 0, r * 0.3, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function getScreenPos(wx, wy) {
+        return {
+            x: (wx - camera.x) * camera.zoom + width/2,
+            y: (wy - camera.y) * camera.zoom + height/2
+        };
+    }
+
+    function drawBackground() {
+        const bgType = saveData.equipped.bgTexture;
+
+        // Base color
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, width, height);
+
+        if (bgType === 1) {
+            // Nebula
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            for(let i=0; i<5; i++) {
+                let px = (Math.sin(time*0.1 + i) * width*0.5 + width/2) - camera.x * 0.1 * i;
+                let py = (Math.cos(time*0.1 + i) * height*0.5 + height/2) - camera.y * 0.1 * i;
+                let gradient = ctx.createRadialGradient(px, py, 0, px, py, width*0.5);
+                gradient.addColorStop(0, PALETTE[i%PALETTE.length] + '22'); // 22 is hex opacity
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+            }
+            ctx.restore();
+        } else if (bgType === 2) {
+            // Quantum Matrix
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
+            ctx.lineWidth = 1;
+            const size = 50 * camera.zoom;
+            const offsetX = (camera.x * camera.zoom) % size;
+            const offsetY = (camera.y * camera.zoom) % size;
+            
+            ctx.beginPath();
+            for(let x = -offsetX; x < width; x += size) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, height);
+            }
+            for(let y = -offsetY; y < height; y += size) {
+                ctx.moveTo(0, y); ctx.lineTo(width, y);
+            }
+            ctx.stroke();
+            
+            // Hex dots
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.2)';
+            for(let x = -offsetX; x < width; x += size) {
+                for(let y = -offsetY; y < height; y += size) {
+                    if ((x+y)%3===0) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, 2, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+        } else {
+            // Standard Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            const size = 40 * camera.zoom;
+            const offsetX = (camera.x * camera.zoom * 0.5) % size;
+            const offsetY = (camera.y * camera.zoom * 0.5) % size;
+            
+            ctx.beginPath();
+            for(let x = -offsetX; x < width; x += size) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, height);
+            }
+            for(let y = -offsetY; y < height; y += size) {
+                ctx.moveTo(0, y); ctx.lineTo(width, y);
+            }
+            ctx.stroke();
+        }
+    }
+
+    function draw() {
+        drawBackground();
+
+        ctx.save();
+        
+        // Apply Shake
+        if (screenShake > 0) {
+            ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+        }
+
+        // Apply Camera
+        ctx.translate(width/2, height/2);
+        ctx.scale(camera.zoom, camera.zoom);
+        ctx.translate(-camera.x, -camera.y);
+
+        const skin = saveData.equipped.skin;
+
+        // Draw Chain
+        if (currentState === STATE.PLAYING || currentState === STATE.LEVELCOMPLETE || currentState === STATE.GAMEOVER) {
+            chain.forEach(link => {
+                drawLink(ctx, link.x, link.y, link.angle, link.c1, link.c2, skin);
+            });
+
+            // Draw Open End Highlights
+            if (draggedPieceIndex !== -1) {
+                const ends = getOpenEnds();
+                ctx.shadowBlur = 15;
+                ends.forEach(end => {
+                    ctx.shadowColor = PALETTE[end.color];
+                    ctx.strokeStyle = PALETTE[end.color];
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(end.pos.x, end.pos.y, NODE_RADIUS * 1.5 + Math.sin(time*5)*5, 0, Math.PI*2);
+                    ctx.stroke();
+                });
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw Snap Preview
+            if (previewSnap && draggedPieceIndex !== -1) {
+                drawLink(ctx, previewSnap.x, previewSnap.y, previewSnap.angle, previewSnap.c1, previewSnap.c2, skin, true);
+                
+                // Visual dashed line removed because new math perfectly aligns nodes, 
+                // making the connection inherently obvious.
+            }
+        }
+
+        ctx.restore(); // Restore world transforms
+
+        // Draw Particles (Screen space)
+        particles.forEach(p => p.draw(ctx));
+
+        // Draw Hand (UI Space)
+        if (currentState === STATE.PLAYING) {
+            const positions = getHandItemPositions();
+            
+            hand.forEach((p, i) => {
+                if (i === draggedPieceIndex) return; // Draw dragged piece last
+                
+                const px = positions[i].x;
+                const py = positions[i].y + p.animY;
+                
+                drawLink(ctx, px, py, p.baseAngle, p.c1, p.c2, skin);
+                
+                // Rotation Assist Hint
+                if (saveData.upgrades.rotationAssist) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🔄', px, py - 30 + p.animY);
+                }
+            });
+
+            // Draw dragged piece
+            if (draggedPieceIndex !== -1) {
+                const p = hand[draggedPieceIndex];
+                if (!previewSnap) {
+                    // Draw dragged piece with initial grab offset to prevent it popping to cursor
+                    drawLink(ctx, pointer.x - dragOffset.x, pointer.y - dragOffset.y, p.baseAngle, p.c1, p.c2, skin);
+                }
+            }
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initialize
+    initPlatformConnection();
+    gameLoop();
+
+</script>
+</body>
+</html>

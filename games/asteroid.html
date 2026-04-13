@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Asteroid Farmer</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff00ea;
+            --bg-dark: #0a0a12;
+            --bg-panel: rgba(15, 15, 25, 0.85);
+            --text-main: #e0e0ff;
+            --border-glow: 0 0 10px rgba(0, 243, 255, 0.5);
+            --danger: #ff3366;
+            --success: #4ade80;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas when playing */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, rgba(10, 10, 20, 0.4) 0%, rgba(0, 0, 0, 0.9) 100%);
+            pointer-events: auto;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--border-glow), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+        }
+
+        .shop-panel {
+            width: 800px;
+            max-width: 95%;
+            max-height: 90%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0 0 1rem 0;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px var(--primary);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin: 0 0 1rem 0;
+            color: var(--primary);
+        }
+
+        button {
+            background: linear-gradient(180deg, rgba(0, 243, 255, 0.2) 0%, rgba(0, 150, 255, 0.1) 100%);
+            border: 1px solid var(--primary);
+            color: white;
+            font-size: 1.2rem;
+            padding: 10px 24px;
+            margin: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 5px rgba(0, 243, 255, 0.2);
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 15px var(--primary);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: rgba(100, 100, 100, 0.2);
+            border-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .hud-right {
+            align-items: flex-end;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 12px;
+            border-radius: 4px;
+            border-left: 3px solid var(--primary);
+            backdrop-filter: blur(2px);
+        }
+
+        .health-bar-container {
+            width: 200px;
+            height: 12px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 100%;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            transition: width 0.2s, background-color 0.2s;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .shop-item:hover {
+            border-color: rgba(0, 243, 255, 0.5);
+            background: rgba(0, 243, 255, 0.05);
+        }
+
+        .shop-item h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .shop-item p {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin: 0 0 15px 0;
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .cost {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .equipped-badge {
+            color: var(--success);
+            font-weight: bold;
+            margin: 10px 0;
+            display: none;
+        }
+
+        /* Toasts */
+        #toast-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease-out, fadeOut 0.5s ease-in 2.5s forwards;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* Controls Hint */
+        .controls-hint {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: var(--primary);
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            transition: opacity 0.5s;
+        }
+
+        .loader {
+            border: 3px solid rgba(0, 243, 255, 0.2);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom scrollbar for shop */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 243, 255, 0.8); }
+
+    </style>
+</head>
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <div class="loader"></div>
+        <div>INITIALIZING SYSTEMS...</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <!-- HUD -->
+        <div id="hud" class="hud" style="display: none;">
+            <div class="hud-left">
+                <div class="stat-box">SCORE: <span id="scoreVal">0</span></div>
+                <div class="stat-box" style="color: #ffd700;">FRAGMENTS: <span id="fragVal">0</span></div>
+            </div>
+            <div class="hud-right">
+                <div class="stat-box">WAVE: <span id="waveVal">1</span></div>
+                <div class="health-bar-container">
+                    <div id="healthBar" class="health-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <div class="panel">
+                <h1>Asteroid Farmer</h1>
+                <p>Mine asteroids. Collect fragments. Survive.</p>
+                <div style="margin: 30px 0;">
+                    <button id="btn-start">Start Mining</button>
+                    <button id="btn-shop">Upgrades & Shop</button>
+                </div>
+                <div class="controls-hint">
+                    WASD / Arrows to Move<br>
+                    Mouse to Aim & Left Click to Shoot
+                </div>
+            </div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen">
+            <div class="panel shop-panel">
+                <h2>Equipment & Upgrades</h2>
+                <div class="shop-grid" id="shop-container">
+                    <!-- Shop items generated by JS -->
+                </div>
+                <div style="margin-top: 20px;">
+                    <button id="btn-shop-back">Back to Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="screen-gameover" class="screen">
+            <div class="panel">
+                <h1 style="color: var(--danger); text-shadow: 0 0 15px var(--danger);">HULL BREACH</h1>
+                <h2 style="color: white;">Final Score: <span id="go-score">0</span></h2>
+                <p>High Score: <span id="go-highscore" style="color: var(--primary);">0</span></p>
+                <div style="margin: 30px 0;">
+                    <button id="btn-restart">Mine Again</button>
+                    <button id="btn-menu">Main Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+<script>
+/**
+ * ASTEROID FARMER
+ * High-performance HTML5 Canvas Game
+ * Includes Particle System, Custom Physics, and SimgaBucks API Integration
+ */
+
+// --- CONSTANTS & CONFIG ---
+const GAME_ID = "asteroid";
+const FPS = 60;
+const CANVAS_WIDTH = window.innerWidth;
+const CANVAS_HEIGHT = window.innerHeight;
+
+// --- PLATFORM API (SIMGABUCKS & SAVE/LOAD) ---
+let pendingPurchases = {};
+let loadMsgId = "";
+let isLoaded = false;
+
+// Default Save State
+let saveData = {
+    highScore: 0,
+    fragmentsTotal: 0, // Total lifetime fragments (just for stats)
+    unlockedSkins: ["base"],
+    equippedSkin: "base",
+    unlockedLasers: ["cyan"],
+    equippedLaser: "cyan",
+    shieldLevel: 0,
+    tractorLevel: 0
+};
+
+// Platform Communication
+function saveGame() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function loadGame() {
+    loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Fallback if platform doesn't respond within 2 seconds
+    setTimeout(() => {
+        if (!isLoaded) {
+            console.warn("Load timeout. Using local defaults.");
+            finishLoading();
+        }
+    }, 2000);
+}
+
+function earnSimgaBucks(amount, reason = "") {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks! ${reason}`, "#ffd700");
+}
+
+function buyItem(id, cost, callback) {
+    const msgId = Math.random().toString(36).substring(2);
+    pendingPurchases[msgId] = callback;
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+// Platform Message Listener
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+        if (data.data) {
+            // Merge loaded data with defaults to ensure schema consistency
+            saveData = { ...saveData, ...data.data };
+        }
+        finishLoading();
+    }
+
+    if (data.type === "spendResponse") {
+        const callback = pendingPurchases[data.msgId];
+        if (callback) {
+            if (data.success) {
+                callback(true);
+                showToast("Purchase Successful!", "#4ade80");
+            } else {
+                callback(false);
+                showToast("Not enough SimgaBucks!", "#ff3366");
+            }
+            delete pendingPurchases[data.msgId];
+        }
+    }
+});
+
+function finishLoading() {
+    isLoaded = true;
+    document.getElementById("loading").style.opacity = 0;
+    setTimeout(() => {
+        document.getElementById("loading").style.display = "none";
+        showScreen("menu");
+        renderShop();
+    }, 500);
+}
+
+// --- ENGINE & STATE ---
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d", { alpha: false }); // Optimize for no transparency on base canvas
+
+let cw, ch;
+let lastTime = 0;
+let gameState = "loading"; // loading, menu, playing, gameover, shop
+let animationFrameId;
+
+// Input State
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+const mouse = { x: 0, y: 0, down: false };
+
+// Game Entities
+let player;
+let asteroids = [];
+let projectiles = [];
+let particles = [];
+let fragments = [];
+let stars = [];
+
+// Session Stats
+let score = 0;
+let sessionFragments = 0;
+let wave = 1;
+let asteroidSpawnTimer = 0;
+let fragmentsForNextReward = 10;
+let screenShake = 0;
+
+// --- UTILITIES ---
+function resizeCanvas() {
+    cw = window.innerWidth;
+    ch = window.innerHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+    if (gameState !== "playing") drawBackground(); // Redraw if not looping
+}
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function distance(p1, p2) { return Math.hypot(p2.x - p1.x, p2.y - p1.y); }
+function angleCalc(p1, p2) { return Math.atan2(p2.y - p1.y, p2.x - p1.x); }
+
+function showToast(text, color = "white") {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.style.borderColor = color;
+    toast.innerHTML = text;
+    container.appendChild(toast);
+    setTimeout(() => {
+        if(toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 3000);
+}
+
+function addScreenShake(amount) {
+    screenShake = Math.min(screenShake + amount, 30);
+}
+
+// --- SHOP DATA ---
+const SHOP_ITEMS = [
+    { id: "skin_base", type: "skin", name: "Miner Mk I", desc: "Standard reliable mining hull.", cost: 0, value: "base" },
+    { id: "skin_wraith", type: "skin", name: "Wraith Interceptor", desc: "Sleek, aerodynamic frame.", cost: 25, value: "wraith" },
+    { id: "skin_scarab", type: "skin", name: "Scarab Heavy", desc: "Bulky, reinforced plating.", cost: 50, value: "scarab" },
+    
+    { id: "laser_cyan", type: "laser", name: "Argon Laser", desc: "Standard cyan cutting beam.", cost: 0, value: "cyan" },
+    { id: "laser_emerald", type: "laser", name: "Emerald Pulse", desc: "Bright green focused optics.", cost: 15, value: "emerald" },
+    { id: "laser_amethyst", type: "laser", name: "Amethyst Beam", desc: "Deep purple high-energy core.", cost: 30, value: "amethyst" },
+    
+    { id: "upgrade_shield1", type: "shield", name: "Shield Capacitor I", desc: "+25% Max Hull Integrity.", cost: 20, value: 1, req: 0 },
+    { id: "upgrade_shield2", type: "shield", name: "Shield Capacitor II", desc: "+50% Max Hull Integrity.", cost: 45, value: 2, req: 1 },
+    { id: "upgrade_shield3", type: "shield", name: "Shield Capacitor III", desc: "+100% Max Hull Integrity.", cost: 90, value: 3, req: 2 },
+    
+    { id: "upgrade_tractor1", type: "tractor", name: "Tractor Beam I", desc: "Increases fragment pickup range.", cost: 15, value: 1, req: 0 },
+    { id: "upgrade_tractor2", type: "tractor", name: "Tractor Beam II", desc: "Massive fragment pickup range.", cost: 40, value: 2, req: 1 }
+];
+
+const COLORS = {
+    cyan: { core: "#ffffff", glow: "#00f3ff", proj: "#00f3ff" },
+    emerald: { core: "#ffffff", glow: "#22ff00", proj: "#22ff00" },
+    amethyst: { core: "#ffffff", glow: "#b700ff", proj: "#b700ff" },
+    wraith: { primary: "#ff3366", secondary: "#440011" },
+    scarab: { primary: "#ffd700", secondary: "#443300" },
+    base: { primary: "#e0e0ff", secondary: "#222244" }
+};
+
+// --- CLASSES ---
+
+class Player {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.x = cw / 2;
+        this.y = ch / 2;
+        this.vx = 0;
+        this.vy = 0;
+        this.angle = 0;
+        this.radius = 16;
+        this.speed = 0.4;
+        this.friction = 0.95;
+        this.maxHealth = 100 + (saveData.shieldLevel * 25);
+        this.health = this.maxHealth;
+        this.lastShot = 0;
+        this.fireRate = 150; // ms
+        this.tractorRadius = 100 + (saveData.tractorLevel * 75);
+        this.invulnerableTime = 0;
+    }
+
+    update(dt) {
+        // Movement
+        let ax = 0, ay = 0;
+        if (keys.w || keys.ArrowUp) ay -= this.speed;
+        if (keys.s || keys.ArrowDown) ay += this.speed;
+        if (keys.a || keys.ArrowLeft) ax -= this.speed;
+        if (keys.d || keys.ArrowRight) ax += this.speed;
+
+        this.vx += ax;
+        this.vy += ay;
+        this.vx *= this.friction;
+        this.vy *= this.friction;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Screen wrap
+        if (this.x < 0) this.x = cw;
+        if (this.x > cw) this.x = 0;
+        if (this.y < 0) this.y = ch;
+        if (this.y > ch) this.y = 0;
+
+        // Aiming
+        this.angle = angleCalc(this, mouse);
+
+        // Shooting
+        if (mouse.down && performance.now() - this.lastShot > this.fireRate) {
+            this.shoot();
+        }
+
+        // Exhaust Particles
+        if (ax !== 0 || ay !== 0) {
+            if (Math.random() < 0.5) {
+                const pAngle = this.angle + Math.PI + rand(-0.3, 0.3);
+                const px = this.x + Math.cos(this.angle + Math.PI) * 15;
+                const py = this.y + Math.sin(this.angle + Math.PI) * 15;
+                spawnParticle(px, py, Math.cos(pAngle)*2, Math.sin(pAngle)*2, COLORS[saveData.equippedLaser].glow, 20);
+            }
+        }
+
+        if (this.invulnerableTime > 0) this.invulnerableTime -= dt;
+
+        // Health UI
+        const pct = Math.max(0, this.health / this.maxHealth) * 100;
+        const hb = document.getElementById("healthBar");
+        hb.style.width = pct + "%";
+        if (pct < 30) hb.style.backgroundColor = "var(--danger)";
+        else hb.style.backgroundColor = "var(--primary)";
+    }
+
+    shoot() {
+        this.lastShot = performance.now();
+        const nx = Math.cos(this.angle);
+        const ny = Math.sin(this.angle);
+        
+        // Spawn slightly ahead of player
+        const sx = this.x + nx * 20;
+        const sy = this.y + ny * 20;
+        
+        projectiles.push(new Projectile(sx, sy, nx * 12, ny * 12, saveData.equippedLaser));
+        
+        // Minor recoil
+        this.vx -= nx * 0.5;
+        this.vy -= ny * 0.5;
+
+        // Muzzle flash
+        spawnExplosion(sx, sy, 3, COLORS[saveData.equippedLaser].glow, 2);
+    }
+
+    damage(amount) {
+        if (this.invulnerableTime > 0) return;
+        this.health -= amount;
+        addScreenShake(10);
+        spawnExplosion(this.x, this.y, 10, "#ff3366");
+        this.invulnerableTime = 1000; // 1 second iframe
+
+        if (this.health <= 0) {
+            gameOver();
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        // Blinking if invulnerable
+        if (this.invulnerableTime > 0 && Math.floor(performance.now() / 100) % 2 === 0) {
+            ctx.globalAlpha = 0.3;
+        }
+
+        const style = COLORS[saveData.equippedSkin];
+        
+        // Engine Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = COLORS[saveData.equippedLaser].glow;
+        ctx.beginPath();
+        ctx.moveTo(-10, -5);
+        ctx.lineTo(-20, 0);
+        ctx.lineTo(-10, 5);
+        ctx.fillStyle = ctx.shadowColor;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Ship Hull
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = style.primary;
+        ctx.fillStyle = style.secondary;
+
+        ctx.beginPath();
+        if (saveData.equippedSkin === "base") {
+            ctx.moveTo(15, 0);
+            ctx.lineTo(-10, 10);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-10, -10);
+        } else if (saveData.equippedSkin === "wraith") {
+            ctx.moveTo(20, 0);
+            ctx.lineTo(-5, 12);
+            ctx.lineTo(-15, 5);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-15, -5);
+            ctx.lineTo(-5, -12);
+        } else if (saveData.equippedSkin === "scarab") {
+            ctx.moveTo(12, 0);
+            ctx.lineTo(5, 15);
+            ctx.lineTo(-15, 12);
+            ctx.lineTo(-15, -12);
+            ctx.lineTo(5, -15);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Cockpit window
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(2, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // Draw tractor beam radius (faint)
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.tractorRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 243, 255, 0.05)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+}
+
+class Projectile {
+    constructor(x, y, vx, vy, colorId) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.life = 100;
+        this.colorData = COLORS[colorId];
+    }
+    update(dt) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= dt * 0.05;
+        // Trail
+        if(Math.random() < 0.3) spawnParticle(this.x, this.y, 0, 0, this.colorData.glow, 10);
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.atan2(this.vy, this.vx));
+        
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.colorData.glow;
+        
+        ctx.fillStyle = this.colorData.core;
+        ctx.fillRect(-6, -2, 12, 4);
+        
+        ctx.restore();
+    }
+}
+
+class Asteroid {
+    constructor(x, y, size) {
+        this.x = x;
+        this.y = y;
+        this.size = size; // 3 = large, 2 = medium, 1 = small
+        this.radius = size * 18 + rand(-3, 3);
+        const speed = (4 - size) * rand(0.5, 1.5);
+        const angle = rand(0, Math.PI * 2);
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.rot = rand(0, Math.PI * 2);
+        this.rotSpeed = rand(-0.05, 0.05);
+        this.hp = size * 2;
+        
+        // Generate craggy shape
+        this.points = [];
+        const numPoints = 8 + size * 2;
+        for (let i = 0; i < numPoints; i++) {
+            const a = (i / numPoints) * Math.PI * 2;
+            const r = this.radius * rand(0.8, 1.2);
+            this.points.push({x: Math.cos(a) * r, y: Math.sin(a) * r});
+        }
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rot += this.rotSpeed;
+
+        if (this.x < -this.radius) this.x = cw + this.radius;
+        if (this.x > cw + this.radius) this.x = -this.radius;
+        if (this.y < -this.radius) this.y = ch + this.radius;
+        if (this.y > ch + this.radius) this.y = -this.radius;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rot);
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#8899aa";
+        ctx.fillStyle = "#1a1a24";
+
+        ctx.beginPath();
+        ctx.moveTo(this.points[0].x, this.points[0].y);
+        for(let i=1; i<this.points.length; i++) {
+            ctx.lineTo(this.points[i].x, this.points[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner crater details (stylized)
+        ctx.strokeStyle = "#334455";
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.3, this.radius * 0.2, this.radius * 0.2, 0, Math.PI*2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+    break() {
+        spawnExplosion(this.x, this.y, this.size * 10, "#8899aa");
+        addScreenShake(this.size * 2);
+
+        // Economy Logic
+        if (this.size === 3) {
+            earnSimgaBucks(1, "Large Asteroid Destroyed!");
+        }
+
+        // Spawn smaller asteroids
+        if (this.size > 1) {
+            for (let i = 0; i < 2; i++) {
+                asteroids.push(new Asteroid(this.x, this.y, this.size - 1));
+            }
+        }
+        
+        // Spawn fragments
+        const fragCount = rand(2, this.size * 3);
+        for(let i=0; i<fragCount; i++) {
+            fragments.push(new Fragment(this.x, this.y));
+        }
+
+        score += this.size * 100;
+        document.getElementById("scoreVal").innerText = score;
+    }
+}
+
+class Fragment {
+    constructor(x, y) {
+        this.x = x + rand(-10, 10);
+        this.y = y + rand(-10, 10);
+        this.vx = rand(-2, 2);
+        this.vy = rand(-2, 2);
+        this.life = 600; // 10 seconds approx
+        this.rot = rand(0, Math.PI*2);
+        this.color = ["#00f3ff", "#ff00ea", "#ffd700"][Math.floor(rand(0, 3))];
+    }
+    update(dt) {
+        // Friction
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+        
+        // Tractor beam logic
+        const dist = distance(this, player);
+        if (dist < player.tractorRadius) {
+            const angle = angleCalc(this, player);
+            const force = (player.tractorRadius - dist) / player.tractorRadius * 0.5;
+            this.vx += Math.cos(angle) * force;
+            this.vy += Math.sin(angle) * force;
+        }
+
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rot += 0.05;
+        this.life -= dt * 0.05;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rot);
+
+        // Glow based on remaining life
+        const alpha = Math.min(1, this.life / 100);
+        ctx.globalAlpha = alpha;
+        
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = this.color;
+        
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.moveTo(0, -4);
+        ctx.lineTo(3, 0);
+        ctx.lineTo(0, 4);
+        ctx.lineTo(-3, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+    }
+    collect() {
+        spawnExplosion(this.x, this.y, 5, this.color, 1);
+        sessionFragments++;
+        saveData.fragmentsTotal++;
+        document.getElementById("fragVal").innerText = sessionFragments;
+        score += 10;
+        document.getElementById("scoreVal").innerText = score;
+
+        // Reward logic: every N fragments
+        if (sessionFragments >= fragmentsForNextReward) {
+            earnSimgaBucks(1, `Collected ${fragmentsForNextReward} Fragments!`);
+            fragmentsForNextReward += 10; // Next milestone
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy, color, life) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        this.size = rand(1, 3);
+    }
+    update(dt) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= dt * 0.05;
+    }
+    draw() {
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// --- SYSTEM FUNCTIONS ---
+
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 150; i++) {
+        stars.push({
+            x: rand(0, cw),
+            y: rand(0, ch),
+            size: rand(0.5, 2),
+            speed: rand(0.1, 0.5),
+            alpha: rand(0.3, 1)
+        });
+    }
+}
+
+function drawBackground() {
+    // Deep space gradient
+    const grad = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, Math.max(cw, ch));
+    grad.addColorStop(0, "#0a0a12");
+    grad.addColorStop(1, "#020205");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Stars
+    ctx.fillStyle = "#ffffff";
+    stars.forEach(s => {
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+        ctx.fill();
+        
+        if (gameState === "playing") {
+            s.x -= s.speed;
+            if (s.x < 0) {
+                s.x = cw;
+                s.y = rand(0, ch);
+            }
+        }
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+function spawnParticle(x, y, vx, vy, color, life) {
+    particles.push(new Particle(x, y, vx, vy, color, life));
+}
+
+function spawnExplosion(x, y, count, color, speedScale = 1) {
+    for (let i = 0; i < count; i++) {
+        const a = rand(0, Math.PI * 2);
+        const s = rand(1, 4) * speedScale;
+        spawnParticle(x, y, Math.cos(a)*s, Math.sin(a)*s, color, rand(20, 50));
+    }
+}
+
+function spawnAsteroid(edgeOnly = true) {
+    let x, y;
+    if (edgeOnly) {
+        if (Math.random() < 0.5) {
+            x = Math.random() < 0.5 ? -30 : cw + 30;
+            y = rand(0, ch);
+        } else {
+            x = rand(0, cw);
+            y = Math.random() < 0.5 ? -30 : ch + 30;
+        }
+    } else {
+        // Ensure not too close to center where player starts
+        do {
+            x = rand(0, cw);
+            y = rand(0, ch);
+        } while (distance({x,y}, {x:cw/2, y:ch/2}) < 200);
+    }
+    asteroids.push(new Asteroid(x, y, 3)); // Always spawn large
+}
+
+// --- GAME LOOP ---
+
+function startGame() {
+    player = new Player();
+    asteroids = [];
+    projectiles = [];
+    particles = [];
+    fragments = [];
+    score = 0;
+    sessionFragments = 0;
+    wave = 1;
+    fragmentsForNextReward = 10;
+    asteroidSpawnTimer = 0;
+    
+    document.getElementById("scoreVal").innerText = "0";
+    document.getElementById("fragVal").innerText = "0";
+    document.getElementById("waveVal").innerText = "1";
+    document.getElementById("healthBar").style.width = "100%";
+    document.getElementById("healthBar").style.backgroundColor = "var(--primary)";
+    
+    // Initial wave
+    for(let i=0; i<3; i++) spawnAsteroid(false);
+
+    showScreen("hud");
+    gameState = "playing";
+    lastTime = performance.now();
+    cancelAnimationFrame(animationFrameId);
+    gameLoop();
+}
+
+function gameOver() {
+    gameState = "gameover";
+    
+    if (score > saveData.highScore) {
+        saveData.highScore = score;
+        earnSimgaBucks(2, "New High Score!");
+    }
+    
+    // Survival bonus based on wave
+    if (wave > 2) {
+        earnSimgaBucks(Math.floor(wave / 2), `Reached Wave ${wave}!`);
+    }
+
+    saveGame();
+
+    document.getElementById("go-score").innerText = score;
+    document.getElementById("go-highscore").innerText = saveData.highScore;
+    
+    spawnExplosion(player.x, player.y, 50, "#ff3366", 2);
+    addScreenShake(30);
+    
+    // Let explosions render briefly before showing screen
+    setTimeout(() => {
+        showScreen("gameover");
+    }, 1000);
+}
+
+function gameLoop(currentTime = performance.now()) {
+    if (gameState !== "playing" && gameState !== "gameover") return;
+    
+    const dt = currentTime - lastTime;
+    lastTime = currentTime;
+
+    // Fixed timestep logic wrapper for stability
+    const logicSteps = Math.min(Math.floor(dt / (1000/FPS)), 5) || 1; // Cap jumps
+    const stepTime = dt / logicSteps;
+
+    // Logic Update
+    for(let s = 0; s < logicSteps; s++) {
+        if (gameState === "playing") {
+            player.update(stepTime);
+            
+            // Asteroid Spawning logic (Wave progression)
+            asteroidSpawnTimer += stepTime;
+            const spawnInterval = Math.max(1000, 4000 - wave * 200); // gets faster
+            if (asteroidSpawnTimer > spawnInterval) {
+                spawnAsteroid(true);
+                asteroidSpawnTimer = 0;
+                
+                // Increase wave every 10 asteroids spawned approximately
+                if (Math.random() < 0.1) {
+                    wave++;
+                    document.getElementById("waveVal").innerText = wave;
+                    showToast(`Wave ${wave}`, "var(--primary)");
+                    if (wave % 5 === 0) earnSimgaBucks(3, `Wave ${wave} Reached!`);
+                }
+            }
+        }
+
+        // Entities Update
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            let p = projectiles[i];
+            p.update(stepTime);
+            if (p.life <= 0 || p.x < 0 || p.x > cw || p.y < 0 || p.y > ch) {
+                projectiles.splice(i, 1);
+            }
+        }
+
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+            let a = asteroids[i];
+            a.update();
+            
+            // Collision with Player
+            if (gameState === "playing" && distance(a, player) < a.radius + player.radius * 0.8) {
+                player.damage(a.size * 10);
+                a.break();
+                asteroids.splice(i, 1);
+                continue;
+            }
+
+            // Collision with Projectiles
+            for (let j = projectiles.length - 1; j >= 0; j--) {
+                let p = projectiles[j];
+                if (distance(a, p) < a.radius) {
+                    a.hp--;
+                    spawnExplosion(p.x, p.y, 3, p.colorData.glow);
+                    projectiles.splice(j, 1);
+                    if (a.hp <= 0) {
+                        a.break();
+                        asteroids.splice(i, 1);
+                    }
+                    break;
+                }
+            }
+        }
+
+        for (let i = fragments.length - 1; i >= 0; i--) {
+            let f = fragments[i];
+            f.update(stepTime);
+            if (f.life <= 0) {
+                fragments.splice(i, 1);
+                continue;
+            }
+            if (gameState === "playing" && distance(f, player) < player.radius + 10) {
+                f.collect();
+                fragments.splice(i, 1);
+            }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.update(stepTime);
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+        
+        // Screen Shake decay
+        if (screenShake > 0) screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+
+    // Render Update
+    // Background uses composite operation
+    ctx.globalCompositeOperation = "source-over";
+    drawBackground();
+    
+    // Apply Shake
+    ctx.save();
+    if (screenShake > 0) {
+        ctx.translate(rand(-screenShake, screenShake), rand(-screenShake, screenShake));
+    }
+
+    // Additive blending for glow effects
+    ctx.globalCompositeOperation = "screen";
+
+    fragments.forEach(f => f.draw());
+    particles.forEach(p => p.draw());
+    projectiles.forEach(p => p.draw());
+    
+    ctx.globalCompositeOperation = "source-over"; // Reset for solid objects
+    asteroids.forEach(a => a.draw());
+    
+    if (gameState === "playing") {
+        player.draw();
+    }
+
+    ctx.restore(); // Restore shake transform
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+// --- UI & SHOP LOGIC ---
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen, .hud').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
+    
+    if (screenId === "hud") {
+        document.getElementById("hud").style.display = 'flex';
+    } else {
+        const el = document.getElementById("screen-" + screenId);
+        if (el) {
+            el.style.display = 'flex';
+            el.classList.add('active');
+        }
+    }
+}
+
+function renderShop() {
+    const container = document.getElementById("shop-container");
+    container.innerHTML = "";
+
+    SHOP_ITEMS.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "shop-item";
+
+        // Determine state
+        let isUnlocked = false;
+        let isEquipped = false;
+        let isAvailableToBuy = true;
+
+        if (item.type === "skin") {
+            isUnlocked = saveData.unlockedSkins.includes(item.value);
+            isEquipped = saveData.equippedSkin === item.value;
+        } else if (item.type === "laser") {
+            isUnlocked = saveData.unlockedLasers.includes(item.value);
+            isEquipped = saveData.equippedLaser === item.value;
+        } else if (item.type === "shield") {
+            isUnlocked = saveData.shieldLevel >= item.value;
+            isEquipped = saveData.shieldLevel >= item.value;
+            isAvailableToBuy = saveData.shieldLevel === item.req;
+        } else if (item.type === "tractor") {
+            isUnlocked = saveData.tractorLevel >= item.value;
+            isEquipped = saveData.tractorLevel >= item.value;
+            isAvailableToBuy = saveData.tractorLevel === item.req;
+        }
+
+        let actionHtml = "";
+        
+        if (isEquipped && (item.type === "skin" || item.type === "laser")) {
+            actionHtml = `<div class="equipped-badge" style="display:block;">Equipped</div>`;
+        } else if (isUnlocked && (item.type === "skin" || item.type === "laser")) {
+            actionHtml = `<button onclick="equipItem('${item.type}', '${item.value}')">Equip</button>`;
+        } else if (isUnlocked && (item.type === "shield" || item.type === "tractor")) {
+            actionHtml = `<div class="equipped-badge" style="display:block;">Purchased</div>`;
+        } else if (isAvailableToBuy) {
+            actionHtml = `<div class="cost">${item.cost} SimgaBucks</div>
+                          <button onclick="purchaseItem('${item.id}', ${item.cost})">Buy</button>`;
+        } else {
+            actionHtml = `<div class="cost">Locked</div>`;
+            div.style.opacity = "0.5";
+        }
+
+        div.innerHTML = `
+            <h3>${item.name}</h3>
+            <p>${item.desc}</p>
+            ${actionHtml}
+        `;
+        container.appendChild(div);
+    });
+}
+
+window.purchaseItem = function(id, cost) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (!item) return;
+
+    buyItem(id, cost, (success) => {
+        if (success) {
+            // Apply upgrade locally
+            if (item.type === "skin") {
+                saveData.unlockedSkins.push(item.value);
+                saveData.equippedSkin = item.value;
+            } else if (item.type === "laser") {
+                saveData.unlockedLasers.push(item.value);
+                saveData.equippedLaser = item.value;
+            } else if (item.type === "shield") {
+                saveData.shieldLevel = item.value;
+            } else if (item.type === "tractor") {
+                saveData.tractorLevel = item.value;
+            }
+            saveGame();
+            renderShop();
+        }
+    });
+}
+
+window.equipItem = function(type, value) {
+    if (type === "skin") saveData.equippedSkin = value;
+    if (type === "laser") saveData.equippedLaser = value;
+    saveGame();
+    renderShop();
+}
+
+// --- EVENT LISTENERS ---
+
+window.addEventListener('resize', resizeCanvas);
+
+// Keyboard
+window.addEventListener("keydown", e => {
+    if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+});
+window.addEventListener("keyup", e => {
+    if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+});
+
+// Mouse coordinates & click
+window.addEventListener("mousemove", e => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+});
+window.addEventListener("mousedown", e => {
+    if(e.button === 0) mouse.down = true;
+});
+window.addEventListener("mouseup", e => {
+    if(e.button === 0) mouse.down = false;
+});
+
+// UI Buttons
+document.getElementById("btn-start").addEventListener("click", startGame);
+document.getElementById("btn-restart").addEventListener("click", startGame);
+document.getElementById("btn-shop").addEventListener("click", () => {
+    gameState = "shop";
+    showScreen("shop");
+    renderShop();
+});
+document.getElementById("btn-shop-back").addEventListener("click", () => {
+    gameState = "menu";
+    showScreen("menu");
+});
+document.getElementById("btn-menu").addEventListener("click", () => {
+    gameState = "menu";
+    showScreen("menu");
+});
+
+// --- BOOT ---
+resizeCanvas();
+initStars();
+drawBackground(); // Draw initial bg behind loading screen
+loadGame(); // Start load flow
+
+</script>
+</body>
+</html>

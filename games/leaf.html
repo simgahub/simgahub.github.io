@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Leaf Sweeper</title>
+    <style>
+        /* CSS Reset & Core Styling */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Canvas */
+        #gameCanvas { display: block; width: 100%; height: 100%; }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            pointer-events: none; transition: opacity 0.3s;
+        }
+        .active { pointer-events: auto; z-index: 10; }
+        .hidden { opacity: 0; pointer-events: none; z-index: -1; }
+
+        /* Glassmorphism Panels */
+        .panel {
+            background: rgba(20, 25, 30, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px;
+            padding: 30px; text-align: center; color: white; box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            max-width: 90%; min-width: 300px;
+        }
+
+        /* Typography */
+        h1 { font-size: 3rem; margin-bottom: 10px; color: #ffb74d; text-shadow: 0 2px 10px rgba(255, 183, 77, 0.5); letter-spacing: 2px; }
+        h2 { font-size: 2rem; margin-bottom: 20px; color: #fff; }
+        p { font-size: 1.1rem; margin-bottom: 20px; color: #ccc; }
+        .currency-text { color: #4CAF50; font-weight: bold; text-shadow: 0 0 8px rgba(76, 175, 80, 0.6); }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(45deg, #e65100, #ff9800); border: none; border-radius: 30px;
+            padding: 12px 30px; font-size: 1.2rem; color: white; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(230, 81, 0, 0.4); transition: transform 0.1s, box-shadow 0.1s;
+            margin: 10px; text-transform: uppercase; letter-spacing: 1px;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(230, 81, 0, 0.6); }
+        button:active { transform: scale(0.95); }
+        button.secondary { background: linear-gradient(45deg, #455a64, #607d8b); box-shadow: 0 4px 15px rgba(69, 90, 100, 0.4); }
+        button.buy-btn { background: linear-gradient(45deg, #2e7d32, #4caf50); font-size: 1rem; padding: 10px 20px; }
+        button:disabled { background: #555; cursor: not-allowed; transform: none; box-shadow: none; color: #888; }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%; padding: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            pointer-events: none; z-index: 5; opacity: 1; transition: opacity 0.3s;
+        }
+        .hud-box {
+            background: rgba(0, 0, 0, 0.5); border-radius: 15px; padding: 10px 20px;
+            color: white; font-size: 1.2rem; font-weight: bold; border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Shop Grid */
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-height: 50vh; overflow-y: auto; padding-right: 10px; }
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 15px; border: 1px solid rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; justify-content: space-between; text-align: left;
+        }
+        .shop-item h3 { color: #ffb74d; font-size: 1.1rem; margin-bottom: 5px; }
+        .shop-item p { font-size: 0.9rem; margin-bottom: 10px; color: #aaa; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #ff9800; border-radius: 4px; }
+
+        /* Notification */
+        #notificationBox {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8); color: white; padding: 10px 25px; border-radius: 20px;
+            font-weight: bold; opacity: 0; transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none; z-index: 20; border: 1px solid #4CAF50; color: #4CAF50;
+        }
+        .notif-anim { animation: popupNotif 2.5s ease-in-out; }
+        @keyframes popupNotif { 0% { opacity: 0; transform: translate(-50%, -20px); } 15% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
+
+        /* Pile Warning */
+        #warningOverlay {
+            position: absolute; top:0; left:0; width: 100%; height: 100%; pointer-events: none;
+            box-shadow: inset 0 0 100px rgba(255,0,0,0); transition: box-shadow 0.2s; z-index: 2;
+        }
+        .danger { box-shadow: inset 0 0 150px rgba(255,0,0,0.5) !important; animation: pulseRed 1s infinite; }
+        @keyframes pulseRed { 0% { box-shadow: inset 0 0 50px rgba(255,0,0,0.3); } 50% { box-shadow: inset 0 0 150px rgba(255,0,0,0.7); } 100% { box-shadow: inset 0 0 50px rgba(255,0,0,0.3); } }
+
+        /* Messages Modal */
+        #msgModal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20,20,20,0.95); padding: 20px 40px; border-radius: 15px; border: 1px solid #ff9800;
+            color: white; z-index: 50; display: none; text-align: center; pointer-events: auto; box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+        
+        @media (max-width: 600px) { .shop-grid { grid-template-columns: 1fr; } h1 { font-size: 2.2rem; } }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="warningOverlay"></div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-box">Score: <span id="hudScore">0</span></div>
+        <div class="hud-box" style="text-align: right;">
+            High Score: <span id="hudHighScore">0</span><br>
+            <span style="font-size: 0.9rem; color: #ccc;">Level <span id="hudLevel">1</span></span>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menuScreen" class="overlay active">
+        <div class="panel">
+            <h1>LEAF SWEEPER</h1>
+            <p>Clear the yard before the leaves pile up.</p>
+            <button onclick="startGame()">Play</button>
+            <button class="secondary" onclick="openShop()">Shop & Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="overlay hidden">
+        <div class="panel">
+            <h2>YARD OVERWHELMED!</h2>
+            <p>You swept <span id="endScore" style="color:#ffb74d; font-weight:bold;">0</span> leaves.</p>
+            <button onclick="startGame()">Play Again</button>
+            <button class="secondary" onclick="openMenu()">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shopScreen" class="overlay hidden">
+        <div class="panel" style="max-width: 800px;">
+            <h2>UPGRADES & THEMES</h2>
+            <p>Spend SimgaBucks to improve your sweeping!</p>
+            <div class="shop-grid" id="shopContainer">
+                <!-- Populated via JS -->
+            </div>
+            <button class="secondary" style="margin-top: 20px;" onclick="openMenu()">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notificationBox">+1 SimgaBuck</div>
+
+    <!-- Custom Alert Message -->
+    <div id="msgModal">
+        <h3 id="msgTitle" style="margin-bottom:10px; color:#ff5252;">Notice</h3>
+        <p id="msgText" style="margin-bottom:15px; color:#ddd;"></p>
+        <button class="secondary" onclick="closeMsgModal()">Close</button>
+    </div>
+
+<script>
+/**
+ * LEAF SWEEPER - CORE CONFIGURATION
+ */
+const GAME_ID = "leaf";
+
+// Game State
+let state = {
+    screen: "menu", // menu, game, gameover, shop
+    score: 0,
+    highScore: 0,
+    level: 1,
+    pileHeight: 0,
+    maxPileHeight: 100, // Percentage 0-100
+    isPaused: false
+};
+
+// Player Save Data
+let saveObject = {
+    highScore: 0,
+    upgrades: {
+        radius: 0, // Level 0-4
+        slowFall: 0, // Level 0-4
+        theme: "autumn", // autumn, twilight, winter
+        skin: "wooden" // wooden, golden, neon
+    }
+};
+
+// Economy Tracking
+let sessionEconomy = {
+    leavesSwept: 0,
+    leavesSinceLastReward: 0,
+    milestoneNext: 50,
+    windGustActive: false,
+    windGustLeavesCleared: 0,
+    windGustTotalLeaves: 0
+};
+
+// Shop Configurations
+const SHOP_ITEMS = {
+    radius: {
+        id: "radius", type: "upgrade", name: "Wider Rake", desc: "Increases sweep radius.",
+        maxLevel: 4, costs: [10, 25, 50, 100, 200], values: [50, 65, 80, 100, 125] // Base 50, scales up
+    },
+    slowFall: {
+        id: "slowFall", type: "upgrade", name: "Zen Mode", desc: "Leaves fall slower.",
+        maxLevel: 4, costs: [15, 30, 60, 120, 250], values: [1, 0.9, 0.8, 0.7, 0.6] // Multiplier for speed
+    },
+    theme_twilight: {
+        id: "theme_twilight", type: "theme", name: "Twilight Theme", desc: "Beautiful evening yard with fireflies.",
+        cost: 50, value: "twilight", requires: "theme"
+    },
+    theme_winter: {
+        id: "theme_winter", type: "theme", name: "Winter Theme", desc: "Frosty yard with icy falling leaves.",
+        cost: 100, value: "winter", requires: "theme"
+    },
+    skin_golden: {
+        id: "skin_golden", type: "skin", name: "Golden Rake", desc: "Shiny cosmetic rake.",
+        cost: 150, value: "golden", requires: "skin"
+    },
+    skin_neon: {
+        id: "skin_neon", type: "skin", name: "Neon Rake", desc: "Glowing cyberpunk rake.",
+        cost: 300, value: "neon", requires: "skin"
+    }
+};
+
+let pendingPurchase = null;
+
+/**
+ * PLATFORM COMMUNICATION (IFRAME)
+ */
+function requestSave() {
+    saveObject.highScore = state.highScore;
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveObject
+    }, "*");
+}
+
+function requestLoad() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+    // Store globally to verify response
+    window.__currentLoadId = loadMsgId;
+}
+
+function rewardSimgaBucks(amount, reasonText) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showNotification(`+${amount} SimgaBucks! (${reasonText})`);
+}
+
+function requestPurchase(itemId, cost) {
+    const msgId = Math.random().toString(36).substring(2);
+    pendingPurchase = { id: itemId, msgId: msgId, cost: cost };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+// Listen for messages from parent
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    // Load Response
+    if (data.type === "loadResponse" && data.msgId === window.__currentLoadId) {
+        if (data.data) {
+            saveObject = { ...saveObject, ...data.data };
+            // Ensure upgrades object exists if migrating old saves
+            if(!saveObject.upgrades) saveObject.upgrades = {radius:0, slowFall:0, theme:"autumn", skin:"wooden"};
+            state.highScore = saveObject.highScore || 0;
+            updateHUD();
+            buildShop();
+        }
+    }
+
+    // Purchase Response
+    if (data.type === "spendResponse") {
+        if (pendingPurchase && data.msgId === pendingPurchase.msgId) {
+            if (data.success) {
+                applyPurchaseSuccess(pendingPurchase.id);
+            } else {
+                showCustomMessage("Purchase Failed", "Not enough SimgaBucks!");
+            }
+            pendingPurchase = null;
+        }
+    }
+});
+
+function applyPurchaseSuccess(itemId) {
+    const item = SHOP_ITEMS[itemId] || Object.values(SHOP_ITEMS).find(i => i.id === itemId);
+    if (item.type === "upgrade") {
+        saveObject.upgrades[item.id] = (saveObject.upgrades[item.id] || 0) + 1;
+    } else if (item.type === "theme") {
+        saveObject.upgrades.theme = item.value;
+    } else if (item.type === "skin") {
+        saveObject.upgrades.skin = item.value;
+    }
+    requestSave();
+    buildShop();
+    showCustomMessage("Success", `${item.name} acquired!`);
+}
+
+
+/**
+ * CANVAS SETUP & RENDERER
+ */
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let width, height;
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Input
+let mouse = { x: width/2, y: height/2, isDown: false };
+
+function handleInput(e) {
+    if(state.screen !== "game") return;
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    // Smooth trailing interpolation
+    mouse.targetX = clientX;
+    mouse.targetY = clientY;
+}
+window.addEventListener("mousemove", handleInput);
+window.addEventListener("touchmove", handleInput, {passive: false});
+window.addEventListener("mousedown", () => mouse.isDown = true);
+window.addEventListener("mouseup", () => mouse.isDown = false);
+window.addEventListener("touchstart", (e) => { mouse.isDown = true; handleInput(e); });
+window.addEventListener("touchend", () => mouse.isDown = false);
+
+
+/**
+ * GAME ENTITIES & LOGIC
+ */
+let leaves = [];
+let particles = [];
+let floatingTexts = [];
+let bgElements = []; // clouds, stars, fireflies
+let lastTime = 0;
+let spawnTimer = 0;
+let windTimer = 0;
+let windForce = 0;
+let screenShake = 0;
+
+// Player/Rake Physics
+let player = { x: width/2, y: height/2, vx: 0, vy: 0, prevX: width/2, prevY: height/2 };
+
+function getRadius() { return SHOP_ITEMS.radius.values[saveObject.upgrades.radius || 0]; }
+function getSpeedMult() { return SHOP_ITEMS.slowFall.values[saveObject.upgrades.slowFall || 0]; }
+
+function spawnLeaf() {
+    const types = [0, 1, 2]; // 0: Maple, 1: Oak, 2: Simple
+    const theme = saveObject.upgrades.theme;
+    
+    let baseColors;
+    if (theme === "winter") baseColors = ["#81d4fa", "#b3e5fc", "#e1f5fe", "#ffffff"];
+    else if (theme === "twilight") baseColors = ["#5c6bc0", "#7986cb", "#3f51b5", "#3949ab"];
+    else baseColors = ["#e65100", "#ef6c00", "#f57c00", "#ff9800", "#8d6e63"]; // Autumn
+    
+    const size = 15 + Math.random() * 15;
+    
+    leaves.push({
+        x: Math.random() * width,
+        y: -50,
+        vx: (Math.random() - 0.5) * 1,
+        vy: (1 + Math.random() * 1.5 + (state.level * 0.2)) * getSpeedMult(),
+        size: size,
+        angle: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.05,
+        type: types[Math.floor(Math.random() * types.length)],
+        color: baseColors[Math.floor(Math.random() * baseColors.length)],
+        swayOffset: Math.random() * Math.PI * 2,
+        swaySpeed: 0.02 + Math.random() * 0.03,
+        weight: 1 + Math.random() // affects wind impact
+    });
+
+    if(sessionEconomy.windGustActive) sessionEconomy.windGustTotalLeaves++;
+}
+
+function spawnParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            size: Math.random() * 6 + 2,
+            life: 1.0,
+            color: color,
+            type: Math.random() > 0.5 ? 'circle' : 'square'
+        });
+    }
+}
+
+function addFloatingText(x, y, text, color) {
+    floatingTexts.push({ x: x, y: y, text: text, color: color, life: 1.0, vy: -1 });
+}
+
+function updateGame(dt) {
+    if (state.screen !== "game" || state.isPaused) return;
+
+    // Time scaling
+    const dtMult = dt / 16.66; // Normalize to 60fps
+
+    // Shake logic
+    if (screenShake > 0) screenShake -= dtMult * 0.5;
+    if (screenShake < 0) screenShake = 0;
+
+    // Level progression
+    let currentSpawnRate = Math.max(10, 60 - state.level * 2); // Frames between spawns
+
+    // Wind Logic
+    windTimer -= dtMult;
+    if (windTimer <= 0) {
+        if (!sessionEconomy.windGustActive) {
+            // Start Wind Gust
+            sessionEconomy.windGustActive = true;
+            windForce = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 3);
+            windTimer = 300; // ~5 seconds
+            sessionEconomy.windGustLeavesCleared = 0;
+            sessionEconomy.windGustTotalLeaves = 0;
+            addFloatingText(width/2, height/2, "WIND GUST!", "#fff");
+        } else {
+            // End Wind Gust - Economy check
+            if (sessionEconomy.windGustTotalLeaves > 0 && sessionEconomy.windGustLeavesCleared >= sessionEconomy.windGustTotalLeaves * 0.8) {
+                // Rewarded for clearing 80%+ of wind gust leaves
+                rewardSimgaBucks(2, "Wind Gust Cleared");
+            }
+            sessionEconomy.windGustActive = false;
+            windForce = 0;
+            windTimer = 600 + Math.random() * 600; // 10-20 sec to next wind
+        }
+    }
+
+    // Spawn Logic
+    spawnTimer -= dtMult;
+    if (spawnTimer <= 0) {
+        spawnLeaf();
+        spawnTimer = sessionEconomy.windGustActive ? currentSpawnRate * 0.5 : currentSpawnRate; // Spawn faster during wind
+    }
+
+    // Player Physics (Smooth follow)
+    if (mouse.targetX !== undefined) {
+        player.prevX = player.x;
+        player.prevY = player.y;
+        player.x += (mouse.targetX - player.x) * 0.3 * dtMult;
+        player.y += (mouse.targetY - player.y) * 0.3 * dtMult;
+        player.vx = player.x - player.prevX;
+        player.vy = player.y - player.prevY;
+    }
+    let pRadius = getRadius();
+    let playerSpeedSq = player.vx*player.vx + player.vy*player.vy;
+    let isSweeping = playerSpeedSq > 25; // Must be moving to sweep effectively
+
+    // Leaves Update
+    let pileAdd = 0;
+    for (let i = leaves.length - 1; i >= 0; i--) {
+        let l = leaves[i];
+        
+        // Movement
+        l.y += l.vy * dtMult;
+        l.angle += l.rotSpeed * dtMult;
+        
+        // Sway & Wind
+        let currentSway = Math.sin(Date.now() * l.swaySpeed + l.swayOffset) * 2;
+        let currentWind = sessionEconomy.windGustActive ? (windForce / l.weight) : 0;
+        l.x += (l.vx + currentSway + currentWind) * dtMult;
+
+        // Wrap horizontal
+        if (l.x < -50) l.x = width + 50;
+        if (l.x > width + 50) l.x = -50;
+
+        // Collision with Rake/Player
+        let dx = l.x - player.x;
+        let dy = l.y - player.y;
+        let distSq = dx*dx + dy*dy;
+
+        if (distSq < (pRadius + l.size)*(pRadius + l.size)) {
+            // Swept!
+            if (isSweeping || mouse.isDown) { // Require movement or mouse down/touch to actively sweep
+                spawnParticles(l.x, l.y, l.color, 5);
+                leaves.splice(i, 1);
+                handleSweep();
+                
+                // Slight physical knockback to nearby leaves
+                for(let j=0; j<leaves.length; j++) {
+                    let other = leaves[j];
+                    let ddx = other.x - player.x;
+                    let ddy = other.y - player.y;
+                    let dSq = ddx*ddx + ddy*ddy;
+                    if(dSq < (pRadius*2)*(pRadius*2) && dSq > 0) {
+                        let f = 100 / Math.sqrt(dSq);
+                        other.x += (ddx > 0 ? 1 : -1) * f;
+                        other.y += (ddy > 0 ? 1 : -1) * f;
+                    }
+                }
+                continue;
+            } else {
+                // Just bump it gently if rake is still
+                l.x += dx * 0.05;
+                l.y += dy * 0.05;
+            }
+        }
+
+        // Bottom hit (Pile up)
+        if (l.y > height) {
+            pileAdd += l.size * 0.02; // Small increment per leaf
+            leaves.splice(i, 1);
+        }
+    }
+
+    // Update Pile
+    if (pileAdd > 0) {
+        state.pileHeight += pileAdd;
+        screenShake = 2; // Small bump
+        
+        let warningUI = document.getElementById("warningOverlay");
+        if(state.pileHeight > state.maxPileHeight * 0.75) {
+            warningUI.classList.add("danger");
+        } else {
+            warningUI.classList.remove("danger");
+        }
+
+        if (state.pileHeight >= state.maxPileHeight) {
+            triggerGameOver();
+        }
+    }
+    // Very slow natural pile decay
+    if (state.pileHeight > 0) {
+        state.pileHeight -= 0.01 * dtMult; 
+        if(state.pileHeight < 0) state.pileHeight = 0;
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx * dtMult;
+        p.y += p.vy * dtMult;
+        p.vx *= 0.95; // friction
+        p.vy *= 0.95;
+        p.vy += 0.2; // gravity
+        p.life -= 0.02 * dtMult;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Update Floating Texts
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        let ft = floatingTexts[i];
+        ft.y += ft.vy * dtMult;
+        ft.life -= 0.015 * dtMult;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+    }
+
+    // Background Elements Update
+    bgElements.forEach(bg => {
+        bg.x += bg.vx * dtMult;
+        bg.y += bg.vy * dtMult;
+        if(bg.x > width + 50) bg.x = -50;
+        if(bg.x < -50) bg.x = width + 50;
+    });
+}
+
+function handleSweep() {
+    state.score++;
+    sessionEconomy.leavesSwept++;
+    sessionEconomy.leavesSinceLastReward++;
+    
+    if (sessionEconomy.windGustActive) sessionEconomy.windGustLeavesCleared++;
+
+    if (state.score % 20 === 0) {
+        state.level++;
+        document.getElementById("hudLevel").innerText = state.level;
+    }
+
+    document.getElementById("hudScore").innerText = state.score;
+
+    // --- SIMGABUCKS ECONOMY LOGIC ---
+    // Early hook: First 20 leaves
+    if (sessionEconomy.leavesSwept === 20) {
+        rewardSimgaBucks(1, "Early Bird");
+    } 
+    // Milestone hook
+    else if (state.score >= sessionEconomy.milestoneNext) {
+        let reward = state.score < 150 ? 2 : (state.score < 500 ? 5 : 10);
+        rewardSimgaBucks(reward, `Milestone: ${state.score}`);
+        sessionEconomy.milestoneNext += Math.max(50, Math.floor(state.score * 1.5)); // Scaling milestones
+        sessionEconomy.leavesSinceLastReward = 0;
+    }
+    // Steady pacing fallback (approx every 80 leaves)
+    else if (sessionEconomy.leavesSinceLastReward >= 80) {
+        rewardSimgaBucks(2, "Steady Sweeping");
+        sessionEconomy.leavesSinceLastReward = 0;
+    }
+}
+
+/**
+ * GRAPHICS DRAWING FUNCTIONS
+ */
+function drawBackground() {
+    const theme = saveObject.upgrades.theme;
+    
+    // Base Gradient
+    let grad = ctx.createLinearGradient(0, 0, 0, height);
+    if (theme === "autumn") {
+        grad.addColorStop(0, "#2c1e16");
+        grad.addColorStop(1, "#1a2e1a");
+    } else if (theme === "twilight") {
+        grad.addColorStop(0, "#0b0c10");
+        grad.addColorStop(1, "#1f2833");
+    } else if (theme === "winter") {
+        grad.addColorStop(0, "#1a252c");
+        grad.addColorStop(1, "#2c3e50");
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw background elements (stars, fireflies, snow)
+    ctx.globalCompositeOperation = "screen";
+    bgElements.forEach(bg => {
+        ctx.beginPath();
+        ctx.arc(bg.x, bg.y, bg.size, 0, Math.PI*2);
+        ctx.fillStyle = bg.color;
+        ctx.globalAlpha = bg.alpha * (Math.sin(Date.now()*0.001 + bg.pulsePhase)*0.5 + 0.5);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = "source-over";
+
+    // Draw Wind visual
+    if (sessionEconomy.windGustActive) {
+        ctx.globalAlpha = 0.1;
+        ctx.strokeStyle = theme === "winter" ? "#fff" : "#ffb74d";
+        ctx.lineWidth = 2;
+        let windLines = 5;
+        let timeOffset = Date.now() * 0.005;
+        for(let i=0; i<windLines; i++) {
+            ctx.beginPath();
+            let y = (height / windLines) * i + Math.sin(timeOffset + i) * 50;
+            ctx.moveTo(0, y);
+            for(let x=0; x<width; x+=50) {
+                ctx.lineTo(x, y + Math.sin(x*0.01 + timeOffset * windForce) * 20);
+            }
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    // Draw Pile (Bottom gradient overlay)
+    if (state.pileHeight > 0) {
+        let pilePrc = state.pileHeight / state.maxPileHeight;
+        let pileH = pilePrc * height * 0.5; // Max 50% of screen height
+        
+        let pGrad = ctx.createLinearGradient(0, height - pileH, 0, height);
+        pGrad.addColorStop(0, "rgba(0,0,0,0)");
+        
+        if (theme === "autumn") pGrad.addColorStop(1, "rgba(230, 81, 0, 0.8)");
+        else if (theme === "twilight") pGrad.addColorStop(1, "rgba(63, 81, 181, 0.8)");
+        else if (theme === "winter") pGrad.addColorStop(1, "rgba(225, 245, 254, 0.8)");
+
+        ctx.fillStyle = pGrad;
+        
+        // Wavy top edge for pile
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        ctx.lineTo(0, height - pileH);
+        for(let x=0; x<=width; x+=40) {
+            ctx.lineTo(x, height - pileH + Math.sin(x*0.05 + Date.now()*0.002)*10 * pilePrc);
+        }
+        ctx.lineTo(width, height);
+        ctx.fill();
+
+        // Warning Line
+        if (pilePrc > 0.75) {
+            ctx.strokeStyle = `rgba(255, 0, 0, ${Math.abs(Math.sin(Date.now()*0.005))})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, height - (state.maxPileHeight/state.maxPileHeight * height * 0.5));
+            ctx.lineTo(width, height - (state.maxPileHeight/state.maxPileHeight * height * 0.5));
+            ctx.stroke();
+        }
+    }
+}
+
+function drawLeafShape(type, size) {
+    if (saveObject.upgrades.theme === "winter") {
+        // Draw Snowflakes instead of leaves for winter
+        ctx.beginPath();
+        for(let i=0; i<6; i++) {
+            ctx.moveTo(0,0);
+            ctx.lineTo(0, -size);
+            ctx.moveTo(0, -size*0.5);
+            ctx.lineTo(size*0.3, -size*0.8);
+            ctx.moveTo(0, -size*0.5);
+            ctx.lineTo(-size*0.3, -size*0.8);
+            ctx.rotate(Math.PI / 3);
+        }
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        return;
+    }
+
+    ctx.beginPath();
+    if (type === 0) { // Maple-ish
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size*0.3, -size*0.3);
+        ctx.lineTo(size*0.8, -size*0.4);
+        ctx.lineTo(size*0.5, size*0.1);
+        ctx.lineTo(size*0.7, size*0.6);
+        ctx.lineTo(size*0.1, size*0.5);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size*0.1, size*0.5);
+        ctx.lineTo(-size*0.7, size*0.6);
+        ctx.lineTo(-size*0.5, size*0.1);
+        ctx.lineTo(-size*0.8, -size*0.4);
+        ctx.lineTo(-size*0.3, -size*0.3);
+    } else if (type === 1) { // Oak-ish (lobed)
+        ctx.arc(0, -size*0.6, size*0.4, Math.PI, 0);
+        ctx.arc(size*0.4, -size*0.2, size*0.3, -Math.PI/2, Math.PI/2);
+        ctx.arc(size*0.3, size*0.4, size*0.3, -Math.PI/2, Math.PI/2);
+        ctx.lineTo(0, size);
+        ctx.arc(-size*0.3, size*0.4, size*0.3, Math.PI/2, -Math.PI/2);
+        ctx.arc(-size*0.4, -size*0.2, size*0.3, Math.PI/2, -Math.PI/2);
+    } else { // Willow/Simple
+        ctx.ellipse(0, 0, size*0.3, size, 0, 0, Math.PI*2);
+    }
+    ctx.closePath();
+}
+
+function drawLeaves() {
+    leaves.forEach(l => {
+        ctx.save();
+        ctx.translate(l.x, l.y);
+        ctx.rotate(l.angle);
+        
+        // Shadow for depth
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 5;
+
+        // Draw shape
+        if(saveObject.upgrades.theme !== "winter") {
+            ctx.fillStyle = l.color;
+            drawLeafShape(l.type, l.size);
+            ctx.fill();
+            
+            // Central vein detail
+            ctx.strokeStyle = "rgba(0,0,0,0.2)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, l.size*0.8);
+            ctx.lineTo(0, -l.size*0.8);
+            ctx.stroke();
+        } else {
+            drawLeafShape(l.type, l.size); // Snowflakes are stroked
+        }
+
+        ctx.restore();
+    });
+}
+
+function drawParticles() {
+    particles.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        if(p.type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        }
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+function drawFloatingTexts() {
+    ctx.textAlign = "center";
+    ctx.font = "bold 20px 'Segoe UI', sans-serif";
+    floatingTexts.forEach(ft => {
+        ctx.globalAlpha = Math.max(0, ft.life);
+        ctx.fillStyle = ft.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(ft.text, ft.x, ft.y);
+    });
+    ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
+}
+
+function drawPlayer() {
+    let px = player.x;
+    let py = player.y;
+    let radius = getRadius();
+    let skin = saveObject.upgrades.skin;
+
+    ctx.save();
+    ctx.translate(px, py);
+
+    // Calculate velocity angle for visual rotation
+    let angle = Math.atan2(player.vy, player.vx);
+    let speedSq = player.vx*player.vx + player.vy*player.vy;
+    let isMoving = speedSq > 5;
+    
+    // Draw Area of Effect (Glow)
+    if(isMoving || mouse.isDown) {
+        let grad = ctx.createRadialGradient(0, 0, radius*0.3, 0, 0, radius);
+        if(skin === "neon") {
+            grad.addColorStop(0, "rgba(0, 255, 255, 0.4)");
+            grad.addColorStop(1, "rgba(0, 255, 255, 0)");
+        } else if (skin === "golden") {
+            grad.addColorStop(0, "rgba(255, 215, 0, 0.4)");
+            grad.addColorStop(1, "rgba(255, 215, 0, 0)");
+        } else {
+            grad.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+            grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    if(isMoving) {
+        ctx.rotate(angle);
+    }
+
+    // Draw Rake Head
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    if (skin === "neon") {
+        ctx.strokeStyle = "#0ff";
+        ctx.shadowColor = "#0ff";
+        ctx.shadowBlur = 15;
+        ctx.lineWidth = 4;
+        // Cyberpunk arc
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, -Math.PI/3, Math.PI/3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(10, -10); ctx.lineTo(10, 10);
+        ctx.stroke();
+    } else if (skin === "golden") {
+        ctx.strokeStyle = "#FFD700";
+        ctx.fillStyle = "#DAA520";
+        ctx.shadowColor = "#FFD700";
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 3;
+        // Fancy curve
+        ctx.beginPath();
+        ctx.moveTo(15, -20);
+        ctx.quadraticCurveTo(25, 0, 15, 20);
+        ctx.stroke();
+        // Tines
+        for(let ty=-15; ty<=15; ty+=6) {
+            ctx.beginPath(); ctx.moveTo(15 + (15-Math.abs(ty))*0.2, ty); ctx.lineTo(25, ty); ctx.stroke();
+        }
+    } else {
+        // Wooden default
+        ctx.strokeStyle = "#5D4037";
+        ctx.lineWidth = 5;
+        // Head bar
+        ctx.beginPath();
+        ctx.moveTo(5, -25);
+        ctx.lineTo(5, 25);
+        ctx.stroke();
+        // Tines
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#8D6E63";
+        for(let ty=-20; ty<=20; ty+=5) {
+            ctx.beginPath(); ctx.moveTo(5, ty); ctx.lineTo(20, ty); ctx.stroke();
+        }
+        // Handle fragment
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#4E342E";
+        ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-20, 0); ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function render() {
+    if(state.screen !== "game" && state.screen !== "gameover") return;
+
+    ctx.save();
+    
+    // Screen shake application
+    if (screenShake > 0) {
+        let sx = (Math.random() - 0.5) * screenShake * 5;
+        let sy = (Math.random() - 0.5) * screenShake * 5;
+        ctx.translate(sx, sy);
+    }
+
+    drawBackground();
+    drawLeaves();
+    drawParticles();
+    drawPlayer();
+    drawFloatingTexts();
+
+    ctx.restore();
+}
+
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    let dt = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // Cap delta time to prevent huge jumps on tab switch
+    if (dt > 100) dt = 16.66; 
+
+    updateGame(dt);
+    render();
+
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * GAME FLOW MANAGEMENT
+ */
+function initBgElements() {
+    bgElements = [];
+    let count = 30;
+    const theme = saveObject.upgrades.theme;
+    
+    let color = "rgba(255,255,255,0.1)";
+    if(theme === "twilight") color = "#cddc39"; // Fireflies
+    if(theme === "winter") color = "#ffffff"; // Snow/dust
+    
+    for(let i=0; i<count; i++) {
+        bgElements.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5,
+            size: Math.random() * 2 + 1,
+            color: color,
+            alpha: Math.random() * 0.5 + 0.1,
+            pulsePhase: Math.random() * Math.PI * 2
+        });
+    }
+}
+
+function startGame() {
+    state.screen = "game";
+    state.score = 0;
+    state.level = 1;
+    state.pileHeight = 0;
+    state.isPaused = false;
+    leaves = [];
+    particles = [];
+    floatingTexts = [];
+    spawnTimer = 0;
+    windTimer = 600; // 10 seconds before first potential wind
+    
+    sessionEconomy.leavesSwept = 0;
+    sessionEconomy.leavesSinceLastReward = 0;
+    sessionEconomy.milestoneNext = 50;
+    sessionEconomy.windGustActive = false;
+
+    initBgElements();
+
+    document.getElementById("menuScreen").classList.add("hidden");
+    document.getElementById("menuScreen").classList.remove("active");
+    document.getElementById("gameOverScreen").classList.add("hidden");
+    document.getElementById("gameOverScreen").classList.remove("active");
+    document.getElementById("shopScreen").classList.add("hidden");
+    document.getElementById("shopScreen").classList.remove("active");
+    
+    document.getElementById("hud").classList.remove("hidden");
+    updateHUD();
+    
+    let warningUI = document.getElementById("warningOverlay");
+    warningUI.classList.remove("danger");
+
+    lastTime = performance.now();
+}
+
+function triggerGameOver() {
+    state.screen = "gameover";
+    document.getElementById("endScore").innerText = state.score;
+    document.getElementById("hud").classList.add("hidden");
+    
+    let overScreen = document.getElementById("gameOverScreen");
+    overScreen.classList.remove("hidden");
+    overScreen.classList.add("active");
+
+    if (state.score > state.highScore) {
+        state.highScore = state.score;
+        saveObject.highScore = state.highScore;
+    }
+    requestSave(); // Save on game over
+}
+
+function openMenu() {
+    state.screen = "menu";
+    document.getElementById("hud").classList.add("hidden");
+    document.querySelectorAll('.overlay').forEach(el => {
+        el.classList.add('hidden');
+        el.classList.remove('active');
+    });
+    let menu = document.getElementById("menuScreen");
+    menu.classList.remove('hidden');
+    menu.classList.add('active');
+}
+
+/**
+ * SHOP & UI LOGIC
+ */
+function updateHUD() {
+    document.getElementById("hudScore").innerText = state.score;
+    document.getElementById("hudHighScore").innerText = state.highScore;
+    document.getElementById("hudLevel").innerText = state.level;
+}
+
+function showNotification(text) {
+    const notif = document.getElementById("notificationBox");
+    notif.innerText = text;
+    notif.classList.remove("notif-anim");
+    void notif.offsetWidth; // trigger reflow
+    notif.classList.add("notif-anim");
+}
+
+function showCustomMessage(title, text) {
+    document.getElementById("msgTitle").innerText = title;
+    document.getElementById("msgText").innerText = text;
+    document.getElementById("msgModal").style.display = "block";
+}
+function closeMsgModal() {
+    document.getElementById("msgModal").style.display = "none";
+}
+
+function openShop() {
+    state.screen = "shop";
+    document.getElementById("menuScreen").classList.add("hidden");
+    document.getElementById("menuScreen").classList.remove("active");
+    let shop = document.getElementById("shopScreen");
+    shop.classList.remove("hidden");
+    shop.classList.add("active");
+    buildShop();
+}
+
+function buildShop() {
+    const container = document.getElementById("shopContainer");
+    container.innerHTML = "";
+
+    // Upgrades
+    for (let key in SHOP_ITEMS) {
+        const item = SHOP_ITEMS[key];
+        const div = document.createElement("div");
+        div.className = "shop-item";
+        
+        let header = `<h3>${item.name}</h3>`;
+        let desc = `<p>${item.desc}</p>`;
+        let actionBtn = "";
+
+        if (item.type === "upgrade") {
+            let currentLevel = saveObject.upgrades[item.id] || 0;
+            let isMax = currentLevel >= item.maxLevel;
+            
+            desc += `<p style="color:#4caf50; font-size:0.8rem;">Level: ${currentLevel}/${item.maxLevel}</p>`;
+            
+            if (isMax) {
+                actionBtn = `<button class="buy-btn" disabled>MAXED</button>`;
+            } else {
+                let cost = item.costs[currentLevel];
+                actionBtn = `<button class="buy-btn" onclick="requestPurchase('${item.id}', ${cost})">Buy (${cost} SB)</button>`;
+            }
+        } 
+        else if (item.type === "theme" || item.type === "skin") {
+            let category = item.type; // "theme" or "skin"
+            let isOwned = saveObject.upgrades[category] === item.value || saveObject.upgrades[item.id]; // check string value or unlock boolean
+            // Handle retroactive unlocks if we swap logic
+            let isActive = saveObject.upgrades[category] === item.value;
+
+            if (isActive) {
+                actionBtn = `<button class="buy-btn secondary" disabled>EQUIPPED</button>`;
+            } else if (saveObject.upgrades[item.id]) { // unlocked but not equipped
+                actionBtn = `<button class="buy-btn secondary" onclick="equipItem('${category}', '${item.value}')">EQUIP</button>`;
+            } else {
+                actionBtn = `<button class="buy-btn" onclick="requestPurchase('${item.id}', ${item.cost})">Unlock (${item.cost} SB)</button>`;
+            }
+        }
+
+        div.innerHTML = header + desc + actionBtn;
+        container.appendChild(div);
+    }
+}
+
+function equipItem(category, value) {
+    saveObject.upgrades[category] = value;
+    requestSave();
+    buildShop();
+}
+
+// Initial Boot
+requestLoad(); // Ask parent for data
+initBgElements();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

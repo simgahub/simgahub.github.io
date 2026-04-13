@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tower Climb</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');
+
+        :root {
+            --primary: #00d2ff;
+            --secondary: #3a7bd5;
+            --bg-dark: rgba(10, 15, 30, 0.9);
+            --text-main: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #050510;
+            overflow: hidden;
+            font-family: 'Righteous', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.4), inset 0 0 20px rgba(0, 210, 255, 0.2);
+            pointer-events: auto;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            backdrop-filter: blur(5px);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: -webkit-linear-gradient(#fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            text-shadow: 0px 4px 15px rgba(0,210,255,0.5);
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, var(--secondary), var(--primary));
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-family: inherit;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 200px;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 210, 255, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: rgba(0, 210, 255, 0.1);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            display: none;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            width: calc(100% - 40px);
+        }
+
+        #hud.active {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-element {
+            font-size: 1.5rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-value {
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.8rem;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .shop-item:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: rgba(0, 210, 255, 0.05);
+        }
+
+        .shop-item h3 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .shop-item p {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 15px;
+            min-height: 40px;
+        }
+
+        .shop-btn {
+            background: #ffd700;
+            color: #000;
+            border: none;
+            padding: 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .shop-btn:hover {
+            background: #ffea00;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+        
+        .shop-btn.owned {
+            background: #4caf50;
+            color: white;
+        }
+
+        .shop-btn.equipped {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.8);
+            border-left: 4px solid var(--primary);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            font-size: 1rem;
+            animation: slideDown 0.3s forwards, fadeOut 0.5s 2.5s forwards;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .toast.reward { border-left-color: #ffd700; }
+        .toast.error { border-left-color: #ff3b3b; }
+
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
+        /* Controls Hint */
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            pointer-events: none;
+            font-size: 1rem;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #050510;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary);
+            font-size: 2rem;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">CONNECTING TO PLATFORM...</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="toast-container"></div>
+    
+    <div id="hud">
+        <div class="hud-element">
+            <span>ALTITUDE:</span> <span id="scoreDisplay" class="stat-value">0</span>m
+        </div>
+        <div class="hud-element" id="shieldIndicator" style="display: none; color: #00ffcc;">
+            🛡️ SHIELD ACTIVE
+        </div>
+    </div>
+
+    <div class="controls-hint" id="controlsHint" style="display: none;">
+        [A/D] or [Left/Right] to Change Lanes • [SPACE] to Jump
+        <br>Touch: Tap Left/Right halves • Swipe Up to Jump
+    </div>
+
+    <div id="ui-layer">
+        <!-- Main Menu -->
+        <div id="menuScreen" class="screen">
+            <h1>Tower Climb</h1>
+            <p style="margin-bottom: 30px; color: #aaa; text-align: center;">Ascend the endless spire.<br>Dodge falling hazards.</p>
+            <button class="btn" onclick="startGame()">Start Climb</button>
+            <button class="btn btn-outline" onclick="showScreen('shopScreen')">Upgrades & Shop</button>
+            <div style="margin-top: 20px; color: var(--primary);">High Score: <span id="menuHighScore">0</span>m</div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shopScreen" class="screen" style="width: 90%; max-width: 900px;">
+            <h2>Simga Shop</h2>
+            <div class="shop-grid" id="shopGrid">
+                <!-- Shop items injected via JS -->
+            </div>
+            <button class="btn btn-outline" onclick="showScreen('menuScreen')" style="margin-top: 20px;">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen">
+            <h1 style="color: #ff3b3b; text-shadow: 0 4px 15px rgba(255, 59, 59, 0.5);">CLIMB FAILED</h1>
+            <h2 id="finalScoreDisplay">Altitude: 0m</h2>
+            <p id="rewardSummary" style="margin-bottom: 30px; color: #ffd700; font-size: 1.2rem;">SimgaBucks Earned: 0</p>
+            <button class="btn" onclick="startGame()">Try Again</button>
+            <button class="btn btn-outline" onclick="showScreen('menuScreen')">Main Menu</button>
+        </div>
+    </div>
+
+<script>
+/** * GAME CONFIGURATION AND STATE
+ */
+const GAME_ID = "towerClimb";
+
+const SHOP_ITEMS = [
+    { id: 'skin_ninja', name: 'Ninja Skin', desc: 'Sleek and shadowy climber.', cost: 50, type: 'skin' },
+    { id: 'skin_cyber', name: 'Cyber Suit', desc: 'Neon glowing technological suit.', cost: 100, type: 'skin' },
+    { id: 'jump_boost', name: 'Jump Thrusters', desc: 'Stay in the air longer when jumping.', cost: 40, type: 'upgrade' },
+    { id: 'shield_helm', name: 'Shield Helmet', desc: 'Absorb one hit per run.', cost: 80, type: 'upgrade' },
+    { id: 'theme_neon', name: 'Neon Tower', desc: 'Change the tower aesthetics.', cost: 150, type: 'theme' }
+];
+
+let saveObject = {
+    highScore: 0,
+    unlocked: {
+        'skin_base': true,
+        'theme_stone': true
+    },
+    equipped: {
+        skin: 'skin_base',
+        theme: 'theme_stone'
+    }
+};
+
+let pendingPurchases = {};
+let gameState = 'INIT'; // INIT, MENU, PLAYING, GAMEOVER, SHOP
+let canvas, ctx;
+let lastTime = 0;
+let animationFrameId;
+
+// Game Logic Variables
+let score = 0;
+let distanceCounter = 0; // For small rewards
+let earnedThisRun = 0;
+let gameSpeed = 1;
+let difficultyMultiplier = 1;
+
+let lanes = []; // X coordinates for lanes
+const NUM_LANES = 3;
+let player = null;
+let hazards = [];
+let particles = [];
+let bgStars = [];
+let floatingRunes = [];
+
+// Screen Shake
+let shakeTime = 0;
+let shakeMagnitude = 0;
+
+/**
+ * PLATFORM COMMUNICATION (IFRAME POSTMESSAGE)
+ */
+
+function saveData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveObject
+    }, "*");
+}
+
+function loadData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Fallback if platform doesn't respond quickly (e.g. testing outside platform)
+    setTimeout(() => {
+        if (gameState === 'INIT') {
+            finishLoading();
+        }
+    }, 1500);
+
+    return loadMsgId;
+}
+
+function rewardSimgaBucks(amount, reason) {
+    earnedThisRun += amount;
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks (${reason})`, "reward");
+}
+
+function requestPurchase(itemId, cost) {
+    const msgId = Math.random().toString(36);
+    pendingPurchases[msgId] = { id: itemId, cost: cost };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+
+    // For local testing without platform:
+    // setTimeout(() => simulatePurchaseResponse(msgId, true), 500);
+}
+
+// Global Message Listener
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === "loadResponse") {
+        if (data.data) {
+            // Merge loaded data with defaults to prevent errors on new variables
+            saveObject = { ...saveObject, ...data.data };
+            if (!saveObject.unlocked) saveObject.unlocked = { 'skin_base': true, 'theme_stone': true };
+            if (!saveObject.equipped) saveObject.equipped = { skin: 'skin_base', theme: 'theme_stone' };
+        }
+        finishLoading();
+    } 
+    else if (data.type === "spendResponse") {
+        const itemInfo = pendingPurchases[data.msgId];
+        if (itemInfo) {
+            if (data.success) {
+                saveObject.unlocked[itemInfo.id] = true;
+                
+                // Auto equip if skin or theme
+                const shopItem = SHOP_ITEMS.find(i => i.id === itemInfo.id);
+                if (shopItem && shopItem.type === 'skin') saveObject.equipped.skin = itemInfo.id;
+                if (shopItem && shopItem.type === 'theme') saveObject.equipped.theme = itemInfo.id;
+
+                saveData();
+                renderShop();
+                showToast(`Purchase Successful!`, "reward");
+            } else {
+                showToast(`Not enough SimgaBucks!`, "error");
+            }
+            delete pendingPurchases[data.msgId];
+        }
+    }
+});
+
+function finishLoading() {
+    if (gameState === 'INIT') {
+        document.getElementById('loading').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('loading').style.display = 'none';
+            showScreen('menuScreen');
+        }, 500);
+    }
+}
+
+/**
+ * UI & SYSTEM MANAGEMENT
+ */
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('hud').classList.remove('active');
+    document.getElementById('controlsHint').style.display = 'none';
+    
+    if (screenId) {
+        const screenEl = document.getElementById(screenId);
+        if (screenEl) {
+            screenEl.classList.add('active');
+        }
+    }
+
+    if (screenId === 'menuScreen') {
+        gameState = 'MENU';
+        document.getElementById('menuHighScore').innerText = Math.floor(saveObject.highScore);
+    } else if (screenId === 'shopScreen') {
+        gameState = 'SHOP';
+        renderShop();
+    } else if (screenId === 'playing') {
+        gameState = 'PLAYING';
+        document.getElementById('hud').classList.add('active');
+        document.getElementById('controlsHint').style.display = 'block';
+    } else if (screenId === 'gameOverScreen') {
+        gameState = 'GAMEOVER';
+        document.getElementById('finalScoreDisplay').innerText = `Altitude: ${Math.floor(score)}m`;
+        document.getElementById('rewardSummary').innerText = `SimgaBucks Earned: ${earnedThisRun}`;
+        
+        if (score > saveObject.highScore) {
+            saveObject.highScore = score;
+        }
+        saveData();
+    }
+}
+
+function showToast(message, type = "") {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function renderShop() {
+    const grid = document.getElementById('shopGrid');
+    grid.innerHTML = '';
+    
+    SHOP_ITEMS.forEach(item => {
+        const isUnlocked = saveObject.unlocked[item.id];
+        const isEquipped = (saveObject.equipped.skin === item.id) || (saveObject.equipped.theme === item.id);
+        
+        let btnHTML = '';
+        if (isEquipped) {
+            btnHTML = `<button class="shop-btn equipped">Equipped</button>`;
+        } else if (isUnlocked) {
+            // Upgrades are always active if unlocked
+            if (item.type === 'upgrade') {
+                 btnHTML = `<button class="shop-btn owned">Active</button>`;
+            } else {
+                 btnHTML = `<button class="shop-btn owned" onclick="equipItem('${item.id}', '${item.type}')">Equip</button>`;
+            }
+        } else {
+            btnHTML = `<button class="shop-btn" onclick="requestPurchase('${item.id}', ${item.cost})">${item.cost} SB</button>`;
+        }
+
+        grid.innerHTML += `
+            <div class="shop-item">
+                <div>
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                </div>
+                ${btnHTML}
+            </div>
+        `;
+    });
+}
+
+function equipItem(id, type) {
+    if (type === 'skin') saveObject.equipped.skin = id;
+    if (type === 'theme') saveObject.equipped.theme = id;
+    saveData();
+    renderShop();
+}
+
+/**
+ * CORE GAME MECHANICS & OBJECTS
+ */
+
+class Player {
+    constructor() {
+        this.lane = 1; // Middle lane (0, 1, 2)
+        this.targetLane = 1;
+        this.x = 0; // Updated in resize
+        this.y = 0; // Updated in resize
+        this.baseY = 0;
+        
+        // Jump Physics
+        this.isJumping = false;
+        this.jumpVelocity = 0;
+        this.z = 0; // Simulated Z axis (height off ground)
+        
+        // Upgrades
+        this.hasShield = saveObject.unlocked['shield_helm'] === true;
+        this.jumpBoost = saveObject.unlocked['jump_boost'] === true;
+        
+        this.gravity = this.jumpBoost ? -0.4 : -0.6;
+        this.jumpStrength = this.jumpBoost ? 14 : 12;
+
+        // Visuals
+        this.skin = saveObject.equipped.skin;
+        this.animTimer = 0;
+        this.color = '#fff';
+        this.accent = '#00d2ff';
+        
+        if (this.skin === 'skin_ninja') { this.color = '#111'; this.accent = '#ff3b3b'; }
+        if (this.skin === 'skin_cyber') { this.color = '#1a1a2e'; this.accent = '#00ffcc'; }
+    }
+
+    update(dt) {
+        // Smooth lane transition
+        const targetX = lanes[this.targetLane];
+        this.x += (targetX - this.x) * 0.2;
+        
+        if (Math.abs(this.x - targetX) < 1) {
+            this.x = targetX;
+            this.lane = this.targetLane;
+        }
+
+        // Jump logic
+        if (this.isJumping) {
+            this.z += this.jumpVelocity;
+            this.jumpVelocity += this.gravity;
+            
+            if (this.z <= 0) {
+                this.z = 0;
+                this.isJumping = false;
+                createParticles(this.x, this.y, this.accent, 5, "impact");
+            }
+        }
+
+        this.animTimer += dt;
+        this.y = this.baseY - this.z; 
+    }
+
+    jump() {
+        if (!this.isJumping) {
+            this.isJumping = true;
+            this.jumpVelocity = this.jumpStrength;
+            createParticles(this.x, this.y, "#fff", 8, "dust");
+        }
+    }
+
+    moveLeft() {
+        if (this.targetLane > 0) {
+            this.targetLane--;
+            createParticles(this.x, this.y, this.accent, 3, "spark");
+        }
+    }
+
+    moveRight() {
+        if (this.targetLane < NUM_LANES - 1) {
+            this.targetLane++;
+            createParticles(this.x, this.y, this.accent, 3, "spark");
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Shadow
+        ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.5 - this.z/100)})`;
+        ctx.beginPath();
+        ctx.ellipse(0, this.z + 20, 20 - this.z/5, 8 - this.z/10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Scale effect based on jump
+        const scale = 1 + (this.z / 150);
+        ctx.scale(scale, scale);
+
+        // Body Sway/Bop
+        const sway = this.isJumping ? 0 : Math.sin(this.animTimer * 0.01) * 3;
+        ctx.translate(0, sway);
+
+        // Glow
+        ctx.shadowColor = this.accent;
+        ctx.shadowBlur = 15;
+
+        // Draw Character based on skin
+        if (this.skin === 'skin_ninja') {
+            this.drawNinja(ctx);
+        } else if (this.skin === 'skin_cyber') {
+            this.drawCyber(ctx);
+        } else {
+            this.drawBase(ctx);
+        }
+
+        // Shield Effect
+        if (this.hasShield) {
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#00ffcc';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(0, -15, 35, 0, Math.PI*2);
+            ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(0, 255, 204, 0.1)';
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    // Custom drawing routines to avoid plain rectangles
+    drawBase(ctx) {
+        // Scarf
+        ctx.fillStyle = '#ff5722';
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.quadraticCurveTo(-20, -10 + Math.sin(this.animTimer*0.02)*10, -30 + Math.sin(this.animTimer*0.015)*5, 10 + Math.cos(this.animTimer*0.01)*5);
+        ctx.lineTo(-25, 15);
+        ctx.quadraticCurveTo(-10, -5, 0, -5);
+        ctx.fill();
+
+        // Body capsule
+        ctx.fillStyle = '#eee';
+        ctx.beginPath();
+        ctx.roundRect(-12, -20, 24, 35, 12);
+        ctx.fill();
+
+        // Visor
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.roundRect(-8, -15, 16, 10, 5);
+        ctx.fill();
+        
+        // Eye Glow
+        ctx.fillStyle = this.accent;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(-2, -10, 2, 0, Math.PI*2);
+        ctx.arc(6, -10, 2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    drawNinja(ctx) {
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.moveTo(0, -25);
+        ctx.lineTo(15, -10);
+        ctx.lineTo(12, 15);
+        ctx.lineTo(-12, 15);
+        ctx.lineTo(-15, -10);
+        ctx.closePath();
+        ctx.fill();
+
+        // Red belt
+        ctx.fillStyle = '#ff3b3b';
+        ctx.fillRect(-12, 5, 24, 4);
+        
+        // Ninja eyes
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-10, -15, 20, 6);
+        ctx.fillStyle = this.accent;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(-3, -12, 2, 0, Math.PI*2);
+        ctx.arc(4, -12, 2, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    drawCyber(ctx) {
+        ctx.fillStyle = '#1a1a2e';
+        ctx.beginPath();
+        ctx.moveTo(-15, -20);
+        ctx.lineTo(15, -20);
+        ctx.lineTo(20, 0);
+        ctx.lineTo(10, 20);
+        ctx.lineTo(-10, 20);
+        ctx.lineTo(-20, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Neon lines
+        ctx.strokeStyle = this.accent;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(-10, -20);
+        ctx.lineTo(0, -5);
+        ctx.lineTo(10, -20);
+        ctx.stroke();
+
+        // Cyber visor
+        ctx.fillStyle = this.accent;
+        ctx.fillRect(-12, -12, 24, 4);
+    }
+}
+
+class Hazard {
+    constructor(lane, y, speed, type) {
+        this.lane = lane;
+        this.x = lanes[lane];
+        this.y = y;
+        this.speed = speed;
+        this.type = type; // 'spike', 'energy'
+        this.rotation = 0;
+        this.markedForDeletion = false;
+        this.radius = 18;
+    }
+
+    update(dt, climbSpeed) {
+        this.y += this.speed + climbSpeed;
+        this.rotation += 0.05;
+
+        // Trail effect
+        if (Math.random() < 0.3) {
+            let color = this.type === 'spike' ? '#ff3b3b' : '#cc00ff';
+            createParticles(this.x + (Math.random()-0.5)*10, this.y, color, 1, "trail");
+        }
+
+        if (this.y > canvas.height + 50) {
+            this.markedForDeletion = true;
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+
+        if (this.type === 'spike') {
+            // Draw Spiked Mine
+            ctx.shadowColor = '#ff3b3b';
+            ctx.shadowBlur = 15;
+            
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ff3b3b';
+            for(let i=0; i<8; i++) {
+                ctx.rotate(Math.PI / 4);
+                ctx.beginPath();
+                ctx.moveTo(-4, -10);
+                ctx.lineTo(4, -10);
+                ctx.lineTo(0, -22);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Core
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI*2);
+            ctx.fill();
+
+        } else if (this.type === 'energy') {
+            // Draw Energy Orb
+            ctx.shadowColor = '#cc00ff';
+            ctx.shadowBlur = 20;
+
+            const grad = ctx.createRadialGradient(0,0,0, 0,0, 20);
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(0.3, '#ff00ff');
+            grad.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI*2);
+            ctx.fill();
+
+            // Inner electric zigzags
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.lineTo(-5, -10);
+            ctx.lineTo(5, 10);
+            ctx.lineTo(10, 0);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color, type) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.type = type;
+        this.life = 1;
+        
+        if (type === "impact") {
+            this.vx = (Math.random() - 0.5) * 8;
+            this.vy = (Math.random() - 0.5) * 8;
+            this.decay = 0.05;
+            this.size = Math.random() * 4 + 2;
+        } else if (type === "trail") {
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = -Math.random() * 3;
+            this.decay = 0.08;
+            this.size = Math.random() * 3 + 1;
+        } else if (type === "spark") {
+            this.vx = (Math.random() - 0.5) * 10;
+            this.vy = (Math.random() - 0.5) * 5;
+            this.decay = 0.06;
+            this.size = Math.random() * 2 + 1;
+        } else if (type === "dust") {
+            this.vx = (Math.random() - 0.5) * 4;
+            this.vy = Math.random() * 2;
+            this.decay = 0.04;
+            this.size = Math.random() * 5 + 3;
+        } else if (type === "bgWind") {
+            this.vx = 0;
+            this.vy = Math.random() * 15 + 10; // Fast downward
+            this.decay = 0.01;
+            this.size = Math.random() * 2;
+        }
+    }
+
+    update(dt) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        if(this.type === "dust") this.size += 0.2;
+    }
+
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        
+        if (this.type === "bgWind") {
+            ctx.fillRect(this.x, this.y, 1, this.size * 15);
+        } else {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+    }
+}
+
+function createParticles(x, y, color, count, type) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(x, y, color, type));
+    }
+}
+
+/**
+ * INITIALIZATION & ENGINE
+ */
+
+function initEngine() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Controls
+    window.addEventListener('keydown', (e) => {
+        if (gameState !== 'PLAYING') return;
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') player.moveLeft();
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') player.moveRight();
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') player.jump();
+    });
+
+    // Touch Controls
+    let touchStartX = 0;
+    let touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+        if (gameState !== 'PLAYING') return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (gameState !== 'PLAYING') return;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const dx = touchEndX - touchStartX;
+        const dy = touchEndY - touchStartY;
+
+        if (Math.abs(dy) > 50 && dy < 0) { // Swipe up
+            player.jump();
+        } else if (Math.abs(dx) < 30) { // Tap
+            if (touchEndX < canvas.width / 2) player.moveLeft();
+            else player.moveRight();
+        }
+    });
+
+    // Initialize bg stars
+    for(let i=0; i<50; i++) {
+        bgStars.push({
+            x: Math.random(),
+            y: Math.random(),
+            size: Math.random() * 2 + 1,
+            alpha: Math.random()
+        });
+    }
+
+    // Attempt Load
+    loadData();
+    requestAnimationFrame(gameLoop);
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Recalculate lanes based on screen width
+    const center = canvas.width / 2;
+    const spacing = Math.min(120, canvas.width / 4);
+    lanes = [center - spacing, center, center + spacing];
+
+    if (player) {
+        player.baseY = canvas.height * 0.75; // Player stands at lower quarter
+    }
+}
+
+function startGame() {
+    score = 0;
+    distanceCounter = 0;
+    earnedThisRun = 0;
+    gameSpeed = 5;
+    difficultyMultiplier = 1;
+    
+    hazards = [];
+    particles = [];
+    floatingRunes = [];
+    
+    player = new Player();
+    player.x = lanes[1];
+    player.baseY = canvas.height * 0.75;
+    
+    // First fast reward milestone (20-30s in -> 300 distance)
+    
+    document.getElementById('shieldIndicator').style.display = player.hasShield ? 'flex' : 'none';
+    
+    showScreen('playing');
+}
+
+function triggerGameOver() {
+    gameState = 'GAMEOVER';
+    shakeMagnitude = 20;
+    shakeTime = 30;
+    createParticles(player.x, player.y, '#ff3b3b', 50, "impact");
+    
+    // Small pity reward if survived a bit but didn't hit a milestone
+    if (score > 150 && earnedThisRun === 0) {
+        rewardSimgaBucks(1, "Valiant Effort");
+    }
+    
+    setTimeout(() => {
+        showScreen('gameOverScreen');
+    }, 1000);
+}
+
+/**
+ * GAME LOOP
+ */
+
+function gameLoop(timestamp) {
+    const dt = timestamp - lastTime;
+    lastTime = timestamp;
+
+    update(dt);
+    draw(ctx);
+
+    requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+    if (gameState === 'PLAYING') {
+        // Climb Logic
+        score += (gameSpeed / 60);
+        distanceCounter += (gameSpeed / 60);
+        
+        document.getElementById('scoreDisplay').innerText = Math.floor(score);
+
+        // Difficulty scaling
+        gameSpeed = 5 + (score / 200);
+        difficultyMultiplier = 1 + (score / 1000);
+
+        // Economy Logic
+        // 1st reward very quickly (score ~150-200)
+        // Then steady drops
+        if (earnedThisRun === 0 && score > 200) {
+            rewardSimgaBucks(1, "First Checkpoint");
+        } else if (distanceCounter > 500) {
+            distanceCounter = 0;
+            // Every 500m gives a bigger reward
+            rewardSimgaBucks(Math.floor(Math.random() * 2) + 2, "Milestone Reached");
+        } else if (Math.random() < 0.001 * difficultyMultiplier) {
+            // Rare random drop
+            rewardSimgaBucks(1, "Rare Crystal Found");
+        }
+
+        // Spawn Hazards
+        const spawnRate = 0.02 + (score / 50000); // Slowly increases
+        if (Math.random() < spawnRate) {
+            const lane = Math.floor(Math.random() * NUM_LANES);
+            const speed = Math.random() * 3 * difficultyMultiplier + 2;
+            const type = saveObject.equipped.theme === 'theme_neon' ? 'energy' : 'spike';
+            hazards.push(new Hazard(lane, -50, speed, type));
+        }
+
+        // Background wind particles for speed illusion
+        if (Math.random() < 0.2) {
+            createParticles(Math.random() * canvas.width, 0, "rgba(255,255,255,0.3)", 1, "bgWind");
+        }
+
+        player.update(dt);
+
+        // Update Hazards & Collision
+        for (let i = hazards.length - 1; i >= 0; i--) {
+            let h = hazards[i];
+            h.update(dt, gameSpeed);
+
+            // Collision check
+            // Use actual physical distance instead of strict lanes to account for smooth movement
+            const xDist = Math.abs(h.x - player.x);
+            const yDist = Math.abs(h.y - player.y);
+
+            if (!h.markedForDeletion && xDist < h.radius + 12) {
+                // If hazard is near player's base Y, check jump height (z)
+                if (yDist < h.radius + 15) {
+                    if (player.z < 30) { // Player is on ground or barely jumping
+                        if (player.hasShield) {
+                            player.hasShield = false;
+                            h.markedForDeletion = true;
+                            document.getElementById('shieldIndicator').style.display = 'none';
+                            createParticles(player.x, player.y, '#00ffcc', 30, "impact");
+                            shakeMagnitude = 10;
+                            shakeTime = 10;
+                        } else {
+                            triggerGameOver();
+                        }
+                    } else if (player.z >= 30 && player.isJumping) {
+                        // Successfully jumped over! Optional: Small score bonus
+                    }
+                }
+            }
+
+            if (h.markedForDeletion) {
+                hazards.splice(i, 1);
+            }
+        }
+        
+        // Spawn Background Runes
+        if (Math.random() < 0.05) {
+            floatingRunes.push({
+                x: lanes[Math.floor(Math.random() * NUM_LANES)],
+                y: -50,
+                speed: gameSpeed * 0.8 // Move slightly slower than hazards for depth
+            });
+        }
+        
+        for (let i = floatingRunes.length - 1; i >= 0; i--) {
+            floatingRunes[i].y += floatingRunes[i].speed;
+            if (floatingRunes[i].y > canvas.height + 50) floatingRunes.splice(i, 1);
+        }
+    }
+
+    // Update particles regardless of state
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt);
+        if (particles[i].life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+
+    // Screen Shake update
+    if (shakeTime > 0) {
+        shakeTime--;
+    }
+}
+
+function draw(ctx) {
+    // 1. Draw Background (Dynamic based on theme and score)
+    const isNeon = saveObject.equipped && saveObject.equipped.theme === 'theme_neon';
+    
+    // Gradient Sky
+    let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    if (isNeon) {
+        grad.addColorStop(0, '#0a0a1a');
+        grad.addColorStop(1, '#1a0033');
+    } else {
+        const heightProgress = Math.min(1, (score || 0) / 5000);
+        // Colors shift from blue dusk to deep space
+        const rTop = Math.floor(10 - 10 * heightProgress);
+        const gTop = Math.floor(20 - 20 * heightProgress);
+        const bTop = Math.floor(40 - 20 * heightProgress);
+        grad.addColorStop(0, `rgb(${rTop},${gTop},${bTop})`);
+        grad.addColorStop(1, '#050510');
+    }
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Apply Shake
+    ctx.save();
+    if (shakeTime > 0) {
+        const dx = (Math.random() - 0.5) * shakeMagnitude;
+        const dy = (Math.random() - 0.5) * shakeMagnitude;
+        ctx.translate(dx, dy);
+    }
+
+    // 2. Draw Stars/Nebula (Parallax)
+    ctx.fillStyle = '#fff';
+    bgStars.forEach(star => {
+        // Slowly move stars downwards to simulate upward climbing
+        let sy = star.y * canvas.height + ((score || 0) * 0.1) % canvas.height;
+        if (sy > canvas.height) sy -= canvas.height;
+        
+        ctx.globalAlpha = star.alpha;
+        ctx.beginPath();
+        ctx.arc(star.x * canvas.width, sy, star.size, 0, Math.PI*2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    // 3. Draw Tower Columns / Ladders
+    ctx.lineWidth = 4;
+    lanes.forEach(x => {
+        // Draw pillar back
+        let pillarGrad = ctx.createLinearGradient(x - 40, 0, x + 40, 0);
+        if (isNeon) {
+            pillarGrad.addColorStop(0, 'rgba(0, 210, 255, 0.05)');
+            pillarGrad.addColorStop(0.5, 'rgba(0, 210, 255, 0.15)');
+            pillarGrad.addColorStop(1, 'rgba(0, 210, 255, 0.05)');
+            ctx.strokeStyle = 'rgba(0, 210, 255, 0.3)';
+        } else {
+            pillarGrad.addColorStop(0, 'rgba(30, 40, 50, 0.5)');
+            pillarGrad.addColorStop(0.5, 'rgba(50, 60, 70, 0.8)');
+            pillarGrad.addColorStop(1, 'rgba(30, 40, 50, 0.5)');
+            ctx.strokeStyle = 'rgba(100, 150, 200, 0.2)';
+        }
+        
+        ctx.fillStyle = pillarGrad;
+        ctx.fillRect(x - 30, 0, 60, canvas.height);
+
+        // Borders
+        ctx.beginPath();
+        ctx.moveTo(x - 30, 0); ctx.lineTo(x - 30, canvas.height);
+        ctx.moveTo(x + 30, 0); ctx.lineTo(x + 30, canvas.height);
+        ctx.stroke();
+
+        // Glowing center rail
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = isNeon ? '#00d2ff' : '#4a90e2';
+        ctx.strokeStyle = isNeon ? 'rgba(0, 210, 255, 0.5)' : 'rgba(74, 144, 226, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    });
+
+    // Draw floating runes/details on pillars
+    ctx.fillStyle = isNeon ? 'rgba(0, 255, 204, 0.4)' : 'rgba(255, 215, 0, 0.3)';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = ctx.fillStyle;
+    floatingRunes.forEach(rune => {
+        ctx.fillRect(rune.x - 10, rune.y, 20, 5);
+        ctx.fillRect(rune.x - 5, rune.y - 15, 10, 35);
+    });
+    ctx.shadowBlur = 0;
+
+    // 4. Draw Game Entities
+    if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+        // Draw Particles behind player
+        particles.forEach(p => { if(p.type === "bgWind" || p.type === "trail") p.draw(ctx); });
+
+        // Draw Player
+        if (player && gameState !== 'GAMEOVER') {
+            player.draw(ctx);
+        }
+
+        // Draw Hazards
+        hazards.forEach(h => h.draw(ctx));
+
+        // Draw Foreground Particles
+        particles.forEach(p => { if(p.type !== "bgWind" && p.type !== "trail") p.draw(ctx); });
+    }
+
+    ctx.restore(); // Restore from shake
+}
+
+// Start
+window.onload = initEngine;
+
+</script>
+</body>
+</html>

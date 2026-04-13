@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Parachute Drop</title>
+    <style>
+        /* --- RESET & BASE --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* --- UI OVERLAYS --- */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .panel { background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.05); pointer-events: auto; text-align: center; max-width: 90%; max-height: 90%; overflow-y: auto; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; }
+        .hidden { opacity: 0; transform: scale(0.9); pointer-events: none !important; position: absolute; }
+        
+        h1 { font-size: 2.5rem; margin-bottom: 10px; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; letter-spacing: 2px; }
+        h2 { font-size: 1.8rem; margin-bottom: 20px; color: #fff; }
+        p { margin-bottom: 20px; color: #ccc; line-height: 1.5; }
+
+        /* --- BUTTONS --- */
+        .btn { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: #fff; border: none; padding: 12px 24px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3); margin: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5); filter: brightness(1.1); }
+        .btn:active { transform: translateY(1px); }
+        .btn.secondary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3); }
+        .btn.disabled { background: #444; color: #888; box-shadow: none; cursor: not-allowed; transform: none; filter: none; }
+
+        /* --- HUD --- */
+        #hud { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .hud-box { background: rgba(0,0,0,0.4); padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); font-size: 1.2rem; font-weight: bold; }
+        
+        /* Wind Indicator */
+        #wind-indicator { display: flex; align-items: center; gap: 10px; }
+        #wind-arrow { width: 40px; height: 10px; background: rgba(255,255,255,0.2); position: relative; border-radius: 5px; }
+        #wind-fill { height: 100%; background: #00f2fe; border-radius: 5px; transition: width 0.2s, margin-left 0.2s; }
+        #wind-text { font-size: 0.9rem; color: #aaa; width: 50px; text-align: center; }
+
+        /* --- SHOP --- */
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 20px; text-align: left; }
+        .shop-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; transition: transform 0.2s; }
+        .shop-item:hover { background: rgba(255,255,255,0.1); border-color: rgba(0, 242, 254, 0.5); }
+        .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .item-title { font-weight: bold; font-size: 1.1rem; color: #fff; }
+        .item-level { color: #00f2fe; font-size: 0.9rem; }
+        .item-desc { font-size: 0.85rem; color: #aaa; margin-bottom: 15px; flex-grow: 1; }
+        .buy-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .buy-btn:hover { background: #34ce57; box-shadow: 0 0 10px rgba(40,167,69,0.5); }
+        .buy-btn.equipped { background: #00f2fe; color: #000; cursor: default; box-shadow: none; }
+        .buy-btn.equip { background: #667eea; }
+
+        /* --- TOAST --- */
+        #toast-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; pointer-events: none; z-index: 100;}
+        .toast { background: rgba(40, 167, 69, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: floatUp 2.5s ease-in-out forwards; }
+        @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 10% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(-20px); } 100% { opacity: 0; transform: translateY(-40px); } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .panel { padding: 20px; }
+            .shop-grid { grid-template-columns: 1fr; }
+            #hud { flex-direction: column; gap: 10px; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div class="hud-box">Round: <span id="round-display">1</span></div>
+            <div class="hud-box" id="wind-indicator">
+                <span style="font-size: 0.9rem; color:#ccc;">WIND</span>
+                <div id="wind-arrow"><div id="wind-fill"></div></div>
+                <div id="wind-text">0 mph</div>
+            </div>
+            <div class="hud-box">Score: <span id="score-display">0</span></div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="main-menu" class="panel">
+            <h1>Parachute Drop</h1>
+            <p>Navigate the winds. Land safely on the glowing platform.<br>Use <b>Left/Right Arrows</b>, <b>A/D</b>, or <b>Tap sides of screen</b>.</p>
+            <button class="btn" onclick="startGame()">Start Drop</button>
+            <button class="btn secondary" onclick="showShop()">Shop & Upgrades</button>
+        </div>
+
+        <!-- Game Over / Round Complete Screen -->
+        <div id="game-over" class="panel hidden">
+            <h2 id="result-title">Landing Successful!</h2>
+            <p id="result-desc">Perfect center! +2 SimgaBucks</p>
+            <h3 style="margin-bottom: 20px; color: #00f2fe;">Total Score: <span id="final-score">0</span></h3>
+            <button class="btn" id="next-round-btn" onclick="nextRound()">Next Round</button>
+            <button class="btn secondary" onclick="showShop()">Visit Shop</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop" class="panel hidden">
+            <h2>Hangar Shop</h2>
+            <p style="font-size:0.9rem;">Upgrade your gear using SimgaBucks.</p>
+            <div id="shop-container" class="shop-grid">
+                <!-- Shop items injected via JS -->
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="btn secondary" onclick="hideShop()">Back to Menu</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="toast-container"></div>
+
+<script>
+/**
+ * PARACHUTE DROP - Platform Integration & Core Logic
+ */
+
+// --- CONSTANTS & INTEGRATION ---
+const GAME_ID = "parachute";
+let platformLoaded = false;
+let pendingPurchases = {};
+
+// Save Data Structure
+let gameSave = {
+    upgrades: {
+        windResist: 0,
+        landingPad: 0
+    },
+    skins: {
+        parachute: 'base',
+        theme: 'day'
+    },
+    unlocked: {
+        parachute: ['base'],
+        theme: ['day']
+    },
+    highScore: 0,
+    maxRound: 1
+};
+
+// Shop Definitions
+const SHOP_ITEMS = {
+    windResist: {
+        type: 'upgrade', name: "Wind Resistance",
+        desc: "Reduces the effect of crosswinds by 10% per level.",
+        maxLevel: 5, costs: [10, 20, 30, 40, 50]
+    },
+    landingPad: {
+        type: 'upgrade', name: "Pad Expander",
+        desc: "Increases the width of the landing target.",
+        maxLevel: 5, costs: [10, 20, 30, 40, 50]
+    },
+    para_rainbow: {
+        type: 'skin', category: 'parachute', id: 'rainbow', name: "Rainbow Chute",
+        desc: "A bright, colorful parachute canopy.", cost: 25
+    },
+    para_neon: {
+        type: 'skin', category: 'parachute', id: 'neon', name: "Neon Glow",
+        desc: "A futuristic glowing parachute.", cost: 50
+    },
+    theme_sunset: {
+        type: 'skin', category: 'theme', id: 'sunset', name: "Sunset Skies",
+        desc: "Fly during a beautiful golden hour.", cost: 25
+    },
+    theme_night: {
+        type: 'skin', category: 'theme', id: 'night', name: "Midnight Drop",
+        desc: "Dark skies with twinkling stars.", cost: 50
+    }
+};
+
+// Color Palettes for Themes and Skins
+const PALETTES = {
+    theme: {
+        day: { top: '#1CB5E0', bottom: '#000046', cloud: 'rgba(255,255,255,0.6)', starAlpha: 0 },
+        sunset: { top: '#ff7e5f', bottom: '#feb47b', cloud: 'rgba(255,200,200,0.5)', starAlpha: 0.2 },
+        night: { top: '#0f2027', bottom: '#203a43', cloud: 'rgba(100,120,140,0.4)', starAlpha: 0.8 }
+    },
+    parachute: {
+        base: ['#e74c3c', '#c0392b', '#ecf0f1'],
+        rainbow: ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082'],
+        neon: ['#00f2fe', '#4facfe', '#000000']
+    }
+};
+
+// --- PLATFORM COMMUNICATION ---
+
+function addSimgaBucks(amount, reason = "") {
+    window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+    showToast(`+${amount} SimgaBucks${reason ? ' (' + reason + ')' : ''}!`);
+}
+
+function requestPurchase(itemId, cost, onSuccess) {
+    const msgId = Math.random().toString(36).substring(2, 10);
+    pendingPurchases[msgId] = onSuccess;
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+function saveGameData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: gameSave
+    }, "*");
+}
+
+function loadGameData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+}
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    
+    // Handle Load
+    if (data.type === "loadResponse" && data.data) {
+        const saved = data.data;
+        if (saved.upgrades) gameSave.upgrades = { ...gameSave.upgrades, ...saved.upgrades };
+        if (saved.skins) gameSave.skins = { ...gameSave.skins, ...saved.skins };
+        if (saved.unlocked) gameSave.unlocked = { ...gameSave.unlocked, ...saved.unlocked };
+        gameSave.highScore = saved.highScore || 0;
+        gameSave.maxRound = saved.maxRound || 1;
+        platformLoaded = true;
+        renderShop();
+    }
+
+    // Handle Purchase
+    if (data.type === "spendResponse") {
+        if (data.success) {
+            if (pendingPurchases[data.msgId]) {
+                pendingPurchases[data.msgId]();
+                saveGameData();
+                renderShop();
+            }
+        } else {
+            alert("Not enough SimgaBucks!");
+        }
+        delete pendingPurchases[data.msgId];
+    }
+});
+
+// Request load on start
+loadGameData();
+// Fallback if platform doesn't respond
+setTimeout(() => { if(!platformLoaded) { platformLoaded = true; renderShop(); } }, 1000);
+
+
+// --- ENGINE & STATE ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+let lastTime = 0;
+let score = 0;
+let round = 1;
+
+// Inputs
+const keys = { left: false, right: false };
+const touch = { active: false, x: 0 };
+
+window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+});
+window.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+});
+
+// Touch controls
+canvas.addEventListener('touchstart', (e) => {
+    touch.active = true;
+    touch.x = e.touches[0].clientX;
+});
+canvas.addEventListener('touchmove', (e) => {
+    touch.x = e.touches[0].clientX;
+});
+canvas.addEventListener('touchend', () => { touch.active = false; });
+
+// Resize handling
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- GAME ENTITIES ---
+
+let player = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, radius: 15 };
+let target = { x: 0, width: 100, y: 0, vx: 0, baseWidth: 100 };
+let environment = { 
+    wind: 0, 
+    targetWind: 0, 
+    windChangeTimer: 0,
+    clouds: [],
+    particles: [],
+    stars: [],
+    bgOffset: 0
+};
+
+// --- GAMEPLAY FUNCTIONS ---
+
+function initRound() {
+    // Reset Player
+    player.x = canvas.width / 2;
+    player.y = -50;
+    player.vx = 0;
+    player.vy = canvas.height * 0.15; // Fall speed scales with screen height (~6-7s fall)
+    player.angle = 0;
+
+    // Reset Target
+    const upgradePadLvl = gameSave.upgrades.landingPad;
+    target.baseWidth = Math.max(100, canvas.width * 0.15) + (upgradePadLvl * 20);
+    target.width = target.baseWidth;
+    target.x = canvas.width / 2;
+    target.y = canvas.height - 40;
+    
+    // Target Movement (Harder rounds)
+    if (round >= 4) {
+        target.vx = (Math.random() > 0.5 ? 1 : -1) * (canvas.width * 0.05 + (round * 5));
+    } else {
+        target.vx = 0;
+    }
+
+    // Reset Environment
+    environment.clouds = [];
+    for(let i=0; i<15; i++) spawnCloud(true);
+    
+    environment.stars = [];
+    if(PALETTES.theme[gameSave.skins.theme].starAlpha > 0) {
+        for(let i=0; i<50; i++) {
+            environment.stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1,
+                alpha: Math.random()
+            });
+        }
+    }
+
+    // Wind Logic
+    if (round === 1) {
+        environment.targetWind = 0;
+    } else if (round === 2) {
+        environment.targetWind = (Math.random() > 0.5 ? 1 : -1) * (canvas.width * 0.05);
+    } else {
+        environment.targetWind = (Math.random() > 0.5 ? 1 : -1) * (canvas.width * 0.1 + (round * 10));
+    }
+    environment.wind = environment.targetWind * 0.5;
+    environment.windChangeTimer = 2; // Change wind halfway down on hard levels
+
+    gameState = 'PLAYING';
+    updateHUD();
+    updateWindIndicator();
+}
+
+function spawnCloud(randomY = false) {
+    environment.clouds.push({
+        x: Math.random() * canvas.width,
+        y: randomY ? Math.random() * canvas.height : canvas.height + 50,
+        s: Math.random() * 40 + 30,
+        speed: Math.random() * 0.5 + 0.2
+    });
+}
+
+function spawnParticles(x, y, color, count, type="explosion") {
+    for(let i=0; i<count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 5 + 2;
+        if(type === "smoke") speed = Math.random() * 2;
+        
+        environment.particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - (type==="smoke" ? 2 : 0),
+            life: 1.0,
+            decay: Math.random() * 0.02 + 0.01,
+            color: color,
+            size: Math.random() * 4 + 2,
+            type: type
+        });
+    }
+}
+
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+
+    // --- Physics ---
+    
+    // Input Force
+    let inputForce = 0;
+    let controlAccel = canvas.width * 0.6; // pixels per second squared
+
+    if (keys.left) inputForce = -controlAccel;
+    if (keys.right) inputForce = controlAccel;
+    
+    if (touch.active) {
+        if (touch.x < canvas.width / 2) inputForce = -controlAccel;
+        else inputForce = controlAccel;
+    }
+
+    // Wind Application
+    let resistFactor = 1 - (gameSave.upgrades.windResist * 0.1);
+    let effectiveWind = environment.wind * resistFactor;
+
+    // Wind changing dynamically in later rounds
+    if (round >= 3) {
+        environment.windChangeTimer -= dt;
+        if (environment.windChangeTimer <= 0) {
+            environment.targetWind = (Math.random() * 2 - 1) * (canvas.width * 0.15);
+            environment.windChangeTimer = Math.random() * 2 + 1;
+        }
+        // Lerp wind
+        environment.wind += (environment.targetWind - environment.wind) * dt * 2;
+        updateWindIndicator();
+    }
+
+    // Velocity & Position
+    player.vx += (inputForce + effectiveWind) * dt;
+    player.vx *= 0.95; // Friction/Drag
+    
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // Screen wrap or clamp
+    if(player.x < 0) { player.x = 0; player.vx = 0; }
+    if(player.x > canvas.width) { player.x = canvas.width; player.vx = 0; }
+
+    // Visual swaying angle based on horizontal velocity relative to wind
+    let targetAngle = (player.vx - environment.wind*0.2) * 0.002;
+    // Clamp angle to realistic limits
+    targetAngle = Math.max(-0.5, Math.min(0.5, targetAngle));
+    player.angle += (targetAngle - player.angle) * dt * 5;
+
+    // Target Movement
+    if (target.vx !== 0) {
+        target.x += target.vx * dt;
+        if (target.x - target.width/2 < 0 || target.x + target.width/2 > canvas.width) {
+            target.vx *= -1; // Bounce
+            target.x = Math.max(target.width/2, Math.min(canvas.width - target.width/2, target.x));
+        }
+    }
+
+    // Clouds
+    environment.bgOffset += player.vy * dt * 0.5; // Parallax
+    for (let i = environment.clouds.length - 1; i >= 0; i--) {
+        let c = environment.clouds[i];
+        c.y -= player.vy * dt * c.speed; // Relative upward movement
+        c.x -= environment.wind * dt * 0.5; // Wind blows clouds
+        
+        // Wrap horizontally
+        if(c.x < -100) c.x = canvas.width + 100;
+        if(c.x > canvas.width + 100) c.x = -100;
+
+        if (c.y < -100) {
+            environment.clouds.splice(i, 1);
+            spawnCloud();
+        }
+    }
+
+    // Particles
+    for (let i = environment.particles.length - 1; i >= 0; i--) {
+        let p = environment.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+        if (p.type === "smoke") p.size += 0.1;
+        if (p.life <= 0) environment.particles.splice(i, 1);
+    }
+
+    // Wind streaks (visual only)
+    if (Math.random() < 0.1) {
+        let speed = environment.wind * (Math.random()*0.5 + 0.5);
+        if(Math.abs(speed) > 10) {
+            environment.particles.push({
+                x: speed > 0 ? -50 : canvas.width + 50,
+                y: Math.random() * canvas.height,
+                vx: speed * dt * 60,
+                vy: -player.vy * dt,
+                life: 1.0,
+                decay: 0.02,
+                color: 'rgba(255,255,255,0.3)',
+                size: Math.random() * 3 + 1,
+                type: 'streak'
+            });
+        }
+    }
+
+    // Collision / Landing Check
+    if (player.y >= target.y - player.radius) {
+        handleLanding();
+    }
+}
+
+function handleLanding() {
+    gameState = 'GAMEOVER';
+    
+    // Calculate distance from center of target
+    let dist = Math.abs(player.x - target.x);
+    let maxDist = target.width / 2;
+    
+    let isSuccess = dist <= maxDist;
+    
+    let resultTitle = document.getElementById('result-title');
+    let resultDesc = document.getElementById('result-desc');
+    let btn = document.getElementById('next-round-btn');
+    
+    if (isSuccess) {
+        // Calculate score
+        let accuracy = 1 - (dist / maxDist); // 0 to 1
+        let baseScore = round * 100;
+        let bonusScore = Math.floor(accuracy * 200);
+        let roundScore = baseScore + bonusScore;
+        score += roundScore;
+        
+        let isPerfect = accuracy > 0.9;
+        
+        // SimgaBucks Economy
+        // Goal: 1st reward fast. ~5-15 per 1-3 min session.
+        let simgaBucksEarned = 0;
+        
+        // Base reward scales slightly with round
+        if (round === 1) simgaBucksEarned += 1;
+        else if (round <= 3) simgaBucksEarned += 2;
+        else simgaBucksEarned += 3;
+
+        // Perfect landing bonus
+        if (isPerfect) simgaBucksEarned += 2;
+
+        addSimgaBucks(simgaBucksEarned, `Round ${round} Cleared`);
+
+        // Effects
+        spawnParticles(player.x, target.y, '#00f2fe', 50, 'explosion');
+        if (isPerfect) spawnParticles(player.x, target.y, '#ffea00', 50, 'explosion');
+
+        // UI
+        resultTitle.innerText = "Landing Successful!";
+        resultTitle.style.color = "#00f2fe";
+        resultDesc.innerText = isPerfect ? 
+            `PERFECT DEAD CENTER! (+${simgaBucksEarned} SimgaBucks)` : 
+            `Good landing. (+${simgaBucksEarned} SimgaBucks)`;
+            
+        btn.innerText = "Next Round";
+        btn.classList.remove('disabled');
+        btn.onclick = nextRound;
+        
+        // Update Save
+        if(score > gameSave.highScore) gameSave.highScore = score;
+        if(round >= gameSave.maxRound) gameSave.maxRound = round;
+        saveGameData();
+
+    } else {
+        // Crash
+        spawnParticles(player.x, target.y, '#555', 40, 'smoke');
+        spawnParticles(player.x, target.y, '#e74c3c', 20, 'explosion');
+
+        resultTitle.innerText = "CRASHED!";
+        resultTitle.style.color = "#e74c3c";
+        resultDesc.innerText = "You missed the landing zone.";
+        
+        btn.innerText = "Restart Game";
+        btn.classList.remove('disabled');
+        btn.onclick = resetGame;
+    }
+
+    document.getElementById('final-score').innerText = score;
+    
+    setTimeout(() => {
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('game-over').classList.remove('hidden');
+    }, 1000);
+}
+
+// --- RENDERING ---
+
+function draw() {
+    // 1. Background Gradient
+    let theme = PALETTES.theme[gameSave.skins.theme];
+    let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    // Shift gradient based on height to simulate falling
+    let shift = (environment.bgOffset * 0.05) % 100;
+    grad.addColorStop(0, theme.top);
+    grad.addColorStop(1, theme.bottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 2. Stars (if night/sunset)
+    if(theme.starAlpha > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${theme.starAlpha})`;
+        environment.stars.forEach(s => {
+            // Twinkle
+            let alpha = s.alpha + Math.sin(Date.now() * 0.002 + s.x) * 0.5;
+            ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+            ctx.beginPath();
+            ctx.arc(s.x, (s.y - environment.bgOffset * 0.1) % canvas.height, s.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+    }
+
+    // 3. Clouds
+    ctx.fillStyle = theme.cloud;
+    environment.clouds.forEach(c => {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.s, 0, Math.PI*2);
+        ctx.arc(c.x - c.s*0.8, c.y + c.s*0.2, c.s*0.6, 0, Math.PI*2);
+        ctx.arc(c.x + c.s*0.8, c.y + c.s*0.2, c.s*0.6, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // 4. Target Pad
+    if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+        let ty = target.y;
+        let padHeight = 20;
+
+        // Glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = "#00f2fe";
+        
+        // Base
+        ctx.fillStyle = "#1a1a2e";
+        ctx.beginPath();
+        // Perspective trapezoid
+        ctx.moveTo(target.x - target.width/2 - 10, ty + padHeight);
+        ctx.lineTo(target.x + target.width/2 + 10, ty + padHeight);
+        ctx.lineTo(target.x + target.width/2, ty);
+        ctx.lineTo(target.x - target.width/2, ty);
+        ctx.fill();
+
+        // Edge Lights
+        ctx.shadowBlur = 10;
+        let lightColor = (Math.floor(Date.now() / 200) % 2 === 0) ? '#00f2fe' : '#4facfe';
+        ctx.fillStyle = lightColor;
+        ctx.fillRect(target.x - target.width/2, ty, target.width, 4);
+
+        // Center Marker
+        ctx.fillStyle = "#fff";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(target.x, ty + 8, 8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#e74c3c";
+        ctx.beginPath();
+        ctx.arc(target.x, ty + 8, 4, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // 5. Player (Parachute)
+    if (gameState === 'PLAYING' || (gameState === 'GAMEOVER' && player.y < target.y)) {
+        drawParachute(player.x, player.y, player.angle);
+    } else if (gameState === 'GAMEOVER') {
+        // Draw deflated/landed parachute
+        drawParachuteLanded(player.x, player.y);
+    }
+
+    // 6. Particles & Wind Streaks
+    environment.particles.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life);
+        if (p.type === 'streak') {
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = p.size;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx*2, p.y - p.vy*2);
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+function drawParachute(x, y, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    let colors = PALETTES.parachute[gameSave.skins.parachute] || PALETTES.parachute.base;
+
+    // Strings
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(-30, -50);
+    ctx.moveTo(0, 0); ctx.lineTo(-10, -55);
+    ctx.moveTo(0, 0); ctx.lineTo(10, -55);
+    ctx.moveTo(0, 0); ctx.lineTo(30, -50);
+    ctx.stroke();
+
+    // Canopy
+    // Neon skin gets a glow
+    if(gameSave.skins.parachute === 'neon') {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = colors[0];
+    }
+
+    let pWidth = 80;
+    let pHeight = 40;
+    let segs = colors.length;
+    let segWidth = pWidth / segs;
+
+    for(let i=0; i<segs; i++) {
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        let startX = -pWidth/2 + (i * segWidth);
+        let endX = startX + segWidth;
+        
+        // Arc for top
+        ctx.arc(0, -50, pWidth/2, Math.PI + (i * Math.PI/segs), Math.PI + ((i+1) * Math.PI/segs));
+        
+        // Scalloped bottom
+        ctx.lineTo(endX, -50);
+        ctx.quadraticCurveTo(startX + segWidth/2, -55, startX, -50);
+        ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    // Skydiver Body
+    ctx.fillStyle = "#333";
+    ctx.fillRect(-5, -5, 10, 15); // Torso
+    ctx.beginPath(); ctx.arc(0, -8, 6, 0, Math.PI*2); ctx.fill(); // Head
+    // Limbs flailing slightly based on velocity
+    let limbSway = Math.sin(Date.now()*0.01) * 3;
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 3;
+    // Arms
+    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-12, -5 + limbSway); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(12, -5 - limbSway); ctx.stroke();
+    // Legs
+    ctx.beginPath(); ctx.moveTo(-3, 10); ctx.lineTo(-6, 20 - limbSway); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(3, 10); ctx.lineTo(6, 20 + limbSway); ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawParachuteLanded(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Draw character standing
+    ctx.fillStyle = "#333";
+    ctx.fillRect(-5, -20, 10, 15); 
+    ctx.beginPath(); ctx.arc(0, -23, 6, 0, Math.PI*2); ctx.fill();
+    // Legs
+    ctx.fillRect(-4, -5, 3, 10);
+    ctx.fillRect(1, -5, 3, 10);
+    // Deflated canopy behind
+    ctx.fillStyle = (PALETTES.parachute[gameSave.skins.parachute] || PALETTES.parachute.base)[0];
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 40, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+
+// --- MAIN LOOP ---
+
+function gameLoop(timestamp) {
+    let dt = (timestamp - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; // Cap delta time
+    lastTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+
+// --- UI LOGIC ---
+
+function startGame() {
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    round = 1;
+    score = 0;
+    initRound();
+}
+
+function nextRound() {
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    round++;
+    initRound();
+}
+
+function resetGame() {
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    round = 1;
+    score = 0;
+    initRound();
+}
+
+function updateHUD() {
+    document.getElementById('round-display').innerText = round;
+    document.getElementById('score-display').innerText = score;
+}
+
+function updateWindIndicator() {
+    let maxWind = canvas.width * 0.25; // arbitrary scale for visual
+    let windRatio = environment.wind / maxWind; // -1 to 1
+    windRatio = Math.max(-1, Math.min(1, windRatio));
+
+    let fill = document.getElementById('wind-fill');
+    let arrow = document.getElementById('wind-arrow');
+    let text = document.getElementById('wind-text');
+
+    let w = Math.abs(windRatio) * 100;
+    fill.style.width = `${w}%`;
+    
+    if (windRatio > 0) {
+        // Wind blowing Right
+        fill.style.marginLeft = '50%';
+        fill.style.background = '#00f2fe';
+        arrow.style.transform = 'scaleX(1)';
+        text.innerText = `${Math.round(w)} mph →`;
+    } else if (windRatio < 0) {
+        // Wind blowing Left
+        fill.style.marginLeft = `${50 - w}%`;
+        fill.style.background = '#e74c3c';
+        text.innerText = `← ${Math.round(w)} mph`;
+    } else {
+        fill.style.width = '0%';
+        text.innerText = `0 mph`;
+    }
+}
+
+function showToast(msg) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+        if(container.contains(toast)) container.removeChild(toast);
+    }, 2500);
+}
+
+
+// --- SHOP LOGIC ---
+
+function showShop() {
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('shop').classList.remove('hidden');
+    renderShop();
+}
+
+function hideShop() {
+    document.getElementById('shop').classList.add('hidden');
+    if (gameState === 'MENU') {
+        document.getElementById('main-menu').classList.remove('hidden');
+    } else {
+        document.getElementById('game-over').classList.remove('hidden');
+    }
+}
+
+function renderShop() {
+    const container = document.getElementById('shop-container');
+    container.innerHTML = '';
+
+    Object.keys(SHOP_ITEMS).forEach(key => {
+        const item = SHOP_ITEMS[key];
+        const card = document.createElement('div');
+        card.className = 'shop-item';
+
+        let topHTML = `<div class="item-title">${item.name}</div>`;
+        let btnHTML = '';
+        
+        if (item.type === 'upgrade') {
+            let currentLevel = gameSave.upgrades[key] || 0;
+            topHTML += `<div class="item-level">Lvl ${currentLevel}/${item.maxLevel}</div>`;
+            
+            if (currentLevel >= item.maxLevel) {
+                btnHTML = `<button class="buy-btn equipped">MAXED</button>`;
+            } else {
+                let cost = item.costs[currentLevel];
+                btnHTML = `<button class="buy-btn" onclick="buyUpgrade('${key}', ${cost})">Upgrade (${cost} SB)</button>`;
+            }
+        } else if (item.type === 'skin') {
+            let isUnlocked = gameSave.unlocked[item.category].includes(item.id);
+            let isEquipped = gameSave.skins[item.category] === item.id;
+
+            if (isEquipped) {
+                btnHTML = `<button class="buy-btn equipped">Equipped</button>`;
+            } else if (isUnlocked) {
+                btnHTML = `<button class="buy-btn equip" onclick="equipSkin('${item.category}', '${item.id}')">Equip</button>`;
+            } else {
+                btnHTML = `<button class="buy-btn" onclick="buySkin('${key}', '${item.category}', '${item.id}', ${item.cost})">Buy (${item.cost} SB)</button>`;
+            }
+        }
+
+        card.innerHTML = `
+            <div class="item-header">
+                ${topHTML}
+            </div>
+            <div class="item-desc">${item.desc}</div>
+            ${btnHTML}
+        `;
+        container.appendChild(card);
+    });
+}
+
+function buyUpgrade(key, cost) {
+    requestPurchase(key, cost, () => {
+        gameSave.upgrades[key]++;
+        showToast(`${SHOP_ITEMS[key].name} Upgraded!`);
+    });
+}
+
+function buySkin(key, category, id, cost) {
+    requestPurchase(key, cost, () => {
+        gameSave.unlocked[category].push(id);
+        gameSave.skins[category] = id; // Auto equip
+        showToast(`${SHOP_ITEMS[key].name} Unlocked!`);
+    });
+}
+
+function equipSkin(category, id) {
+    gameSave.skins[category] = id;
+    saveGameData();
+    renderShop();
+    showToast(`Equipped!`);
+}
+
+// --- BOOT ---
+// Draw initial background before play starts
+ctx.fillStyle = PALETTES.theme.day.top;
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

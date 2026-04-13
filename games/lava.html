@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lava Step</title>
+    <style>
+        :root {
+            --primary: #ff4d00;
+            --secondary: #ffaa00;
+            --bg-dark: #110000;
+            --panel-bg: rgba(20, 0, 0, 0.85);
+            --text-main: #ffffff;
+            --ui-glow: 0 0 10px rgba(255, 77, 0, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%);
+            transition: opacity 0.3s ease;
+            pointer-events: none; /* Fixed: Prevents invisible screens from blocking clicks */
+            opacity: 0;
+            z-index: -1;
+        }
+
+        .screen.active {
+            opacity: 1;
+            z-index: 10;
+            pointer-events: auto; /* Fixed: Only the active screen captures clicks */
+        }
+
+        /* Loading Screen */
+        #loading {
+            background: var(--bg-dark);
+            color: var(--primary);
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: var(--ui-glow);
+            z-index: 100;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 77, 0, 0.3);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Titles & Text */
+        h1 {
+            font-size: 48px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px var(--primary), 0 0 30px var(--secondary);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 32px;
+            color: var(--secondary);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+        }
+
+        p {
+            color: #ccc;
+            font-size: 18px;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.4;
+        }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(135deg, #441100, #220000);
+            border: 2px solid var(--primary);
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px 40px;
+            margin: 10px;
+            border-radius: 30px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(255, 77, 0, 0.4);
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            pointer-events: auto;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #661a00, #440000);
+            box-shadow: 0 0 25px rgba(255, 77, 0, 0.8);
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            background: #222;
+            border-color: #555;
+            color: #777;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Shop UI */
+        .shop-container {
+            background: var(--panel-bg);
+            border: 2px solid var(--primary);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(255, 77, 0, 0.2);
+        }
+
+        .shop-category {
+            font-size: 20px;
+            color: #fff;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid var(--primary);
+            padding-bottom: 5px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 77, 0, 0.3);
+            transition: background 0.2s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .item-info h3 {
+            color: #fff;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .item-info p {
+            font-size: 14px;
+            color: #aaa;
+            margin: 0;
+            text-align: left;
+        }
+
+        .shop-btn {
+            font-size: 14px;
+            padding: 10px 20px;
+            margin: 0;
+        }
+
+        /* HUD & Controls */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 5;
+        }
+
+        #hud.active {
+            opacity: 1;
+        }
+
+        #hud.active .mobile-controls {
+            pointer-events: auto; /* Fixed: Enable clicks only when HUD is active */
+        }
+
+        .mobile-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            pointer-events: none; /* Fixed: Prevents invisible HUD from blocking UI layer clicks */
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            color: white;
+            font-size: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: all 0.1s;
+        }
+
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.9);
+            border-color: var(--secondary);
+            box-shadow: 0 0 20px var(--secondary);
+        }
+
+        @media (min-width: 768px) {
+            .mobile-controls {
+                display: none;
+            }
+            .help-text {
+                position: absolute;
+                bottom: 30px;
+                width: 100%;
+                text-align: center;
+                color: rgba(255,255,255,0.5);
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Loading -->
+        <div id="loading" class="screen active">
+            <div class="spinner"></div>
+            <div>Syncing Data...</div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="mainMenu" class="screen">
+            <h1>Lava Step</h1>
+            <p>Leap quickly. The lava is rising.<br>Path changes every step.</p>
+            <div style="font-size: 20px; color: var(--secondary); margin-bottom: 20px;" id="menuHighScore">High Score: 0</div>
+            <button onclick="startGame()">Play</button>
+            <button onclick="showShop()">Shop</button>
+        </div>
+
+        <!-- Shop -->
+        <div id="shopMenu" class="screen">
+            <h2>SimgaShop</h2>
+            <div class="shop-container" id="shopItems">
+                <!-- Injected via JS -->
+            </div>
+            <button onclick="showMenu()" style="margin-top: 20px;">Back to Menu</button>
+        </div>
+
+        <!-- Game Over -->
+        <div id="gameOver" class="screen">
+            <h1 style="color: #ff2222; text-shadow: 0 0 20px #ff0000;">Burned!</h1>
+            <div class="score-box" style="margin-bottom: 20px;">Score: <span id="finalScore">0</span></div>
+            <p id="sbEarnedMsg" style="color: #00ffaa; font-weight: bold; font-size: 20px; text-shadow: 0 0 10px #00ffaa;">+0 SimgaBucks Earned</p>
+            <button onclick="startGame()">Play Again</button>
+            <button onclick="showMenu()">Main Menu</button>
+        </div>
+
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="top-bar">
+            <div class="score-box" id="hudScore">0</div>
+            <div class="score-box" style="font-size: 18px; border-color: #00ffaa; color: #00ffaa;" id="hudShields">Shields: 0</div>
+        </div>
+        <div class="help-text">Use Arrow Keys (Left, Up, Right) to Jump</div>
+        <div class="mobile-controls">
+            <div class="control-btn" id="btnLeft">←</div>
+            <div class="control-btn" id="btnUp">↑</div>
+            <div class="control-btn" id="btnRight">→</div>
+        </div>
+    </div>
+
+<script>
+/**
+ * LAVA STEP - HTML5 Canvas Game
+ * Integrates SimgaBucks platform APIs.
+ */
+
+const GAME_ID = "lavaStep";
+
+// --- STATE & DATA ---
+let saveData = {
+    upgrades: {
+        skins: ['core'],
+        trails: ['dust'],
+        shieldCount: 0
+    },
+    equippedSkin: 'core',
+    equippedTrail: 'dust',
+    highScore: 0
+};
+
+const SHOP_CATALOG = [
+    { id: 'plasma', type: 'skin', name: 'Plasma Skin', desc: 'Cyan glowing core', cost: 15 },
+    { id: 'void', type: 'skin', name: 'Void Skin', desc: 'Dark matter energy', cost: 30 },
+    { id: 'spark', type: 'trail', name: 'Spark Trail', desc: 'Golden particle trail', cost: 20 },
+    { id: 'shield', type: 'consumable', name: 'Lava Shield', desc: 'Saves you from 1 mistake. Stackable.', cost: 15 }
+];
+
+let pendingPurchase = null;
+let gameState = 'LOADING'; // LOADING, MENU, PLAYING, GAMEOVER, SHOP
+let sbEarnedThisRun = 0;
+let bufferedInput = null; // Stores input if pressed mid-jump
+
+// --- PLATFORM COMMS ---
+function sendLoadData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Fallback if platform doesn't respond
+    setTimeout(() => {
+        if (gameState === 'LOADING') {
+            console.log("Load timeout, starting with default save.");
+            finishLoading();
+        }
+    }, 3000);
+
+    // Setup listener
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            if (data.data) {
+                // Merge loaded data
+                saveData.upgrades = data.data.upgrades || saveData.upgrades;
+                saveData.equippedSkin = data.data.equippedSkin || saveData.equippedSkin;
+                saveData.equippedTrail = data.data.equippedTrail || saveData.equippedTrail;
+                saveData.highScore = data.data.highScore || 0;
+                
+                // Ensure default arrays exist
+                if (!saveData.upgrades.skins) saveData.upgrades.skins = ['core'];
+                if (!saveData.upgrades.trails) saveData.upgrades.trails = ['dust'];
+                if (saveData.upgrades.shieldCount === undefined) saveData.upgrades.shieldCount = 0;
+            }
+            if (gameState === 'LOADING') finishLoading();
+        }
+
+        if (data.type === "spendResponse") {
+            handlePurchaseResponse(data);
+        }
+    });
+}
+
+function sendSaveData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function giveSimgaBucks(amount) {
+    if (amount <= 0) return;
+    sbEarnedThisRun += amount;
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    spawnFloatingText(`+${amount} SB`, player.pxX, player.pxY - 50, '#00ffaa');
+}
+
+function requestPurchase(itemId, cost) {
+    const item = SHOP_CATALOG.find(i => i.id === itemId);
+    if (!item) return;
+
+    pendingPurchase = item;
+    const msgId = Math.random().toString(36);
+    
+    // Disable shop buttons
+    renderShop(true);
+
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+function handlePurchaseResponse(data) {
+    if (data.success && pendingPurchase) {
+        // Apply upgrade
+        const item = pendingPurchase;
+        if (item.type === 'skin') {
+            if (!saveData.upgrades.skins.includes(item.id)) saveData.upgrades.skins.push(item.id);
+            saveData.equippedSkin = item.id;
+        } else if (item.type === 'trail') {
+            if (!saveData.upgrades.trails.includes(item.id)) saveData.upgrades.trails.push(item.id);
+            saveData.equippedTrail = item.id;
+        } else if (item.type === 'consumable') {
+            saveData.upgrades.shieldCount++;
+        }
+        sendSaveData();
+        renderShop();
+    } else {
+        alert("Purchase failed. Not enough SimgaBucks or connection error.");
+        renderShop();
+    }
+    pendingPurchase = null;
+}
+
+// --- ENGINE & GAME LOGIC ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+let width, height;
+let centerX, centerY;
+let lastTime = performance.now();
+
+// Game Settings
+const TILE_SIZE = 80;
+const TILE_DEPTH = 25;
+let lavaSpeedBase = 1.2; // Lowered from 1.8 to make horizontal path sections much fairer
+let lavaSpeed = lavaSpeedBase;
+
+// Game State Variables
+let path = [];
+let currentIndex = 0;
+let lavaY = -3; // Measured in tile indices from start
+let score = 0;
+let nextRewardScore = 10;
+let cameraX = 0;
+let cameraY = 0;
+let shake = 0;
+let particles = [];
+let floatingTexts = [];
+
+// Player Entity
+const player = {
+    x: 0,
+    y: 0,
+    pxX: 0,
+    pxY: 0,
+    isJumping: false,
+    jumpProgress: 0,
+    jumpStartX: 0,
+    jumpStartY: 0,
+    jumpEndX: 0,
+    jumpEndY: 0,
+    trail: []
+};
+
+// Skin Configs
+const SKINS = {
+    'core': { color: '#ffffff', glow: '#ff8800' },
+    'plasma': { color: '#e0ffff', glow: '#00eeff' },
+    'void': { color: '#220033', glow: '#aa00ff' }
+};
+
+const TRAILS = {
+    'dust': { color: 'rgba(255,200,100,0.5)', type: 'line' },
+    'spark': { color: '#ffea00', type: 'particles' }
+};
+
+// Initialization
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    centerX = width / 2;
+    centerY = height * 0.75; // Player sits in lower half
+}
+window.addEventListener('resize', resize);
+resize();
+
+function finishLoading() {
+    document.getElementById('menuHighScore').innerText = `High Score: ${saveData.highScore}`;
+    switchScreen('mainMenu');
+}
+
+function switchScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    document.getElementById('hud').classList.remove('active');
+    
+    // Fixed: check if the targeted screen element exists so we don't crash
+    if (screenId) {
+        const targetElement = document.getElementById(screenId);
+        if (targetElement) {
+            targetElement.classList.add('active');
+        }
+    }
+    
+    if (screenId === 'playing') {
+        document.getElementById('hud').classList.add('active');
+        gameState = 'PLAYING';
+    } else {
+        gameState = screenId ? screenId.toUpperCase().replace('MENU', '') : 'IDLE';
+    }
+}
+
+function startGame() {
+    score = 0;
+    sbEarnedThisRun = 0;
+    nextRewardScore = 10;
+    lavaSpeed = lavaSpeedBase;
+    lavaY = -4; // Starts safely behind
+    path = [];
+    particles = [];
+    floatingTexts = [];
+    bufferedInput = null;
+    
+    // Gen initial path
+    path.push({ x: 0, y: 0, dir: 'forward' });
+    for(let i=0; i<20; i++) extendPath();
+    
+    currentIndex = 0;
+    player.x = 0;
+    player.y = 0;
+    player.isJumping = false;
+    player.missed = false; // Fixed: Clears the missed jump flag from the previous run
+    player.trail = [];
+    
+    updateHUD();
+    switchScreen('playing');
+}
+
+function endGame() {
+    gameState = 'GAMEOVER';
+    shake = 30;
+    createExplosion(player.pxX, player.pxY, SKINS[saveData.equippedSkin].glow, 50);
+    
+    // High Score tracking
+    if (score > saveData.highScore) {
+        saveData.highScore = score;
+        document.getElementById('menuHighScore').innerText = `High Score: ${saveData.highScore}`;
+    }
+    
+    // End of run bonus reward
+    if (score > 100) {
+        giveSimgaBucks(3);
+    }
+    
+    sendSaveData();
+    
+    setTimeout(() => {
+        document.getElementById('finalScore').innerText = score;
+        document.getElementById('sbEarnedMsg').innerText = `+${sbEarnedThisRun} SimgaBucks Earned`;
+        switchScreen('gameOver');
+    }, 1500);
+}
+
+// --- LOGIC ---
+function extendPath() {
+    let last = path[path.length - 1];
+    let dirs = ['forward', 'left', 'right'];
+    
+    // Prevent backward/U-turns
+    if (last.dir === 'left') dirs = ['forward', 'left'];
+    if (last.dir === 'right') dirs = ['forward', 'right'];
+    
+    // Soft boundaries to keep path somewhat centered
+    if (last.x <= -2) dirs = dirs.filter(d => d !== 'left');
+    if (last.x >= 2) dirs = dirs.filter(d => d !== 'right');
+    
+    // Bias forward slightly
+    if (Math.random() < 0.3) dirs.push('forward');
+    
+    let nextDir = dirs[Math.floor(Math.random() * dirs.length)];
+    let nextX = last.x + (nextDir === 'left' ? -1 : nextDir === 'right' ? 1 : 0);
+    let nextY = last.y + (nextDir === 'forward' ? 1 : 0);
+    
+    path.push({ x: nextX, y: nextY, dir: nextDir });
+}
+
+function processInput(dir) {
+    if (gameState !== 'PLAYING') return;
+    
+    if (player.isJumping) {
+        bufferedInput = dir; // Buffer the input so it isn't lost if pressed slightly early
+        return;
+    }
+    
+    let targetX = player.x;
+    let targetY = player.y;
+    
+    if (dir === 'left') targetX--;
+    else if (dir === 'right') targetX++;
+    else if (dir === 'forward') targetY++;
+    
+    // Find if target is on path
+    let foundIndex = -1;
+    // Search forward from current
+    for (let i = currentIndex + 1; i < path.length; i++) {
+        if (path[i].x === targetX && path[i].y === targetY) {
+            foundIndex = i;
+            break;
+        }
+        // If we skipped tiles to jump forward, we might fail. 
+        // Lava Step usually requires precise stepping.
+        if (i > currentIndex + 3) break; 
+    }
+    
+    player.jumpStartX = player.pxX;
+    player.jumpStartY = player.pxY;
+    
+    // Setup pixel targets for jump animation
+    let targetPxX = targetX * TILE_SIZE;
+    let targetPxY = -targetY * TILE_SIZE;
+    
+    player.jumpEndX = targetPxX;
+    player.jumpEndY = targetPxY;
+    player.isJumping = true;
+    player.jumpProgress = 0;
+    
+    if (foundIndex !== -1) {
+        // Safe jump
+        currentIndex = foundIndex;
+        player.x = targetX;
+        player.y = targetY;
+        
+        // Add score for each tile advanced
+        let scoreGain = foundIndex - (currentIndex === foundIndex ? currentIndex - 1 : currentIndex) || 1;
+        score += scoreGain;
+        updateHUD();
+        
+        // SimgaBucks Economy Logic
+        checkRewards();
+        
+        // Speed up lava
+        lavaSpeed = lavaSpeedBase + (score * 0.015);
+        
+        // Generate more path
+        if (path.length - currentIndex < 15) {
+            for(let i=0; i<5; i++) extendPath(); // Fixed: Typo in the for loop condition
+        }
+    } else {
+        // Missed! Jumping into lava.
+        player.x = targetX;
+        player.y = targetY;
+        player.missed = true; // Flag to kill on land
+    }
+}
+
+function checkRewards() {
+    if (score >= nextRewardScore) {
+        // First reward at 10, then every 30
+        if (nextRewardScore === 10) {
+            giveSimgaBucks(1);
+            nextRewardScore = 40;
+        } else {
+            giveSimgaBucks(2);
+            nextRewardScore += 30;
+        }
+    }
+}
+
+function useShield() {
+    if (saveData.upgrades.shieldCount > 0) {
+        saveData.upgrades.shieldCount--;
+        updateHUD();
+        createExplosion(player.pxX, player.pxY, '#00ffaa', 30);
+        spawnFloatingText("SHIELD!", player.pxX, player.pxY - 80, '#00ffaa');
+        // Instantly generate a temporary glass platform at current missed coords
+        path.splice(currentIndex + 1, 0, { x: player.x, y: player.y, dir: 'forward', isGlass: true });
+        currentIndex++;
+        player.missed = false;
+        return true;
+    }
+    return false;
+}
+
+function updateHUD() {
+    document.getElementById('hudScore').innerText = score;
+    document.getElementById('hudShields').innerText = `Shields: ${saveData.upgrades.shieldCount}`;
+}
+
+// --- INPUT LISTENERS ---
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') processInput('left');
+    if (e.key === 'ArrowRight' || e.key === 'd') processInput('right');
+    if (e.key === 'ArrowUp' || e.key === 'w') processInput('forward');
+});
+
+document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); processInput('left'); });
+document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); processInput('right'); });
+document.getElementById('btnUp').addEventListener('touchstart', (e) => { e.preventDefault(); processInput('forward'); });
+// Mouse fallback for mobile buttons testing
+document.getElementById('btnLeft').addEventListener('mousedown', (e) => { processInput('left'); });
+document.getElementById('btnRight').addEventListener('mousedown', (e) => { processInput('right'); });
+document.getElementById('btnUp').addEventListener('mousedown', (e) => { processInput('forward'); });
+
+// --- EFFECTS ---
+function createExplosion(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 5 + 2;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            color: color,
+            size: Math.random() * 4 + 2
+        });
+    }
+}
+
+function spawnFloatingText(text, x, y, color) {
+    floatingTexts.push({
+        text: text,
+        x: x,
+        y: y,
+        life: 1.0,
+        color: color
+    });
+}
+
+// --- UPDATE & RENDER LOOP ---
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+    
+    // Update Lava
+    lavaY += lavaSpeed * dt;
+    
+    // Player Camera target (smooth follow)
+    let targetCamX = player.pxX;
+    let targetCamY = player.pxY;
+    
+    cameraX += (targetCamX - cameraX) * 10 * dt;
+    cameraY += (targetCamY - cameraY) * 10 * dt;
+    
+    // Jump Logic
+    if (player.isJumping) {
+        player.jumpProgress += dt * 6; // Snappier jump speed
+        if (player.jumpProgress >= 1) {
+            player.jumpProgress = 1;
+            player.isJumping = false;
+            
+            // Landed
+            player.pxX = player.jumpEndX;
+            player.pxY = player.jumpEndY;
+            
+            // Effect on land
+            createExplosion(player.pxX, player.pxY, SKINS[saveData.equippedSkin].glow, 10);
+            
+            if (player.missed) {
+                if (!useShield()) {
+                    endGame();
+                }
+            } else if (gameState === 'PLAYING' && bufferedInput) {
+                // Execute immediately if there was a buffered input
+                let next = bufferedInput;
+                bufferedInput = null;
+                processInput(next);
+            }
+        } else {
+            // Lerp with actual easing applied
+            let ease = Math.sin(player.jumpProgress * Math.PI / 2); // Ease out
+            player.pxX = player.jumpStartX + (player.jumpEndX - player.jumpStartX) * ease;
+            player.pxY = player.jumpStartY + (player.jumpEndY - player.jumpStartY) * ease;
+        }
+    } else {
+        // Idle follow target
+        player.pxX = player.x * TILE_SIZE;
+        player.pxY = -player.y * TILE_SIZE;
+    }
+    
+    // Check death by lava wave (moved outside !isJumping so death is accurate to your target tile)
+    if (!player.missed && gameState === 'PLAYING') {
+        if (-player.y > -lavaY + 0.5) { // Lava overtook player
+            if (!useShield()) {
+                endGame();
+            } else {
+                lavaY -= 3; // Push lava back a bit if shielded
+            }
+        }
+    }
+    
+    // Trail logic
+    if (player.isJumping || player.trail.length > 0) {
+        // Z-height calculation for trail arc
+        let z = player.isJumping ? Math.sin(player.jumpProgress * Math.PI) * 40 : 0;
+        
+        player.trail.unshift({
+            x: player.pxX,
+            y: player.pxY - z,
+            life: 1.0
+        });
+        if (player.trail.length > 20) player.trail.pop();
+    }
+    
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= dt * 1.5;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+    
+    // Update Texts
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        let ft = floatingTexts[i];
+        ft.y -= dt * 30;
+        ft.life -= dt * 1.2;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+    }
+    
+    // Shake decay
+    if (shake > 0) shake = Math.max(0, shake - dt * 60);
+}
+
+function drawGridTile(ctx, screenX, screenY, state, distFromLava, isGlass) {
+    let topColor, side1, side2;
+    let yOffset = 0;
+    
+    if (isGlass) {
+        topColor = 'rgba(0, 255, 170, 0.4)';
+        side1 = 'rgba(0, 200, 150, 0.3)';
+        side2 = 'rgba(0, 150, 100, 0.3)';
+    } else {
+        if (state === 'sinking') {
+            // Heat up
+            let heat = Math.max(0, 1 - (distFromLava / 2));
+            let r = Math.floor(80 + 175 * heat);
+            let g = Math.floor(80 - 80 * heat);
+            let b = 80 - 80 * heat;
+            topColor = `rgb(${r},${g},${b})`;
+            side1 = `rgb(${r*0.7},${g*0.7},${b*0.7})`;
+            side2 = `rgb(${r*0.5},${g*0.5},${b*0.5})`;
+            
+            // Sinking fall offset
+            if (distFromLava < 0.5) {
+                yOffset = (0.5 - distFromLava) * 100;
+            }
+            
+        } else {
+            topColor = '#4a4a5a';
+            side1 = '#3a3a4a';
+            side2 = '#2a2a3a';
+        }
+    }
+
+    screenY += yOffset;
+
+    let hw = TILE_SIZE / 2 - 2;
+    let hh = TILE_SIZE / 2 - 2;
+    
+    // Shadow / depth logic
+    
+    // Top Face
+    ctx.fillStyle = topColor;
+    ctx.beginPath();
+    ctx.moveTo(screenX - hw, screenY - hh);
+    ctx.lineTo(screenX + hw, screenY - hh);
+    ctx.lineTo(screenX + hw, screenY + hh);
+    ctx.lineTo(screenX - hw, screenY + hh);
+    ctx.fill();
+    
+    if (!isGlass) {
+        // Inner detail
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(screenX - hw + 4, screenY - hh + 4, TILE_SIZE - 12, TILE_SIZE - 12);
+    }
+    
+    // Front Face (3D effect)
+    ctx.fillStyle = side1;
+    ctx.beginPath();
+    ctx.moveTo(screenX - hw, screenY + hh);
+    ctx.lineTo(screenX + hw, screenY + hh);
+    ctx.lineTo(screenX + hw, screenY + hh + TILE_DEPTH);
+    ctx.lineTo(screenX - hw, screenY + hh + TILE_DEPTH);
+    ctx.fill();
+}
+
+function draw() {
+    // 1. Draw Deep Lava Background
+    ctx.fillStyle = '#1a0000';
+    ctx.fillRect(0, 0, width, height);
+    
+    let time = performance.now() * 0.001;
+    
+    // Dynamic lava layers
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 3; i++) {
+        let py = (time * 50 + i * 200) % height;
+        let pSize = 300 + Math.sin(time + i) * 100;
+        let grad = ctx.createRadialGradient(width/2 + Math.sin(time*0.5+i)*200, height - py, 0, width/2, height - py, pSize);
+        grad.addColorStop(0, i===0?'rgba(255, 100, 0, 0.4)':'rgba(255, 30, 0, 0.3)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Apply Camera & Shake
+    ctx.save();
+    
+    if (shake > 0) {
+        ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    }
+    
+    let renderCamX = cameraX;
+    let renderCamY = cameraY;
+
+    // We want the player to visually sit at (centerX, centerY)
+    let offsetX = centerX - renderCamX;
+    let offsetY = centerY - renderCamY;
+    
+    // 2. Draw Tiles
+    // Sort tiles by Y to ensure correct 3D overlap (bottom ones drawn last)
+    let visibleTiles = path.filter(t => {
+        let py = -t.y * TILE_SIZE;
+        // Screen cull
+        let screenY = py + offsetY;
+        return screenY > -100 && screenY < height + 200;
+    });
+    
+    // Draw back-to-front
+    visibleTiles.sort((a, b) => (-a.y) - (-b.y));
+    
+    for (let t of visibleTiles) {
+        let tpx = t.x * TILE_SIZE;
+        let tpy = -t.y * TILE_SIZE;
+        
+        let screenX = tpx + offsetX;
+        let screenY = tpy + offsetY;
+        
+        let distFromLava = t.y - lavaY;
+        
+        if (distFromLava < -1) continue; // Sunk deep
+        
+        let state = distFromLava < 2 ? 'sinking' : 'normal';
+        drawGridTile(ctx, screenX, screenY, state, distFromLava, t.isGlass);
+        
+        // Highlight next step slightly
+        if (t === path[currentIndex + 1] && gameState === 'PLAYING') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            let hw = TILE_SIZE / 2 - 2;
+            let hh = TILE_SIZE / 2 - 2;
+            ctx.strokeRect(screenX - hw, screenY - hh, TILE_SIZE-4, TILE_SIZE-4);
+        }
+    }
+    
+    // 3. Draw Player
+    if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+        let px = player.pxX + offsetX;
+        let py = player.pxY + offsetY;
+        
+        let z = 0;
+        if (player.isJumping) {
+            z = Math.sin(player.jumpProgress * Math.PI) * 40; // Arc height
+        }
+        
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(px, py + TILE_SIZE/4, 15 - z/5, 8 - z/10, 0, 0, Math.PI*2);
+        ctx.fill();
+        
+        // Trail
+        let trailConf = TRAILS[saveData.equippedTrail];
+        if (player.trail.length > 1) {
+            if (trailConf.type === 'line') {
+                ctx.beginPath();
+                ctx.moveTo(player.trail[0].x + offsetX, player.trail[0].y + offsetY);
+                for (let i = 1; i < player.trail.length; i++) {
+                    ctx.lineTo(player.trail[i].x + offsetX, player.trail[i].y + offsetY);
+                }
+                ctx.strokeStyle = trailConf.color;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+            } else {
+                // Particles trail
+                for (let i = 0; i < player.trail.length; i++) {
+                    let pt = player.trail[i];
+                    pt.life -= 0.05;
+                    if (pt.life > 0) {
+                        ctx.fillStyle = trailConf.color;
+                        ctx.globalAlpha = pt.life;
+                        ctx.beginPath();
+                        ctx.arc(pt.x + offsetX, pt.y + offsetY, 5 * pt.life, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+                ctx.globalAlpha = 1.0;
+            }
+        }
+        
+        // Body
+        if (gameState !== 'GAMEOVER') {
+            let skin = SKINS[saveData.equippedSkin] || SKINS['core'];
+            
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = skin.glow;
+            
+            ctx.fillStyle = skin.color;
+            ctx.beginPath();
+            ctx.arc(px, py - z, 15, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Inner core
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(px, py - z, 6, 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+    
+    // 4. Draw Particles
+    for (let p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillRect(p.x + offsetX - p.size/2, p.y + offsetY - p.size/2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1.0;
+    
+    // 5. Draw Floating Texts
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 24px sans-serif';
+    for (let ft of floatingTexts) {
+        ctx.fillStyle = ft.color;
+        ctx.globalAlpha = Math.max(0, ft.life);
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = ft.color;
+        ctx.fillText(ft.text, ft.x + offsetX, ft.y + offsetY);
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1.0;
+    
+    // 6. Lava Overlay / Threat warning
+    let lavaDist = player.y - lavaY;
+    if (lavaDist < 3 && gameState === 'PLAYING') {
+        let warningAlpha = Math.max(0, (3 - lavaDist) / 3 * 0.4);
+        ctx.fillStyle = `rgba(255, 50, 0, ${warningAlpha})`;
+        ctx.fillRect(-offsetX, -offsetY, width, height); // fill relative to camera
+    }
+
+    ctx.restore();
+}
+
+function gameLoop(time) {
+    let dt = (time - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; // Cap delta
+    lastTime = time;
+    
+    update(dt);
+    draw();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// --- SHOP UI ---
+function showMenu() {
+    switchScreen('mainMenu');
+}
+
+function showShop() {
+    renderShop();
+    switchScreen('shopMenu');
+}
+
+function renderShop(disabled = false) {
+    const container = document.getElementById('shopItems');
+    container.innerHTML = '';
+    
+    const categories = { 'skin': 'Skins', 'trail': 'Trails', 'consumable': 'Perks' };
+    
+    let lastCat = '';
+    
+    SHOP_CATALOG.forEach(item => {
+        if (item.type !== lastCat) {
+            let catHeader = document.createElement('div');
+            catHeader.className = 'shop-category';
+            catHeader.innerText = categories[item.type];
+            container.appendChild(catHeader);
+            lastCat = item.type;
+        }
+        
+        let el = document.createElement('div');
+        el.className = 'shop-item';
+        
+        let info = document.createElement('div');
+        info.className = 'item-info';
+        info.innerHTML = `<h3>${item.name}</h3><p>${item.desc}</p>`;
+        
+        let btn = document.createElement('button');
+        btn.className = 'shop-btn';
+        
+        // Determine state
+        let isUnlocked = false;
+        let isEquipped = false;
+        
+        if (item.type === 'skin') {
+            isUnlocked = saveData.upgrades.skins.includes(item.id);
+            isEquipped = saveData.equippedSkin === item.id;
+        } else if (item.type === 'trail') {
+            isUnlocked = saveData.upgrades.trails.includes(item.id);
+            isEquipped = saveData.equippedTrail === item.id;
+        }
+        
+        if (item.type === 'consumable') {
+            btn.innerText = `Buy (${item.cost} SB) [Own: ${saveData.upgrades.shieldCount}]`;
+            btn.onclick = () => requestPurchase(item.id, item.cost);
+        } else {
+            if (isEquipped) {
+                btn.innerText = 'Equipped';
+                btn.disabled = true;
+            } else if (isUnlocked) {
+                btn.innerText = 'Equip';
+                btn.onclick = () => {
+                    if (item.type === 'skin') saveData.equippedSkin = item.id;
+                    if (item.type === 'trail') saveData.equippedTrail = item.id;
+                    sendSaveData();
+                    renderShop();
+                };
+            } else {
+                btn.innerText = `Buy (${item.cost} SB)`;
+                btn.onclick = () => requestPurchase(item.id, item.cost);
+            }
+        }
+        
+        if (disabled && !isUnlocked && item.type !== 'consumable') btn.disabled = true;
+        if (disabled && item.type === 'consumable') btn.disabled = true;
+        
+        el.appendChild(info);
+        el.appendChild(btn);
+        container.appendChild(el);
+    });
+}
+
+// Kickoff
+sendLoadData();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

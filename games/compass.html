@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Compass Dash</title>
+    <style>
+        :root {
+            --bg: #050510;
+            --panel: rgba(15, 15, 30, 0.85);
+            --border: rgba(0, 243, 255, 0.3);
+            --text: #e0e0e0;
+            --accent: #00f3ff;
+            --accent-hover: #5cffff;
+            --danger: #ff0055;
+            --gold: #ffd700;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            overflow: hidden;
+            color: var(--text);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass to canvas when needed */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 243, 255, 0.1) inset;
+            pointer-events: auto;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            display: none;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            display: block;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #b0b0c0;
+        }
+
+        button {
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin: 5px;
+            text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.1) inset;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 20px var(--accent);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-element {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px var(--accent);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Controls Hint Overlay */
+        #controls-hint {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.2rem;
+            pointer-events: none;
+            text-align: center;
+            z-index: 5;
+            transition: opacity 0.5s;
+        }
+
+        /* Shop Styles */
+        .shop-section {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .shop-section h3 {
+            color: var(--accent);
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+        .shop-item:hover {
+            border-color: rgba(255,255,255,0.3);
+        }
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .item-name {
+            font-weight: bold;
+            color: #fff;
+        }
+        .item-desc {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        .buy-btn {
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            min-width: 100px;
+        }
+        .buy-btn.equipped {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: none;
+        }
+        .cost-gold {
+            color: var(--gold);
+            font-weight: bold;
+        }
+
+        /* Notifications */
+        #notifications {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .toast {
+            background: rgba(15, 15, 30, 0.9);
+            border: 1px solid var(--accent);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-weight: bold;
+            animation: slideDown 0.3s ease forwards;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Loading Overlay */
+        #loading-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--accent);
+            font-size: 2rem;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">CONNECTING TO DATABANKS...</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="notifications"></div>
+
+    <div id="controls-hint" style="display: none;">
+        TAP LEFT / RIGHT TO ROTATE<br>
+        (Or use Left/Right Arrow Keys)
+    </div>
+
+    <div class="hud" id="hud" style="display: none;">
+        <div class="hud-element">Wave: <span id="score-display">0</span></div>
+        <div class="hud-element" style="color: var(--gold);">High: <span id="highscore-display">0</span></div>
+    </div>
+
+    <div id="ui-layer">
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen">
+            <h1>COMPASS DASH</h1>
+            <p>Rotate the compass to navigate through the closing hazards.</p>
+            <div style="margin-bottom: 20px; color: var(--gold); font-size: 1.2rem;">
+                High Score: <span id="menu-high-score">0</span>
+            </div>
+            <button onclick="startGame()">START PROTOCOL</button>
+            <button onclick="showScreen('shop-screen')">ARSENAL (SHOP)</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen">
+            <h2>ARSENAL</h2>
+            <div id="shop-content">
+                <!-- Dynamically populated -->
+            </div>
+            <button onclick="showScreen('menu-screen')" style="margin-top: 20px; border-color: #aaa; color: #aaa;">RETURN</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameover-screen" class="screen">
+            <h1 style="color: var(--danger); text-shadow: 0 0 10px var(--danger);">SYSTEM FAILURE</h1>
+            <p style="font-size: 1.5rem; color: #fff;">Wave Reached: <span id="final-score" style="color: var(--accent); font-weight: bold;">0</span></p>
+            <button onclick="startGame()">REBOOT</button>
+            <button onclick="showScreen('menu-screen')" style="border-color: #aaa; color: #aaa;">MAIN MENU</button>
+            <button onclick="showScreen('shop-screen')">UPGRADES</button>
+        </div>
+    </div>
+
+<script>
+    /* =======================================================================
+       1. CORE PLATFORM INTEGRATION & STATE
+    ======================================================================== */
+    const GAME_ID = "compass";
+    let isDataLoaded = false;
+    let pendingPurchase = null;
+
+    // Default Save State
+    let saveData = {
+        highScore: 0,
+        unlockedSkins: ['default'],
+        equippedSkin: 'default',
+        unlockedGlows: ['none'],
+        equippedGlow: 'none',
+        speedLevel: 0,
+        shieldActive: false
+    };
+
+    // Shop Configuration
+    const SHOP_ITEMS = {
+        skins: [
+            { id: 'default', name: 'Standard Arrow', desc: 'Basic geometry.', cost: 0 },
+            { id: 'neon', name: 'Neon Edge', desc: 'Sleek wireframe look.', cost: 20 },
+            { id: 'gold', name: 'Golden Flare', desc: 'Shiny and robust.', cost: 50 },
+            { id: 'prismatic', name: 'Prismatic', desc: 'Ever-shifting colors.', cost: 100 }
+        ],
+        glows: [
+            { id: 'none', name: 'No Glow', desc: 'Keep it clean.', cost: 0 },
+            { id: 'cyan', name: 'Cyan Pulse', desc: 'Radiate digital energy.', cost: 15 },
+            { id: 'crimson', name: 'Crimson Aura', desc: 'Intimidating heat.', cost: 30 }
+        ],
+        upgrades: [
+            { id: 'speed', name: 'Rotation Speed', desc: 'Turn faster to survive longer.', baseCost: 15, isScalable: true, maxLevel: 5 },
+            { id: 'shield', name: 'One-Time Shield', desc: 'Survive one fatal collision.', cost: 20, isConsumable: true }
+        ]
+    };
+
+    // Request Data Load
+    function requestLoad() {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+    }
+
+    // Save Data
+    function saveGameProgress() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    // Give SimgaBucks
+    function rewardSimgaBucks(amount, reason) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        showNotification(`+${amount} SimgaBucks (${reason})`, 'gold');
+    }
+
+    // Request Purchase
+    function attemptPurchase(itemDef, type) {
+        let cost = itemDef.cost;
+        if (itemDef.isScalable) {
+            let currentLevel = saveData.speedLevel;
+            cost = itemDef.baseCost * (currentLevel + 1);
+        }
+
+        const msgId = Math.random().toString(36);
+        pendingPurchase = { id: itemDef.id, type: type, cost: cost, msgId: msgId };
+
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+    }
+
+    // Handle Platform Messages
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        // Load Response
+        if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+            if (data.data) {
+                saveData = { ...saveData, ...data.data };
+                // Ensure arrays exist
+                if (!saveData.unlockedSkins) saveData.unlockedSkins = ['default'];
+                if (!saveData.unlockedGlows) saveData.unlockedGlows = ['none'];
+            }
+            isDataLoaded = true;
+            document.getElementById('loading-screen').style.opacity = '0';
+            setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
+            updateMenuUI();
+            buildShopUI();
+            showScreen('menu-screen');
+        }
+
+        // Spend Response
+        if (data.type === "spendResponse" && pendingPurchase && data.msgId === pendingPurchase.msgId) {
+            if (data.success) {
+                applyPurchase(pendingPurchase);
+                showNotification(`Purchase Successful!`, 'accent');
+            } else {
+                showNotification("Not enough SimgaBucks", 'danger');
+            }
+            pendingPurchase = null;
+        }
+    });
+
+    // Apply successful purchase to local state
+    function applyPurchase(purchase) {
+        if (purchase.type === 'skins') {
+            saveData.unlockedSkins.push(purchase.id);
+            saveData.equippedSkin = purchase.id;
+        } else if (purchase.type === 'glows') {
+            saveData.unlockedGlows.push(purchase.id);
+            saveData.equippedGlow = purchase.id;
+        } else if (purchase.type === 'upgrades') {
+            if (purchase.id === 'speed') {
+                saveData.speedLevel++;
+            } else if (purchase.id === 'shield') {
+                saveData.shieldActive = true;
+            }
+        }
+        saveGameProgress();
+        buildShopUI();
+    }
+
+    // Custom Notification System
+    function showNotification(msg, colorType = 'accent') {
+        const container = document.getElementById('notifications');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = msg;
+        
+        if (colorType === 'danger') toast.style.borderColor = 'var(--danger)';
+        if (colorType === 'gold') toast.style.borderColor = 'var(--gold)';
+        if (colorType === 'accent') toast.style.borderColor = 'var(--accent)';
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    }
+
+    /* =======================================================================
+       2. UI & SHOP LOGIC
+    ======================================================================== */
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (screenId) {
+            document.getElementById(screenId).classList.add('active');
+            document.getElementById('hud').style.display = 'none';
+        } else {
+            // Playing game
+            document.getElementById('hud').style.display = 'flex';
+        }
+    }
+
+    function updateMenuUI() {
+        document.getElementById('menu-high-score').innerText = saveData.highScore;
+        document.getElementById('highscore-display').innerText = saveData.highScore;
+    }
+
+    function buildShopUI() {
+        const container = document.getElementById('shop-content');
+        container.innerHTML = '';
+
+        // Helper to build sections
+        const buildSection = (title, items, type) => {
+            let html = `<div class="shop-section"><h3>${title}</h3>`;
+            items.forEach(item => {
+                let costStr = `<span class="cost-gold">${item.cost} SB</span>`;
+                let btnHtml = '';
+                let isUnlocked = false;
+                let isEquipped = false;
+
+                if (type === 'skins') {
+                    isUnlocked = saveData.unlockedSkins.includes(item.id);
+                    isEquipped = saveData.equippedSkin === item.id;
+                } else if (type === 'glows') {
+                    isUnlocked = saveData.unlockedGlows.includes(item.id);
+                    isEquipped = saveData.equippedGlow === item.id;
+                } else if (type === 'upgrades') {
+                    if (item.id === 'speed') {
+                        let cost = item.baseCost * (saveData.speedLevel + 1);
+                        costStr = `<span class="cost-gold">${cost} SB</span>`;
+                        if (saveData.speedLevel >= item.maxLevel) {
+                            btnHtml = `<button class="buy-btn equipped" disabled>MAX</button>`;
+                        } else {
+                            btnHtml = `<button class="buy-btn" onclick="attemptPurchase({id:'${item.id}', baseCost:${item.baseCost}, isScalable:true}, '${type}')">Buy ${costStr}</button>`;
+                        }
+                    } else if (item.id === 'shield') {
+                        if (saveData.shieldActive) {
+                            btnHtml = `<button class="buy-btn equipped" disabled>READY</button>`;
+                        } else {
+                            btnHtml = `<button class="buy-btn" onclick="attemptPurchase({id:'${item.id}', cost:${item.cost}}, '${type}')">Buy ${costStr}</button>`;
+                        }
+                    }
+                }
+
+                if (type === 'skins' || type === 'glows') {
+                    if (isEquipped) {
+                        btnHtml = `<button class="buy-btn equipped" disabled>EQUIPPED</button>`;
+                    } else if (isUnlocked) {
+                        btnHtml = `<button class="buy-btn" style="border-color:#fff; color:#fff;" onclick="equipItem('${item.id}', '${type}')">EQUIP</button>`;
+                    } else {
+                        btnHtml = `<button class="buy-btn" onclick="attemptPurchase({id:'${item.id}', cost:${item.cost}}, '${type}')">Buy ${costStr}</button>`;
+                    }
+                }
+
+                let extraInfo = '';
+                if (item.id === 'speed') extraInfo = ` (Lv ${saveData.speedLevel}/${item.maxLevel})`;
+
+                html += `
+                    <div class="shop-item">
+                        <div class="item-info">
+                            <span class="item-name">${item.name}${extraInfo}</span>
+                            <span class="item-desc">${item.desc}</span>
+                        </div>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            return html;
+        };
+
+        container.innerHTML += buildSection('Arrow Skins', SHOP_ITEMS.skins, 'skins');
+        container.innerHTML += buildSection('Compass Glows', SHOP_ITEMS.glows, 'glows');
+        container.innerHTML += buildSection('Upgrades', SHOP_ITEMS.upgrades, 'upgrades');
+    }
+
+    function equipItem(id, type) {
+        if (type === 'skins') saveData.equippedSkin = id;
+        if (type === 'glows') saveData.equippedGlow = id;
+        saveGameProgress();
+        buildShopUI();
+    }
+
+
+    /* =======================================================================
+       3. GAME ENGINE & VISUALS
+    ======================================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let w, h, cx, cy;
+    let gameState = 'menu'; // menu, playing, gameover
+    let lastTime = 0;
+    
+    // Game Variables
+    let score = 0;
+    let rings = [];
+    let particles = [];
+    let stars = [];
+    let keys = { left: false, right: false };
+    let touchLeft = false, touchRight = false;
+    let playerAngle = -Math.PI / 2; // Point up initially
+    let screenShake = 0;
+    let timeSinceLastRing = 0;
+    let currentWaveDelay = 2500;
+    let gameTime = 0;
+    let prismaticHue = 0;
+
+    // Resize handling
+    function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        cx = w / 2;
+        cy = h / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    });
+    window.addEventListener('touchstart', (e) => {
+        const x = e.touches[0].clientX;
+        if (x < w/2) touchLeft = true; else touchRight = true;
+        document.getElementById('controls-hint').style.opacity = '0';
+    }, {passive: false});
+    window.addEventListener('touchend', (e) => {
+        touchLeft = false; touchRight = false;
+    });
+    window.addEventListener('mousedown', (e) => {
+        if (gameState !== 'playing') return;
+        if (e.clientX < w/2) touchLeft = true; else touchRight = true;
+        document.getElementById('controls-hint').style.opacity = '0';
+    });
+    window.addEventListener('mouseup', () => { touchLeft = false; touchRight = false; });
+
+    // Math Utils
+    function lerp(start, end, amt) { return (1 - amt) * start + amt * end; }
+    function normalizeAngle(a) { 
+        a = a % (Math.PI * 2); 
+        if (a < 0) a += Math.PI * 2; 
+        return a; 
+    }
+    function angleDiff(a, b) {
+        let d = normalizeAngle(a) - normalizeAngle(b);
+        if (d > Math.PI) d -= Math.PI * 2;
+        if (d < -Math.PI) d += Math.PI * 2;
+        return d;
+    }
+
+    // Background Stars Setup
+    for (let i=0; i<100; i++) {
+        stars.push({
+            x: Math.random() * 2000 - 1000,
+            y: Math.random() * 2000 - 1000,
+            z: Math.random() * 2 + 0.1,
+            size: Math.random() * 2 + 0.5,
+            alpha: Math.random()
+        });
+    }
+
+    class Particle {
+        constructor(x, y, color, speed, life, angle) {
+            this.x = x; this.y = y;
+            this.color = color;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.life = life;
+            this.maxLife = life;
+            this.size = Math.random() * 3 + 1;
+        }
+        update(dt) {
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+            this.life -= dt;
+            // Drag
+            this.vx *= 0.95;
+            this.vy *= 0.95;
+        }
+        draw(ctx) {
+            const alpha = Math.max(0, this.life / this.maxLife);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    class Ring {
+        constructor(wave) {
+            this.radius = Math.max(w, h) * 0.8;
+            this.thickness = 15;
+            this.baseSpeed = 150 + (wave * 8); // pixels per sec
+            this.color = `hsl(${(wave * 15) % 360}, 100%, 60%)`;
+            this.cleared = false;
+            
+            // Generate Gaps
+            this.gaps = [];
+            let numGaps = wave > 10 ? (Math.random() > 0.5 ? 2 : 1) : 1;
+            let gapSize = Math.max(0.4, 1.2 - (wave * 0.03)); // Radians
+
+            let startA = Math.random() * Math.PI * 2;
+            this.gaps.push({ start: startA, end: normalizeAngle(startA + gapSize) });
+
+            if (numGaps > 1) {
+                // Add second gap opposite
+                let startB = normalizeAngle(startA + Math.PI);
+                this.gaps.push({ start: startB, end: normalizeAngle(startB + gapSize) });
+            }
+
+            // Spin effect
+            this.rotation = 0;
+            this.rotSpeed = wave > 5 ? (Math.random() - 0.5) * 0.5 : 0; 
+        }
+
+        update(dt) {
+            this.radius -= this.baseSpeed * dt;
+            this.rotation += this.rotSpeed * dt;
+            
+            if (this.radius < 0) this.radius = 0;
+        }
+
+        draw(ctx) {
+            if (this.radius <= 0) return;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(this.rotation);
+            
+            ctx.lineWidth = this.thickness;
+            ctx.strokeStyle = this.color;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+
+            // Draw solid segments (inverse of gaps)
+            // Sort gaps by start angle
+            let sortedGaps = [...this.gaps].sort((a,b) => a.start - b.start);
+            
+            ctx.beginPath();
+            for (let i = 0; i < sortedGaps.length; i++) {
+                let currentGap = sortedGaps[i];
+                let nextGap = sortedGaps[(i + 1) % sortedGaps.length];
+                
+                let startDraw = currentGap.end;
+                let endDraw = nextGap.start;
+                
+                // If endDraw is less than startDraw, it crosses the 0/2PI line
+                if (endDraw < startDraw && i === sortedGaps.length - 1) {
+                    endDraw += Math.PI * 2;
+                }
+                
+                ctx.arc(0, 0, this.radius, startDraw, endDraw);
+            }
+            ctx.stroke();
+
+            // Inner glowing line
+            ctx.lineWidth = this.thickness * 0.3;
+            ctx.strokeStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        checkCollision(playerAngle) {
+            // Player is hit when ring radius hits player bounds (approx 20px)
+            if (this.radius <= 25 && this.radius > 5 && !this.cleared) {
+                let effectiveAngle = normalizeAngle(playerAngle - this.rotation);
+                
+                // Check if angle is inside ANY gap
+                let inGap = false;
+                for (let gap of this.gaps) {
+                    let s = gap.start;
+                    let e = gap.end;
+                    
+                    if (e < s) { // Gap crosses 0
+                        if (effectiveAngle >= s || effectiveAngle <= e) inGap = true;
+                    } else {
+                        if (effectiveAngle >= s && effectiveAngle <= e) inGap = true;
+                    }
+                }
+                
+                return inGap ? "clear" : "hit";
+            }
+            return "none";
+        }
+    }
+
+    function spawnExplosion(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let speed = Math.random() * 150 + 50;
+            let life = Math.random() * 0.5 + 0.3;
+            particles.push(new Particle(x, y, color, speed, life, angle));
+        }
+    }
+
+    // --- GAME LOOP ---
+    function startGame() {
+        score = 0;
+        rings = [];
+        particles = [];
+        playerAngle = -Math.PI / 2;
+        timeSinceLastRing = 0;
+        currentWaveDelay = 2500;
+        gameTime = 0;
+        
+        document.getElementById('score-display').innerText = '0';
+        showScreen(null);
+        document.getElementById('controls-hint').style.display = 'block';
+        setTimeout(() => document.getElementById('controls-hint').style.opacity = '0', 3000);
+        
+        gameState = 'playing';
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function triggerGameOver() {
+        gameState = 'gameover';
+        screenShake = 20;
+        spawnExplosion(cx, cy, '#ff0055', 50);
+        spawnExplosion(cx, cy, '#fff', 20);
+
+        if (score > saveData.highScore) {
+            saveData.highScore = score;
+            saveGameProgress();
+        }
+
+        document.getElementById('final-score').innerText = score;
+        updateMenuUI();
+
+        setTimeout(() => {
+            showScreen('gameover-screen');
+        }, 1500);
+    }
+
+    function update(dt) {
+        gameTime += dt;
+        prismaticHue = (prismaticHue + dt * 100) % 360;
+
+        // --- Background Stars ---
+        stars.forEach(star => {
+            star.z -= dt * 0.5;
+            if (star.z <= 0) {
+                star.z = 2;
+                star.x = Math.random() * 2000 - 1000;
+                star.y = Math.random() * 2000 - 1000;
+            }
+        });
+
+        if (gameState !== 'playing') {
+            particles.forEach(p => p.update(dt));
+            particles = particles.filter(p => p.life > 0);
+            if (screenShake > 0) screenShake *= 0.9;
+            return;
+        }
+
+        // --- Player Movement ---
+        // Base speed is 3.5 rad/sec. Upgrades add 0.5 rad/sec each.
+        let rotSpeed = 3.5 + (saveData.speedLevel * 0.5); 
+        
+        if (keys.left || touchLeft) playerAngle -= rotSpeed * dt;
+        if (keys.right || touchRight) playerAngle += rotSpeed * dt;
+        playerAngle = normalizeAngle(playerAngle);
+
+        // Player Thruster Particles
+        if ((keys.left || keys.right || touchLeft || touchRight) && Math.random() > 0.5) {
+            let backAngle = playerAngle + Math.PI;
+            let px = cx + Math.cos(backAngle) * 15;
+            let py = cy + Math.sin(backAngle) * 15;
+            particles.push(new Particle(px, py, '#00f3ff', 50, 0.3, backAngle + (Math.random()-0.5)*0.5));
+        }
+
+        // --- Wave Management ---
+        timeSinceLastRing += dt * 1000;
+        if (timeSinceLastRing >= currentWaveDelay) {
+            rings.push(new Ring(score + 1));
+            timeSinceLastRing = 0;
+            currentWaveDelay = Math.max(800, currentWaveDelay * 0.95); // Speed up spawns
+        }
+
+        // --- Ring Logic & Collision ---
+        for (let i = rings.length - 1; i >= 0; i--) {
+            let r = rings[i];
+            r.update(dt);
+
+            let hitStatus = r.checkCollision(playerAngle);
+            
+            if (hitStatus === "hit") {
+                if (saveData.shieldActive) {
+                    // Consume shield
+                    saveData.shieldActive = false;
+                    saveGameProgress();
+                    r.cleared = true; // Force clear
+                    screenShake = 15;
+                    spawnExplosion(cx, cy, '#00f3ff', 30);
+                    showNotification("SHIELD BROKEN!", "accent");
+                    score++;
+                    checkEconomyRewards(score);
+                } else {
+                    triggerGameOver();
+                }
+            } else if (hitStatus === "clear") {
+                r.cleared = true;
+                score++;
+                document.getElementById('score-display').innerText = score;
+                screenShake = 5;
+                spawnExplosion(cx + Math.cos(playerAngle)*30, cy + Math.sin(playerAngle)*30, r.color, 15);
+                checkEconomyRewards(score);
+            }
+
+            if (r.radius <= 0) {
+                rings.splice(i, 1);
+            }
+        }
+
+        // Particles
+        particles.forEach(p => p.update(dt));
+        particles = particles.filter(p => p.life > 0);
+
+        // Shake degrade
+        if (screenShake > 0) {
+            screenShake -= dt * 30;
+            if (screenShake < 0) screenShake = 0;
+        }
+    }
+
+    function checkEconomyRewards(currentScore) {
+        // Economy Guidelines: 
+        // 1st reward in 20-30s. A wave takes ~2.5s initially. Wave 5 is ~12-15s.
+        if (currentScore === 5) rewardSimgaBucks(2, 'Wave 5 Cleared');
+        else if (currentScore === 10) rewardSimgaBucks(3, 'Wave 10 Cleared');
+        else if (currentScore === 20) rewardSimgaBucks(5, 'Boss Wave Cleared');
+        else if (currentScore > 20 && currentScore % 10 === 0) rewardSimgaBucks(4, `Wave ${currentScore} Reached`);
+    }
+
+    function draw() {
+        // Deep space background with slight trails
+        ctx.fillStyle = `rgba(5, 5, 16, 0.4)`;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.save();
+        
+        // Screen Shake Apply
+        if (screenShake > 0) {
+            let dx = (Math.random() - 0.5) * screenShake;
+            let dy = (Math.random() - 0.5) * screenShake;
+            ctx.translate(dx, dy);
+        }
+
+        // Draw Stars (3D perspective illusion)
+        ctx.fillStyle = '#fff';
+        stars.forEach(star => {
+            let sx = cx + (star.x / star.z);
+            let sy = cy + (star.y / star.z);
+            let size = star.size / star.z;
+            if (sx > 0 && sx < w && sy > 0 && sy < h) {
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(sx, sy, size, 0, Math.PI*2);
+                ctx.fill();
+            }
+        });
+        ctx.globalAlpha = 1;
+
+        // Draw Rings
+        rings.forEach(r => r.draw(ctx));
+
+        // Draw Particles
+        particles.forEach(p => p.draw(ctx));
+
+        // Draw Player (if alive)
+        if (gameState !== 'gameover') {
+            drawPlayer();
+        }
+
+        ctx.restore();
+    }
+
+    function drawPlayer() {
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // Draw Compass Glow
+        if (saveData.equippedGlow !== 'none') {
+            let glowColor = saveData.equippedGlow === 'cyan' ? 'rgba(0, 243, 255, 0.4)' : 'rgba(255, 0, 85, 0.4)';
+            let pulse = Math.sin(gameTime * 5) * 5 + 15;
+            let grd = ctx.createRadialGradient(0,0,0, 0,0, pulse + 20);
+            grd.addColorStop(0, glowColor);
+            grd.addColorStop(1, 'transparent');
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(0,0, pulse + 20, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.rotate(playerAngle);
+
+        // Draw Shield
+        if (saveData.shieldActive) {
+            ctx.beginPath();
+            ctx.arc(0, 0, 35, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.lineDashOffset = -gameTime * 20;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00f3ff';
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Skins
+        ctx.shadowBlur = 10;
+        if (saveData.equippedSkin === 'default') {
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(-15, 15);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-15, -15);
+            ctx.closePath();
+            ctx.fill();
+        } 
+        else if (saveData.equippedSkin === 'neon') {
+            ctx.strokeStyle = '#00f3ff';
+            ctx.shadowColor = '#00f3ff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(25, 0);
+            ctx.lineTo(-15, 15);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-15, -15);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0,243,255,0.2)';
+            ctx.fill();
+        }
+        else if (saveData.equippedSkin === 'gold') {
+            let grad = ctx.createLinearGradient(-15, 0, 25, 0);
+            grad.addColorStop(0, '#ffaa00');
+            grad.addColorStop(1, '#ffff00');
+            ctx.fillStyle = grad;
+            ctx.shadowColor = '#ffaa00';
+            ctx.beginPath();
+            ctx.moveTo(25, 0);
+            ctx.lineTo(-15, 18);
+            ctx.lineTo(-8, 0);
+            ctx.lineTo(-15, -18);
+            ctx.closePath();
+            ctx.fill();
+        }
+        else if (saveData.equippedSkin === 'prismatic') {
+            ctx.fillStyle = `hsl(${prismaticHue}, 100%, 60%)`;
+            ctx.shadowColor = `hsl(${prismaticHue}, 100%, 60%)`;
+            ctx.beginPath();
+            ctx.moveTo(25, 0);
+            ctx.lineTo(-15, 15);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-15, -15);
+            ctx.closePath();
+            ctx.fill();
+            // Inner core
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(15, 0);
+            ctx.lineTo(-10, 8);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-10, -8);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function gameLoop(time) {
+        if (!lastTime) lastTime = time;
+        let dt = (time - lastTime) / 1000; // seconds
+        lastTime = time;
+
+        // Limit dt to prevent huge jumps if tab was inactive
+        if (dt > 0.1) dt = 0.1;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // --- INIT SEQUENCE ---
+    // Start drawing background immediately
+    requestAnimationFrame((t) => { lastTime = t; draw(); });
+
+    // Request data from platform
+    setTimeout(() => {
+        requestLoad();
+        // Fallback if not running in iframe/platform doesn't respond
+        setTimeout(() => {
+            if (!isDataLoaded) {
+                console.log("No response from platform, running in standalone mode.");
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
+                updateMenuUI();
+                buildShopUI();
+                showScreen('menu-screen');
+                // Auto game loop for background
+                requestAnimationFrame(gameLoop);
+            }
+        }, 1500);
+    }, 100);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Clockwork Repair</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0502;
+            overflow: hidden;
+            font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+            color: #f2d080;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            /* The canvas internal resolution remains high for crispness, CSS scales it to fit screen */
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* UI Overlays */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 5, 2, 0.85);
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 20px #d9a05b, 2px 2px 0px #000;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #d9a05b;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        .menu-panel {
+            background: linear-gradient(135deg, #2b1b11, #1a0f08);
+            border: 4px solid #8c5b35;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #d9a05b, #8c5b35);
+            border: 2px solid #f2d080;
+            color: #fff;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 8px;
+            text-shadow: 1px 1px 3px #000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            font-family: inherit;
+            transition: all 0.1s ease;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .btn:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .btn:disabled {
+            background: linear-gradient(to bottom, #555, #333);
+            border-color: #777;
+            color: #aaa;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .shop-item {
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #8c5b35;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .shop-item-title { font-weight: bold; margin-bottom: 5px; font-size: 1.2rem; }
+        .shop-item-desc { font-size: 0.9rem; color: #ccc; margin-bottom: 10px; flex-grow: 1; }
+        
+        .buy-btn {
+            background: linear-gradient(to bottom, #2ecc71, #27ae60);
+            border: 2px solid #a8e6cf;
+            font-size: 1.1rem;
+            padding: 10px 20px;
+            width: 100%;
+        }
+
+        /* In-Game HUD Elements */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass to canvas */
+        }
+
+        #hint-btn {
+            position: absolute;
+            bottom: 180px;
+            right: 20px;
+            pointer-events: auto;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            font-size: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #d9a05b, #8c5b35);
+            border: 3px solid #f2d080;
+        }
+        
+        #hint-count {
+            font-size: 0.9rem;
+            background: #000;
+            border-radius: 10px;
+            padding: 2px 8px;
+            margin-top: 5px;
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #d9a05b;
+            color: #f2d080;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            font-size: 1.2rem;
+            animation: slideInFadeOut 3.5s forwards;
+        }
+
+        @keyframes slideInFadeOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 6px solid rgba(255, 255, 255, 0.1);
+            border-top: 6px solid #d9a05b;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD (In-Game UI) -->
+    <div id="hud" class="hidden">
+        <button id="hint-btn" class="btn" onclick="useHint()">
+            Hint
+            <span id="hint-count">0</span>
+        </button>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen">
+        <h1>Clockwork Repair</h1>
+        <div class="spinner"></div>
+        <p>Establishing Connection...</p>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="screen hidden">
+        <div class="menu-panel">
+            <h1>Clockwork Repair</h1>
+            <p>Connect the gears before the machine overloads!</p>
+            <button class="btn" onclick="startLevel()">Start Machine</button>
+            <button class="btn" onclick="showScreen('shop-screen')">Upgrades & Shop</button>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shop-screen" class="screen hidden">
+        <div class="menu-panel" style="max-width: 800px;">
+            <h2>Workshop</h2>
+            <div id="shop-container" class="shop-grid">
+                <!-- Populated by JS -->
+            </div>
+            <button class="btn" onclick="showScreen('main-menu')">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Level Complete Screen -->
+    <div id="level-complete-screen" class="screen hidden">
+        <div class="menu-panel">
+            <h2>Machine Repaired!</h2>
+            <p id="level-stats" style="font-size: 1.2rem; margin-bottom: 20px;"></p>
+            <h3 id="reward-text" style="color: #2ecc71; font-size: 2rem; margin-bottom: 30px;"></h3>
+            <button class="btn" onclick="startLevel()">Next Sector</button>
+            <button class="btn" onclick="showScreen('main-menu')">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen hidden">
+        <div class="menu-panel">
+            <h2 style="color: #e74c3c;">Critical Overload!</h2>
+            <p>The machine pressure exceeded safe limits.</p>
+            <button class="btn" onclick="startLevel()">Retry Sector</button>
+            <button class="btn" onclick="showScreen('main-menu')">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Toasts -->
+    <div id="toast-container"></div>
+</div>
+
+<script>
+    // --- API CONFIGURATION ---
+    const GAME_ID = "clockwork";
+
+    // --- GAME CONSTANTS ---
+    const LOGICAL_W = 1200;
+    const LOGICAL_H = 800;
+    const TRAY_Y = LOGICAL_H - 160;
+    const GEAR_RADII = [30, 45, 60];
+    
+    // --- STATE VARIABLES ---
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency on base canvas
+    
+    let gameState = 'LOADING'; // LOADING, MENU, PLAYING, SHOP, COMPLETE, OVER
+    let lastTime = 0;
+    
+    // Scale tracking for accurate mouse interactions
+    let scaleX = 1;
+    let scaleY = 1;
+
+    // Player Data (Saved/Loaded)
+    let saveObj = {
+        level: 1,
+        skins: ['bronze'],
+        currentSkin: 'bronze',
+        cooling: 0,
+        hasSteam: false,
+        hints: 0,
+        highScore: 0
+    };
+
+    // Shop Configuration
+    const SHOP_ITEMS = [
+        { id: 'skin_bronze', name: 'Bronze Alloy (Default)', cost: 0, type: 'skin', skinId: 'bronze', desc: 'Standard factory gear skin.' },
+        { id: 'skin_silver', name: 'Sterling Steel', cost: 25, type: 'skin', skinId: 'silver', desc: 'Sleek, polished steel finish.' },
+        { id: 'skin_gold', name: 'Aureate Brass', cost: 50, type: 'skin', skinId: 'gold', desc: 'Ornate gold plating for VIPs.' },
+        { id: 'skin_neon', name: 'Plasma Core', cost: 100, type: 'skin', skinId: 'neon', desc: 'Sci-fi neon glowing gears.' },
+        { id: 'upg_cooling', name: 'Cooling System', cost: 30, type: 'cooling', desc: 'Increases max time before overload. (Max 3)', max: 3 },
+        { id: 'upg_steam', name: 'Steam FX Module', cost: 15, type: 'steam', desc: 'Unlocks atmospheric steam particle effects.' },
+        { id: 'cons_hint', name: 'Analyzer Array', cost: 10, type: 'hint', desc: 'Grants 3 Hints. Highlights correct gear placements.' }
+    ];
+    let pendingTransaction = null;
+
+    // Gameplay Elements
+    let pegs = [];
+    let looseGears = [];
+    let particles = [];
+    let bgGears = [];
+    
+    // Mechanics
+    let pressure = 0;
+    let maxPressure = 100;
+    let pressureRate = 1; // Amount per second
+    let machineJammed = false;
+    let draggedGear = null;
+    let targetSpinning = false;
+    let levelStartTime = 0;
+    let bgTime = 0;
+
+    // Hint system
+    let hintActive = false;
+    let hintPeg = null;
+
+    // --- INITIALIZATION ---
+
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Mouse/Touch Events
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+        
+        canvas.addEventListener('touchstart', e => handlePointerDown(e.touches[0]), {passive: false});
+        canvas.addEventListener('touchmove', e => { e.preventDefault(); handlePointerMove(e.touches[0]); }, {passive: false});
+        window.addEventListener('touchend', handlePointerUp);
+
+        // Pre-generate background decorative gears
+        for(let i=0; i<5; i++) {
+            bgGears.push({
+                x: Math.random() * LOGICAL_W,
+                y: Math.random() * LOGICAL_H,
+                r: 150 + Math.random() * 250,
+                speed: (Math.random() - 0.5) * 0.5,
+                angle: Math.random() * Math.PI * 2
+            });
+        }
+
+        // Request Load Data
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+
+        // Listen for Platform Messages
+        window.addEventListener("message", handlePlatformMessage);
+
+        // Start Loop
+        requestAnimationFrame(gameLoop);
+        
+        // Fallback if platform doesn't respond in 2 seconds (e.g., local testing)
+        setTimeout(() => {
+            if (gameState === 'LOADING') {
+                showToast("Local/Fallback Mode Activated");
+                showScreen('main-menu');
+            }
+        }, 2000);
+    }
+
+    function handlePlatformMessage(event) {
+        const data = event.data;
+        if (!data || !data.type) return;
+
+        if (data.type === "loadResponse") {
+            if (data.data) {
+                saveObj = { ...saveObj, ...data.data };
+            }
+            if (gameState === 'LOADING') showScreen('main-menu');
+        } 
+        else if (data.type === "spendResponse") {
+            if (data.success && pendingTransaction) {
+                applyPurchase(pendingTransaction);
+                showToast("Purchase Successful!");
+            } else {
+                showToast("Not enough SimgaBucks!");
+            }
+            pendingTransaction = null;
+            renderShop(); // Refresh UI
+        }
+    }
+
+    function saveGame() {
+        window.parent.postMessage({ type: "saveData", gameId: GAME_ID, data: saveObj }, "*");
+    }
+
+    // --- UI MANAGEMENT ---
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+        document.getElementById('hud').classList.add('hidden');
+        
+        if (screenId && document.getElementById(screenId)) {
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        if (screenId === 'shop-screen') renderShop();
+        if (screenId === 'playing') {
+            document.getElementById('hud').classList.remove('hidden');
+            gameState = 'PLAYING';
+        } else {
+            gameState = screenId === 'main-menu' ? 'MENU' : 
+                        screenId === 'shop-screen' ? 'SHOP' : 
+                        screenId === 'level-complete-screen' ? 'COMPLETE' : 'OVER';
+        }
+    }
+
+    function showToast(msg) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = msg;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
+    }
+
+    // --- SHOP LOGIC ---
+
+    function renderShop() {
+        const container = document.getElementById('shop-container');
+        container.innerHTML = '';
+
+        SHOP_ITEMS.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let html = `<div class="shop-item-title">${item.name}</div>`;
+            html += `<div class="shop-item-desc">${item.desc}</div>`;
+            
+            let btnAction = '';
+            let btnText = '';
+            let btnDisabled = '';
+
+            if (item.type === 'skin') {
+                if (saveObj.skins.includes(item.skinId)) {
+                    if (saveObj.currentSkin === item.skinId) {
+                        btnText = 'Equipped';
+                        btnDisabled = 'disabled';
+                    } else {
+                        btnText = 'Equip';
+                        btnAction = `equipSkin('${item.skinId}')`;
+                    }
+                } else {
+                    btnText = `${item.cost} SB`;
+                    btnAction = `requestPurchase('${item.id}')`;
+                }
+            } else if (item.type === 'cooling') {
+                if (saveObj.cooling >= item.max) {
+                    btnText = 'Maxed Out';
+                    btnDisabled = 'disabled';
+                } else {
+                    btnText = `Level ${saveObj.cooling + 1} - ${item.cost} SB`;
+                    btnAction = `requestPurchase('${item.id}')`;
+                }
+            } else if (item.type === 'steam') {
+                if (saveObj.hasSteam) {
+                    btnText = 'Owned';
+                    btnDisabled = 'disabled';
+                } else {
+                    btnText = `${item.cost} SB`;
+                    btnAction = `requestPurchase('${item.id}')`;
+                }
+            } else if (item.type === 'hint') {
+                btnText = `Buy (${item.cost} SB)`;
+                btnAction = `requestPurchase('${item.id}')`;
+            }
+
+            html += `<button class="btn buy-btn" onclick="${btnAction}" ${btnDisabled}>${btnText}</button>`;
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+    }
+
+    window.equipSkin = function(skinId) {
+        saveObj.currentSkin = skinId;
+        saveGame();
+        renderShop();
+    };
+
+    window.requestPurchase = function(itemId) {
+        if (pendingTransaction) return; // Prevent spam
+        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item) return;
+
+        pendingTransaction = item;
+        const msgId = Math.random().toString(36);
+        
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: item.cost,
+            msgId: msgId
+        }, "*");
+    };
+
+    function applyPurchase(item) {
+        if (item.type === 'skin') {
+            saveObj.skins.push(item.skinId);
+            saveObj.currentSkin = item.skinId;
+        } else if (item.type === 'cooling') {
+            saveObj.cooling++;
+        } else if (item.type === 'steam') {
+            saveObj.hasSteam = true;
+        } else if (item.type === 'hint') {
+            saveObj.hints += 3;
+        }
+        saveGame();
+    }
+
+    // --- GAMEPLAY LOGIC ---
+
+    function startLevel() {
+        showScreen('playing');
+        generateLevel(saveObj.level);
+        
+        pressure = 0;
+        // Base time 60s, decreases by 2s per level, cooling adds 10s. Min 20s.
+        let allowedTime = Math.max(20, 60 - (saveObj.level * 2) + (saveObj.cooling * 10));
+        pressureRate = maxPressure / allowedTime;
+        
+        machineJammed = false;
+        targetSpinning = false;
+        draggedGear = null;
+        particles = [];
+        hintActive = false;
+        levelStartTime = Date.now();
+        
+        document.getElementById('hint-count').innerText = saveObj.hints;
+    }
+
+    function generateLevel(levelNum) {
+        pegs = [];
+        looseGears = [];
+        
+        // Define endpoints
+        let startX = 150;
+        let startY = LOGICAL_H / 2 - 100 + Math.random()*200;
+        
+        let sourcePeg = { x: startX, y: startY, radius: 45, isSource: true, isPath: true };
+        pegs.push(sourcePeg);
+        
+        let currentPeg = sourcePeg;
+        let requiredGears = []; // To populate tray
+        
+        // Generate main path left to right
+        let targetX = LOGICAL_W - 200;
+        let safety = 0;
+        
+        while(currentPeg.x < targetX && safety < 15) {
+            let nextR = GEAR_RADII[Math.floor(Math.random() * GEAR_RADII.length)];
+            let dist = currentPeg.radius + nextR;
+            
+            // Pick an angle moving right (-60 to 60 degrees)
+            let angle = (Math.random() - 0.5) * (Math.PI / 1.5);
+            let nx = currentPeg.x + Math.cos(angle) * dist;
+            let ny = currentPeg.y + Math.sin(angle) * dist;
+            
+            // Constrain Y to stay within play area
+            if (ny < 150 || ny > TRAY_Y - 150) {
+                // Force mostly horizontal if hitting bounds
+                nx = currentPeg.x + dist;
+                ny = currentPeg.y;
+            }
+
+            let newPeg = { x: nx, y: ny, radius: nextR, isPath: true };
+            pegs.push(newPeg);
+            requiredGears.push(nextR);
+            currentPeg = newPeg;
+            safety++;
+        }
+
+        currentPeg.isTarget = true;
+        let targetPeg = currentPeg;
+
+        // Generate decoys/branches
+        let numDecoys = Math.min(2 + Math.floor(levelNum / 2), 6);
+        for(let i=0; i<numDecoys; i++) {
+            // Attach to a random existing peg (except target)
+            let basePeg = pegs[Math.floor(Math.random() * (pegs.length - 1))];
+            let nextR = GEAR_RADII[Math.floor(Math.random() * GEAR_RADII.length)];
+            let dist = basePeg.radius + nextR;
+            let angle = Math.random() * Math.PI * 2;
+            
+            let nx = basePeg.x + Math.cos(angle) * dist;
+            let ny = basePeg.y + Math.sin(angle) * dist;
+            
+            if (ny > 100 && ny < TRAY_Y - 100 && nx > 100 && nx < LOGICAL_W - 100) {
+                // simple collision check
+                let overlap = false;
+                for(let p of pegs) {
+                    if(Math.hypot(p.x - nx, p.y - ny) < p.radius + nextR - 5) { overlap = true; break; }
+                }
+                if(!overlap) {
+                    pegs.push({ x: nx, y: ny, radius: nextR, isPath: false });
+                    requiredGears.push(nextR);
+                }
+            }
+        }
+
+        // Add extra random gears to tray to increase difficulty slightly
+        let extras = Math.min(1 + Math.floor(levelNum / 3), 4);
+        for(let i=0; i<extras; i++) requiredGears.push(GEAR_RADII[Math.floor(Math.random() * GEAR_RADII.length)]);
+
+        // Instantiate Gears
+        // Source
+        looseGears.push(createGear(sourcePeg.x, sourcePeg.y, sourcePeg.radius, true, false, sourcePeg));
+        
+        // Target (Pre-placed but not spinning)
+        // Wait, remove target radius from required since it's pre-placed
+        let tIdx = requiredGears.indexOf(targetPeg.radius);
+        if(tIdx > -1) requiredGears.splice(tIdx, 1);
+        looseGears.push(createGear(targetPeg.x, targetPeg.y, targetPeg.radius, false, true, targetPeg));
+
+        // Place remaining required gears in tray
+        requiredGears.forEach(r => {
+            let tx = 150 + Math.random() * (LOGICAL_W - 300);
+            let ty = TRAY_Y + 50 + Math.random() * 60;
+            looseGears.push(createGear(tx, ty, r, false, false, null));
+        });
+
+        checkSystemConnections();
+    }
+
+    function createGear(x, y, r, isSrc, isTgt, peg) {
+        return {
+            x: x, y: y,
+            radius: r,
+            teeth: Math.floor(r / 4), // Normalize teeth count based on size
+            isSource: isSrc,
+            isTarget: isTgt,
+            peg: peg,
+            omega: 0,
+            angle: Math.random() * Math.PI,
+            dragging: false,
+            jammed: false,
+            glow: false
+        };
+    }
+
+    window.useHint = function() {
+        if (saveObj.hints > 0 && !hintActive && gameState === 'PLAYING') {
+            saveObj.hints--;
+            saveGame();
+            document.getElementById('hint-count').innerText = saveObj.hints;
+            
+            // Find an empty path peg
+            hintPeg = null;
+            for(let p of pegs) {
+                if (p.isPath && !looseGears.find(g => g.peg === p)) {
+                    hintPeg = p;
+                    break;
+                }
+            }
+            if(hintPeg) {
+                hintActive = true;
+                setTimeout(() => { hintActive = false; }, 3000);
+            }
+        }
+    };
+
+    // --- INTERACTION LOGIC ---
+
+    function resize() {
+        // Maintain aspect ratio, fit inside window
+        let winW = window.innerWidth;
+        let winH = window.innerHeight;
+        let scale = Math.min(winW / LOGICAL_W, winH / LOGICAL_H);
+        
+        canvas.style.width = `${LOGICAL_W * scale}px`;
+        canvas.style.height = `${LOGICAL_H * scale}px`;
+        canvas.width = LOGICAL_W;
+        canvas.height = LOGICAL_H;
+
+        // Save scale for mouse math
+        let rect = canvas.getBoundingClientRect();
+        scaleX = LOGICAL_W / rect.width;
+        scaleY = LOGICAL_H / rect.height;
+    }
+
+    function getLogicalPos(clientX, clientY) {
+        let rect = canvas.getBoundingClientRect();
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function handlePointerDown(e) {
+        if (gameState !== 'PLAYING') return;
+        let pos = getLogicalPos(e.clientX, e.clientY);
+        
+        // Find topmost gear
+        for (let i = looseGears.length - 1; i >= 0; i--) {
+            let g = looseGears[i];
+            if (g.isSource || g.isTarget) continue; // Unmovable
+            
+            if (Math.hypot(g.x - pos.x, g.y - pos.y) < g.radius) {
+                g.dragging = true;
+                draggedGear = g;
+                // Move to front of render array
+                looseGears.splice(i, 1);
+                looseGears.push(g);
+                
+                // Detach
+                g.peg = null;
+                checkSystemConnections();
+                break;
+            }
+        }
+    }
+
+    function handlePointerMove(e) {
+        if (!draggedGear || gameState !== 'PLAYING') return;
+        let pos = getLogicalPos(e.clientX, e.clientY);
+        draggedGear.x = pos.x;
+        draggedGear.y = pos.y;
+    }
+
+    function handlePointerUp(e) {
+        if (!draggedGear) return;
+        
+        let g = draggedGear;
+        g.dragging = false;
+        draggedGear = null;
+        
+        // Snap logic
+        let snapped = false;
+        for (let peg of pegs) {
+            if (peg.isSource || peg.isTarget) continue;
+            
+            // Check if occupied
+            if (looseGears.some(other => other.peg === peg)) continue;
+
+            if (Math.hypot(g.x - peg.x, g.y - peg.y) < peg.radius * 0.8) {
+                g.x = peg.x;
+                g.y = peg.y;
+                g.peg = peg;
+                snapped = true;
+                
+                // Visual spark on drop
+                spawnSparks(g.x, g.y, '#fff', 5);
+                break;
+            }
+        }
+        
+        // If not snapped, return to tray bounds smoothly (just snap for immediate feedback)
+        if (!snapped && g.y < TRAY_Y) {
+            g.y = TRAY_Y + 50 + Math.random()*50;
+            g.x = Math.max(100, Math.min(LOGICAL_W-100, g.x));
+        }
+
+        checkSystemConnections();
+    }
+
+    function checkSystemConnections() {
+        machineJammed = false;
+        
+        // Reset state
+        looseGears.forEach(g => {
+            g.omega = 0;
+            g.jammed = false;
+            g.visited = false;
+            g.glow = false;
+        });
+
+        let placed = looseGears.filter(g => g.peg !== null);
+
+        // 1. Collision / Overlap Phase
+        for (let i = 0; i < placed.length; i++) {
+            for (let j = i + 1; j < placed.length; j++) {
+                let g1 = placed[i];
+                let g2 = placed[j];
+                let dist = Math.hypot(g1.x - g2.x, g1.y - g2.y);
+                let expected = g1.radius + g2.radius;
+                
+                if (dist < expected - 5) { // Geometric Overlap
+                    g1.jammed = true;
+                    g2.jammed = true;
+                    machineJammed = true;
+                    // Spark effect exactly between them
+                    let mx = g1.x + (g2.x - g1.x) * (g1.radius / expected);
+                    let my = g1.y + (g2.y - g1.y) * (g1.radius / expected);
+                    spawnSparks(mx, my, '#ff3300', 2);
+                }
+            }
+        }
+
+        // 2. Kinematic Propagation (BFS)
+        let source = placed.find(g => g.isSource);
+        if (source && !machineJammed) {
+            source.omega = 2.0; // Radians per sec
+            source.visited = true;
+            let queue = [source];
+
+            while(queue.length > 0) {
+                let curr = queue.shift();
+                
+                for(let next of placed) {
+                    if(next === curr) continue;
+                    let dist = Math.hypot(curr.x - next.x, curr.y - next.y);
+                    let expected = curr.radius + next.radius;
+
+                    if (Math.abs(dist - expected) <= 5) { // Perfectly Meshed
+                        let expOmega = -curr.omega * (curr.radius / next.radius);
+                        
+                        if(next.visited) {
+                            if(Math.abs(next.omega - expOmega) > 0.01) {
+                                // Conflict! Different rotations driven to same gear
+                                curr.jammed = true;
+                                next.jammed = true;
+                                machineJammed = true;
+                            }
+                        } else {
+                            next.omega = expOmega;
+                            next.visited = true;
+                            queue.push(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check Win
+        let target = placed.find(g => g.isTarget);
+        if (!machineJammed && target && target.omega !== 0 && !targetSpinning) {
+            targetSpinning = true;
+            target.glow = true;
+            spawnSparks(target.x, target.y, '#00ff00', 30);
+            setTimeout(triggerWin, 1500);
+        }
+    }
+
+    function triggerWin() {
+        if (gameState !== 'PLAYING') return;
+        
+        let timeTaken = (Date.now() - levelStartTime) / 1000;
+        
+        // SimgaBucks Economy Logic
+        let reward = 2; // base for completion
+        
+        // Speed bonus
+        if (timeTaken < 15) reward += 2;
+        else if (timeTaken < 30) reward += 1;
+        
+        // Milestone bonus
+        if (saveObj.level % 5 === 0) reward += 5;
+
+        // Reward platform API call
+        window.parent.postMessage({ type: "addSimgaBucks", amount: reward }, "*");
+
+        // Progress Save
+        saveObj.level++;
+        if (saveObj.level > saveObj.highScore) saveObj.highScore = saveObj.level;
+        saveGame();
+
+        // UI
+        document.getElementById('level-stats').innerText = `Sector completed in ${timeTaken.toFixed(1)}s`;
+        document.getElementById('reward-text').innerText = `+${reward} SimgaBucks`;
+        showScreen('level-complete-screen');
+    }
+
+    function triggerGameOver() {
+        if (gameState !== 'PLAYING') return;
+        showScreen('game-over-screen');
+    }
+
+    // --- PARTICLES ---
+
+    function spawnSparks(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                type: 'spark', x: x, y: y,
+                vx: (Math.random() - 0.5) * 600,
+                vy: -200 - Math.random() * 400,
+                life: 0.5 + Math.random()*0.5,
+                maxLife: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function spawnSteam(x, y) {
+        particles.push({
+            type: 'steam', x: x, y: y,
+            vx: (Math.random() - 0.5) * 50,
+            vy: -100 - Math.random() * 100,
+            radius: 15 + Math.random()*25,
+            life: 2.0 + Math.random()*2.0,
+            maxLife: 4.0
+        });
+    }
+
+    // --- MAIN LOOP ---
+
+    function gameLoop(timestamp) {
+        let dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+        if (dt > 0.1) dt = 0.1; // Cap dt
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+        bgTime += dt;
+
+        if (gameState === 'PLAYING') {
+            // Pressure Mechanics
+            let currentRate = pressureRate;
+            if (machineJammed) currentRate *= 3; // Penalty for jams
+            if (targetSpinning) currentRate = -50; // Cool down rapidly on win
+            
+            pressure += currentRate * dt;
+            if (pressure < 0) pressure = 0;
+            if (pressure >= maxPressure && !targetSpinning) {
+                pressure = maxPressure;
+                triggerGameOver();
+            }
+
+            // Gear Physics
+            let isJammedFrame = false;
+            looseGears.forEach(g => {
+                if (machineJammed) {
+                    if (g.isSource) {
+                        // Vibrate source if jammed
+                        g.angle += (Math.random() - 0.5) * 0.1;
+                    }
+                    if (g.jammed && Math.random() < 0.1) {
+                        spawnSparks(g.x, g.y, '#ffaa00', 1);
+                        isJammedFrame = true;
+                    }
+                } else {
+                    g.angle += g.omega * dt;
+                }
+            });
+
+            // Steam passive generation
+            if (saveObj.hasSteam && Math.random() < 0.05 * (pressure/50)) {
+                // Spawn steam randomly from bottom or random pegs
+                let p = pegs[Math.floor(Math.random()*pegs.length)];
+                spawnSteam(p.x, p.y);
+            }
+        }
+
+        // Particle Physics
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+            
+            if (p.type === 'spark') {
+                p.vy += 1000 * dt; // Gravity
+            } else if (p.type === 'steam') {
+                p.radius += 15 * dt; // Expansion
+            }
+
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    // --- RENDERING ---
+
+    function draw() {
+        // Background Base
+        let bgGrad = ctx.createRadialGradient(LOGICAL_W/2, LOGICAL_H/2, 100, LOGICAL_W/2, LOGICAL_H/2, LOGICAL_W);
+        bgGrad.addColorStop(0, '#2b1b11');
+        bgGrad.addColorStop(1, '#050201');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+        // Decor Background Gears
+        bgGears.forEach(bg => {
+            drawGearShape(bg.x, bg.y, bg.r, bg.angle + bgTime * bg.speed, 'bg');
+        });
+
+        if (gameState !== 'PLAYING' && gameState !== 'COMPLETE' && gameState !== 'OVER') return;
+
+        // Tray Area
+        ctx.fillStyle = '#110a05';
+        ctx.fillRect(0, TRAY_Y, LOGICAL_W, LOGICAL_H - TRAY_Y);
+        ctx.strokeStyle = '#8c5b35';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(0, TRAY_Y);
+        ctx.lineTo(LOGICAL_W, TRAY_Y);
+        ctx.stroke();
+
+        // Pegs & Connections
+        pegs.forEach(p => {
+            // Path lines between main pegs (optional, makes it easier. Let's do a faint groove)
+            if (p.isPath) {
+                // Find next path peg to draw pipe (not strictly required but adds visual depth)
+            }
+            
+            // Draw Peg Hole
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fill();
+            
+            // Draw Peg Pin
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8, 0, Math.PI*2);
+            let pGrad = ctx.createRadialGradient(p.x-2, p.y-2, 1, p.x, p.y, 8);
+            pGrad.addColorStop(0, '#f2d080'); pGrad.addColorStop(1, '#8c5b35');
+            ctx.fillStyle = pGrad;
+            ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+        });
+
+        // Hint Highlight
+        if (hintActive && hintPeg) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(hintPeg.x, hintPeg.y, hintPeg.radius, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 10]);
+            ctx.stroke();
+            
+            // Glow
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Gears
+        // Draw non-dragged first, then dragged
+        looseGears.forEach(g => { if (!g.dragging) drawPlayableGear(g); });
+        if (draggedGear) drawPlayableGear(draggedGear, true);
+
+        // Particles
+        particles.forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            if (p.type === 'spark') {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+                // Glow tail
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.5)';
+                ctx.fillRect(p.x - p.vx*0.02, p.y - p.vy*0.02, 6, 6);
+            } else if (p.type === 'steam') {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                ctx.fillStyle = '#a0a0a0';
+                ctx.fill();
+            }
+            ctx.restore();
+        });
+
+        // HUD Elements
+        drawHUD();
+    }
+
+    function drawPlayableGear(g, isDragging = false) {
+        ctx.save();
+        ctx.translate(g.x, g.y);
+        
+        if (isDragging) {
+            ctx.scale(1.1, 1.1); // Enlarge slightly when held
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 15;
+        } else if (g.peg) {
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 5;
+        }
+
+        if (g.jammed) {
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 15;
+        } else if (g.glow || (g.isTarget && targetSpinning)) {
+            ctx.shadowColor = '#00ff00';
+            ctx.shadowBlur = 20;
+        } else if (g.isSource) {
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+        }
+
+        // Draw the complex gear path
+        let style = g.isSource || g.isTarget ? 'bronze' : saveObj.currentSkin;
+        drawComplexGearBody(0, 0, g.radius, g.teeth, g.angle, style);
+
+        // Center markings
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI*2);
+        ctx.fillStyle = '#222';
+        ctx.fill();
+        
+        if (g.isSource) {
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+        } else if (g.isTarget) {
+            ctx.fillStyle = targetSpinning ? '#00ff00' : '#ff0000';
+            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function drawComplexGearBody(cx, cy, radius, teethCount, angle, style) {
+        // We use destination-out composite to punch clean holes for spokes
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+
+        // 1. Draw base cog shape
+        const toothDepth = Math.max(6, radius * 0.15);
+        const innerRadius = radius - toothDepth;
+
+        ctx.beginPath();
+        for (let i = 0; i < teethCount; i++) {
+            let a1 = (i * 2 * Math.PI) / teethCount;
+            let a2 = ((i + 0.35) * 2 * Math.PI) / teethCount;
+            let a3 = ((i + 0.65) * 2 * Math.PI) / teethCount;
+            let a4 = ((i + 1) * 2 * Math.PI) / teethCount;
+
+            if (i === 0) ctx.moveTo(innerRadius * Math.cos(a1), innerRadius * Math.sin(a1));
+            else ctx.lineTo(innerRadius * Math.cos(a1), innerRadius * Math.sin(a1));
+
+            ctx.lineTo(radius * Math.cos(a2), radius * Math.sin(a2));
+            ctx.lineTo(radius * Math.cos(a3), radius * Math.sin(a3));
+            ctx.lineTo(innerRadius * Math.cos(a4), innerRadius * Math.sin(a4));
+        }
+        ctx.closePath();
+
+        // Color Gradient based on style
+        let grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
+        if (style === 'bronze') {
+            grad.addColorStop(0, '#cd7f32'); grad.addColorStop(0.5, '#f2d080'); grad.addColorStop(1, '#8a5a22');
+        } else if (style === 'silver') {
+            grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.5, '#aaaaaa'); grad.addColorStop(1, '#555555');
+        } else if (style === 'gold') {
+            grad.addColorStop(0, '#ffe066'); grad.addColorStop(0.5, '#e6b800'); grad.addColorStop(1, '#997a00');
+        } else if (style === 'neon') {
+            grad.addColorStop(0, '#00ffff'); grad.addColorStop(1, '#ff00ff');
+            ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 10;
+        }
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#222';
+        ctx.stroke();
+
+        // 2. Punch holes (spokes)
+        ctx.globalCompositeOperation = 'destination-out';
+        let numSpokes = teethCount > 10 ? 5 : 4;
+        let holeOuter = radius * 0.6;
+        let holeInner = radius * 0.25;
+        
+        ctx.fillStyle = 'black'; // Color doesn't matter for destination-out
+        for(let i=0; i<numSpokes; i++) {
+            let aStart = (i * 2 * Math.PI) / numSpokes + 0.2;
+            let aEnd = ((i + 1) * 2 * Math.PI) / numSpokes - 0.2;
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, holeOuter, aStart, aEnd);
+            ctx.arc(0, 0, holeInner, aEnd, aStart, true);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // 3. Draw inner rings details
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.beginPath();
+        ctx.arc(0, 0, holeInner, 0, Math.PI*2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, holeOuter, 0, Math.PI*2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawGearShape(x, y, r, angle, type) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        
+        let teeth = Math.floor(r/8);
+        let innerR = r - 15;
+        
+        ctx.beginPath();
+        for (let i = 0; i < teeth; i++) {
+            let a1 = (i * 2 * Math.PI) / teeth;
+            let a2 = ((i + 0.3) * 2 * Math.PI) / teeth;
+            let a3 = ((i + 0.7) * 2 * Math.PI) / teeth;
+            let a4 = ((i + 1) * 2 * Math.PI) / teeth;
+            if (i === 0) ctx.moveTo(innerR * Math.cos(a1), innerR * Math.sin(a1));
+            else ctx.lineTo(innerR * Math.cos(a1), innerR * Math.sin(a1));
+            ctx.lineTo(r * Math.cos(a2), r * Math.sin(a2));
+            ctx.lineTo(r * Math.cos(a3), r * Math.sin(a3));
+            ctx.lineTo(innerR * Math.cos(a4), innerR * Math.sin(a4));
+        }
+        ctx.closePath();
+        
+        if (type === 'bg') {
+            ctx.fillStyle = 'rgba(20, 10, 5, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    function drawHUD() {
+        // Sector Info
+        ctx.fillStyle = '#f2d080';
+        ctx.font = 'bold 36px serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`Sector ${saveObj.level}`, 30, 30);
+        
+        // Gauge background
+        let gx = LOGICAL_W - 120;
+        let gy = 120;
+        let gRad = 80;
+
+        // Dial Plate
+        ctx.beginPath();
+        ctx.arc(gx, gy, gRad, 0.75 * Math.PI, 2.25 * Math.PI);
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = '#1a0f08';
+        ctx.stroke();
+
+        // Pressure Fill
+        let pRatio = pressure / maxPressure;
+        let fillAngle = 0.75 * Math.PI + (pRatio * 1.5 * Math.PI);
+        
+        ctx.beginPath();
+        ctx.arc(gx, gy, gRad, 0.75 * Math.PI, fillAngle);
+        ctx.lineWidth = 14;
+        
+        // Color based on pressure
+        if (pRatio > 0.8) {
+            ctx.strokeStyle = (Date.now() % 200 < 100) ? '#ff0000' : '#ff5500'; // Flash
+        } else if (pRatio > 0.5) {
+            ctx.strokeStyle = '#ffaa00';
+        } else {
+            ctx.strokeStyle = '#2ecc71';
+        }
+        ctx.stroke();
+
+        // Dial border
+        ctx.beginPath();
+        ctx.arc(gx, gy, gRad + 10, 0.75 * Math.PI, 2.25 * Math.PI);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#d9a05b';
+        ctx.stroke();
+
+        // Needle
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.rotate(fillAngle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(gRad - 10, 0);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        
+        // Center pin
+        ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fillStyle = '#d9a05b'; ctx.fill();
+        ctx.restore();
+
+        // Label
+        ctx.textAlign = 'center';
+        ctx.font = '24px serif';
+        ctx.fillStyle = pRatio > 0.8 ? '#ff0000' : '#f2d080';
+        ctx.fillText('PRESSURE', gx, gy + gRad + 25);
+    }
+
+    // Run On Load
+    window.onload = init;
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Windmill Keeper</title>
+    <style>
+        :root {
+            --primary: #4ade80;
+            --primary-hover: #22c55e;
+            --danger: #ef4444;
+            --bg-glass: rgba(15, 23, 42, 0.6);
+            --border-glass: rgba(255, 255, 255, 0.15);
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+
+        #hud {
+            display: none;
+            justify-content: space-between;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .hud-panel {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .hud-stat {
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .power-bar-container {
+            width: 200px;
+            height: 12px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            margin-top: 5px;
+        }
+
+        #power-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #eab308, #4ade80);
+            background-size: 200% 100%;
+            transition: width 0.2s ease-out;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-glass);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #064e3b;
+            border: none;
+            text-shadow: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 20;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .panel {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 90%;
+            width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .panel::-webkit-scrollbar { width: 8px; }
+        .panel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+        .panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to bottom, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        h2 { font-size: 2rem; margin-bottom: 20px; color: #f8fafc; }
+        p { color: var(--text-muted); margin-bottom: 25px; line-height: 1.6; }
+
+        .tutorial-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .shop-item:hover { background: rgba(255, 255, 255, 0.08); }
+        .shop-item-info h3 { font-size: 1.1rem; margin-bottom: 4px; color: #fff; }
+        .shop-item-info span { font-size: 0.9rem; color: var(--text-muted); }
+
+        #notification-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .notification {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            animation: slideDown 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, fadeOut 0.5s ease 2.5s forwards;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .currency-icon { color: #fbbf24; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="notification-container"></div>
+
+        <div id="hud" class="pointer-events-auto">
+            <div class="hud-panel">
+                <div class="hud-stat">Score: <span id="score-val">0</span></div>
+                <div class="hud-stat">
+                    Power
+                    <div class="power-bar-container">
+                        <div id="power-bar"></div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" id="btn-menu">Menu</button>
+                <button class="btn btn-primary" id="btn-shop">Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="screen-menu" class="screen active">
+        <div class="panel pointer-events-auto">
+            <h1>Windmill Keeper</h1>
+            
+            <div class="tutorial-box">
+                <strong style="color: #4ade80;">How to Play:</strong><br><br>
+                1. <strong>Click and Drag</strong> anywhere to aim your windmills.<br>
+                2. Point them <strong>facing the wind</strong> to catch gusts.<br>
+                3. Keep catching wind to maintain your power!
+            </div>
+
+            <p style="font-size: 1rem; color: #fbbf24; font-weight:bold;">High Score: <span id="menu-highscore">0</span></p>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button class="btn btn-primary" style="font-size: 1.3rem; padding: 15px;" id="btn-start">Start Game</button>
+                <button class="btn" id="btn-menu-shop">SimgaBucks Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="screen-shop" class="screen">
+        <div class="panel pointer-events-auto">
+            <h2>SimgaBucks Shop</h2>
+            <p style="margin-bottom: 15px;">Spend your earned <span class="currency-icon">$S</span> to upgrade!</p>
+            
+            <div class="shop-grid" id="shop-container"></div>
+
+            <button class="btn" style="width: 100%;" id="btn-close-shop">Close Shop</button>
+        </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="screen-gameover" class="screen">
+        <div class="panel pointer-events-auto">
+            <h2 style="color: var(--danger);">Power Depleted</h2>
+            <p>The wind died down and your mills stopped spinning.</p>
+            <div style="font-size: 1.5rem; margin-bottom: 10px; font-weight: bold;">Score: <span id="go-score">0</span></div>
+            <p id="go-highscore-msg" style="color: #fde047; font-weight: bold; display: none;">New High Score!</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                <button class="btn btn-primary" id="btn-restart">Try Again</button>
+                <button class="btn" id="btn-go-shop">Visit Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME CONFIG & CONSTANTS ---
+        const GAME_ID = "windmill";
+        
+        // Gameplay Balance
+        const MAX_POWER = 100;
+        const BASE_POWER_DRAIN = 2.0; // Slower drain to be less punishing initially
+        
+        // Global State
+        let canvas, ctx;
+        let width, height;
+        let lastTime = 0;
+        let gameState = 'menu'; 
+        let animationId;
+
+        // Session variables
+        let score = 0;
+        let power = MAX_POWER;
+        let playTime = 0;
+        let sessionGustsCaught = 0;
+        let nextWindmillScore = 1500;
+        let globalTargetAngle = -Math.PI / 2; // Default facing Up
+        
+        // SimgaBucks tracking
+        let firstRewardGiven = false;
+        let nextTimeRewardAt = 60; 
+        let bucksEarnedThisSession = 0;
+
+        // API Variables
+        let loadMsgId = "";
+        let pendingPurchaseId = "";
+        let pendingPurchaseItem = null;
+        let isProcessingPurchase = false;
+
+        // Entities
+        let windmills = [];
+        let gusts = [];
+        let particles = [];
+        let floatingTexts = [];
+        let clouds = [];
+        
+        // Control Tracking (Joystick Style)
+        let pointer = { x: 0, y: 0, active: false };
+        let dragStart = { x: 0, y: 0 };
+
+        // Save Data Structure
+        let savedData = {
+            highScore: 0,
+            upgrades: { angle: 0, boost: 0 },
+            unlockedSkins: ['wood'],
+            currentSkin: 'wood',
+            unlockedThemes: ['day'],
+            currentTheme: 'day'
+        };
+
+        const SHOP_ITEMS = [
+            { id: 'upgrade_angle', type: 'upgrade', category: 'angle', name: 'Wider Catch Angle', desc: 'More forgiving wind capture.', costs: [10, 25, 50], max: 3 },
+            { id: 'upgrade_boost', type: 'upgrade', category: 'boost', name: 'Wind Boost', desc: 'Get more power per catch.', costs: [15, 30, 60], max: 3 },
+            { id: 'skin_stone', type: 'skin', category: 'stone', name: 'Stone Mill Skin', desc: 'A sturdy stone aesthetic.', cost: 50 },
+            { id: 'skin_crystal', type: 'skin', category: 'crystal', name: 'Crystal Mill Skin', desc: 'Glowing magical crystal.', cost: 100 },
+            { id: 'theme_sunset', type: 'theme', category: 'sunset', name: 'Sunset Theme', desc: 'Beautiful evening sky.', cost: 75 },
+            { id: 'theme_night', type: 'theme', category: 'night', name: 'Night Theme', desc: 'Starry midnight sky.', cost: 150 }
+        ];
+
+        const THEMES = {
+            day: { bgTop: '#87CEEB', bgBottom: '#E0F6FF', hillFront: '#3CB371', hillBack: '#8FBC8F', cloudColor: 'rgba(255, 255, 255, 0.6)', hasStars: false },
+            sunset: { bgTop: '#FF7E5F', bgBottom: '#FEB47B', hillFront: '#8C4B41', hillBack: '#D97B66', cloudColor: 'rgba(255, 200, 200, 0.4)', hasStars: false },
+            night: { bgTop: '#0B0B2A', bgBottom: '#1B1B4A', hillFront: '#1A234A', hillBack: '#2A335A', cloudColor: 'rgba(100, 100, 150, 0.2)', hasStars: true }
+        };
+        let stars = [];
+
+        // --- MATH HELPERS ---
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function lerpAngle(a, b, t) {
+            let d = b - a;
+            while (d > Math.PI) d -= Math.PI * 2;
+            while (d < -Math.PI) d += Math.PI * 2;
+            return a + d * t;
+        }
+        function angleDiff(a, b) {
+            let d = b - a;
+            while (d > Math.PI) d -= Math.PI * 2;
+            while (d < -Math.PI) d += Math.PI * 2;
+            return d;
+        }
+
+        // --- API COMMUNICATION ---
+        function loadGameData() {
+            loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+        }
+
+        function saveGameData() {
+            window.parent.postMessage({ type: "saveData", gameId: GAME_ID, data: savedData }, "*");
+        }
+
+        function awardSimgaBucks(amount, reason) {
+            bucksEarnedThisSession += amount;
+            window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+            showNotification(`+${amount} $S (${reason})`, '#fbbf24');
+        }
+
+        function requestPurchase(item) {
+            if (isProcessingPurchase) return;
+            let cost = item.type === 'upgrade' ? item.costs[savedData.upgrades[item.category]] : item.cost;
+            pendingPurchaseId = "spend_" + Date.now();
+            pendingPurchaseItem = item;
+            isProcessingPurchase = true;
+            updateShopUI(); 
+            window.parent.postMessage({ type: "spendSimgaBucks", amount: cost, msgId: pendingPurchaseId }, "*");
+        }
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    savedData = { ...savedData, ...data.data };
+                    if (!savedData.upgrades) savedData.upgrades = { angle: 0, boost: 0 };
+                    if (!savedData.unlockedSkins) savedData.unlockedSkins = ['wood'];
+                    if (!savedData.unlockedThemes) savedData.unlockedThemes = ['day'];
+                }
+                document.getElementById('menu-highscore').innerText = savedData.highScore;
+                updateShopUI();
+            }
+
+            if (data.type === "spendResponse" && data.msgId === pendingPurchaseId) {
+                isProcessingPurchase = false;
+                if (data.success && pendingPurchaseItem) {
+                    const item = pendingPurchaseItem;
+                    if (item.type === 'upgrade') savedData.upgrades[item.category]++;
+                    else if (item.type === 'skin') { savedData.unlockedSkins.push(item.category); savedData.currentSkin = item.category; }
+                    else if (item.type === 'theme') { savedData.unlockedThemes.push(item.category); savedData.currentTheme = item.category; }
+                    saveGameData();
+                    showNotification(`Purchased ${item.name}!`, '#4ade80');
+                } else {
+                    showNotification("Not enough SimgaBucks!", '#ef4444');
+                }
+                pendingPurchaseItem = null;
+                updateShopUI();
+            }
+        });
+
+        // --- CLASSES ---
+        class FloatingText {
+            constructor(x, y, text, color) {
+                this.x = x; this.y = y;
+                this.text = text; this.color = color;
+                this.life = 1.0; this.vy = -30;
+            }
+            update(dt) {
+                this.y += this.vy * dt;
+                this.life -= dt * 1.5;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.font = "bold 20px sans-serif";
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = "rgba(0,0,0,0.8)";
+                ctx.lineWidth = 3;
+                ctx.textAlign = "center";
+                ctx.strokeText(this.text, this.x, this.y);
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        class Windmill {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.headAngle = -Math.PI / 2; // Start facing up
+                this.targetHeadAngle = -Math.PI / 2;
+                this.bladeAngle = 0;
+                this.spinVelocity = 0;
+            }
+
+            update(dt) {
+                this.headAngle = lerpAngle(this.headAngle, this.targetHeadAngle, 10 * dt);
+                this.bladeAngle += this.spinVelocity * dt;
+                if (this.spinVelocity > 0) {
+                    this.spinVelocity -= 0.8 * dt; 
+                    if (this.spinVelocity < 0) this.spinVelocity = 0;
+                }
+                if (this.spinVelocity > 0.5) {
+                    score += this.spinVelocity * 10 * dt;
+                    power += this.spinVelocity * 1.0 * dt;
+                    if (power > MAX_POWER) power = MAX_POWER;
+                }
+            }
+
+            draw(ctx, skinType) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Base
+                ctx.beginPath();
+                const baseW = 40, topW = 20, h = 80;
+                ctx.moveTo(-baseW/2, h); ctx.lineTo(baseW/2, h);
+                ctx.lineTo(topW/2, 0); ctx.lineTo(-topW/2, 0);
+                ctx.closePath();
+                
+                if (skinType === 'stone') {
+                    ctx.fillStyle = '#64748b'; ctx.fill();
+                    ctx.lineWidth = 2; ctx.strokeStyle = '#475569'; ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(-15, 20); ctx.lineTo(15, 20); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(-20, 40); ctx.lineTo(20, 40); ctx.stroke();
+                } else if (skinType === 'crystal') {
+                    let grad = ctx.createLinearGradient(0, 0, 0, h);
+                    grad.addColorStop(0, '#a78bfa'); grad.addColorStop(1, '#2dd4bf');
+                    ctx.fillStyle = grad;
+                    ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 15;
+                    ctx.fill(); ctx.shadowBlur = 0;
+                } else {
+                    let grad = ctx.createLinearGradient(-baseW/2, 0, baseW/2, 0);
+                    grad.addColorStop(0, '#78350f'); grad.addColorStop(0.5, '#b45309'); grad.addColorStop(1, '#78350f');
+                    ctx.fillStyle = grad; ctx.fill();
+                }
+
+                // Head & Blades
+                ctx.translate(0, 0); 
+                ctx.rotate(this.headAngle);
+                
+                ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                ctx.fillStyle = skinType === 'crystal' ? '#fdf4ff' : '#1e293b'; ctx.fill();
+
+                ctx.rotate(this.bladeAngle);
+                ctx.fillStyle = skinType === 'crystal' ? 'rgba(167, 139, 250, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+                ctx.strokeStyle = skinType === 'crystal' ? '#c084fc' : '#cbd5e1';
+                ctx.lineWidth = 2;
+
+                for (let i = 0; i < 4; i++) {
+                    ctx.save(); ctx.rotate((Math.PI / 2) * i);
+                    ctx.beginPath(); ctx.moveTo(10, -5); ctx.lineTo(70, -10);
+                    ctx.lineTo(70, 10); ctx.lineTo(10, 5); ctx.closePath();
+                    ctx.fill(); ctx.stroke(); ctx.restore();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Gust {
+            constructor(targetWindmill) {
+                // Spawn primarily from sides to cross screen clearly
+                if (Math.random() > 0.5) {
+                    this.x = Math.random() > 0.5 ? -100 : width + 100;
+                    this.y = Math.random() * (height - 200) + 100;
+                } else {
+                    this.x = Math.random() * (width - 200) + 100;
+                    this.y = Math.random() > 0.5 ? -100 : height + 100;
+                }
+                
+                let tx, ty;
+                if (targetWindmill) {
+                    // Target a specific windmill to guarantee it crosses a playable path
+                    tx = targetWindmill.x + (Math.random() - 0.5) * 80;
+                    ty = (targetWindmill.y - 80) + (Math.random() - 0.5) * 80;
+                } else {
+                    tx = width/2 + (Math.random() - 0.5) * width * 0.4;
+                    ty = height/2 + (Math.random() - 0.5) * height * 0.4;
+                }
+                
+                this.angle = Math.atan2(ty - this.y, tx - this.x);
+                let baseSpeed = 80 + (score / 200); // Slower, readable speed
+                this.speed = baseSpeed + Math.random() * 30;
+                
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+                this.active = true;
+            }
+
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                
+                if (Math.random() < 0.1) {
+                    particles.push(new Particle(this.x, this.y, 
+                        -this.vx * 0.2 + (Math.random() - 0.5)*10, 
+                        -this.vy * 0.2 + (Math.random() - 0.5)*10, 
+                        'rgba(255,255,255,0.4)', 0.8, 2));
+                }
+
+                if (this.x < -200 || this.x > width + 200 || this.y < -200 || this.y > height + 200) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx, time) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 15;
+                
+                // Clear arrow shape pointing forward
+                ctx.beginPath();
+                ctx.moveTo(15, 0); // Tip
+                ctx.lineTo(-15, 12); // Bottom wing
+                ctx.lineTo(-5, 0);   // Back indent
+                ctx.lineTo(-15, -12); // Top wing
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fill();
+
+                // Wind trails
+                ctx.beginPath();
+                ctx.moveTo(-5, 0);
+                ctx.lineTo(-60, 0);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, vx, vy, color, life, size) {
+                this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+                this.color = color; this.life = life; this.maxLife = life; this.size = size;
+            }
+            update(dt) { this.x += this.vx * dt; this.y += this.vy * dt; this.life -= dt; }
+            draw(ctx) {
+                ctx.save(); ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill(); ctx.restore();
+            }
+        }
+
+        class Cloud {
+            constructor() {
+                this.x = Math.random() * width; this.y = Math.random() * height * 0.5;
+                this.speed = 10 + Math.random() * 20; this.scale = 0.5 + Math.random() * 1.5;
+            }
+            update(dt) {
+                this.x += this.speed * dt;
+                if (this.x > width + 100) { this.x = -100; this.y = Math.random() * height * 0.5; }
+            }
+            draw(ctx, color) {
+                ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.scale, this.scale);
+                ctx.fillStyle = color; ctx.beginPath();
+                ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.arc(25, -10, 25, 0, Math.PI * 2);
+                ctx.arc(45, 5, 20, 0, Math.PI * 2); ctx.arc(-20, 5, 20, 0, Math.PI * 2);
+                ctx.fill(); ctx.restore();
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+        function init() {
+            canvas = document.getElementById('gameCanvas'); ctx = canvas.getContext('2d');
+            window.addEventListener('resize', resize); resize();
+
+            // Setup input - Drag to aim
+            const getPos = (e) => e.touches ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : {x: e.clientX, y: e.clientY};
+
+            const handleStart = (e) => {
+                if (gameState !== 'playing') return;
+                const pos = getPos(e);
+                pointer.x = pos.x; pointer.y = pos.y; pointer.active = true;
+                dragStart.x = pos.x; dragStart.y = pos.y;
+            };
+
+            const handleMove = (e) => {
+                if (!pointer.active || gameState !== 'playing') return;
+                const pos = getPos(e);
+                pointer.x = pos.x; pointer.y = pos.y;
+                
+                let dx = pointer.x - dragStart.x;
+                let dy = pointer.y - dragStart.y;
+                
+                // Only update angle if dragged a tiny bit (deadzone)
+                if (Math.sqrt(dx*dx + dy*dy) > 10) {
+                    globalTargetAngle = Math.atan2(dy, dx);
+                    windmills.forEach(w => w.targetHeadAngle = globalTargetAngle);
+                }
+            };
+
+            const handleEnd = () => { pointer.active = false; };
+
+            window.addEventListener('mousedown', handleStart);
+            window.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+            window.addEventListener('touchstart', handleStart, {passive: false});
+            window.addEventListener('touchmove', handleMove, {passive: false});
+            window.addEventListener('touchend', handleEnd);
+
+            document.getElementById('btn-start').addEventListener('click', startGame);
+            document.getElementById('btn-restart').addEventListener('click', startGame);
+            document.getElementById('btn-menu').addEventListener('click', () => setScreen('menu'));
+            document.getElementById('btn-shop').addEventListener('click', () => setScreen('shop'));
+            document.getElementById('btn-menu-shop').addEventListener('click', () => setScreen('shop'));
+            document.getElementById('btn-go-shop').addEventListener('click', () => setScreen('shop'));
+            document.getElementById('btn-close-shop').addEventListener('click', () => {
+                if (gameState === 'shop') setScreen(power > 0 && playTime > 0 ? 'playing' : 'menu');
+            });
+
+            for(let i=0; i<5; i++) clouds.push(new Cloud());
+            for(let i=0; i<100; i++) stars.push({x: Math.random()*2000, y: Math.random()*2000, s: Math.random()*2});
+
+            loadGameData();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+
+        function setScreen(screen) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('hud').style.display = 'none';
+            gameState = screen;
+            
+            if (screen === 'menu') document.getElementById('screen-menu').classList.add('active');
+            else if (screen === 'shop') { document.getElementById('screen-shop').classList.add('active'); updateShopUI(); }
+            else if (screen === 'gameover') document.getElementById('screen-gameover').classList.add('active');
+            else if (screen === 'playing') document.getElementById('hud').style.display = 'flex';
+        }
+
+        function startGame() {
+            score = 0; power = MAX_POWER; playTime = 0; sessionGustsCaught = 0;
+            nextWindmillScore = 1000; firstRewardGiven = false; nextTimeRewardAt = 60; bucksEarnedThisSession = 0;
+            windmills = []; gusts = []; particles = []; floatingTexts = [];
+            
+            globalTargetAngle = -Math.PI / 2; // Reset aiming up
+            
+            windmills.push(new Windmill(width / 2, height / 2 + 50));
+            setScreen('playing');
+        }
+
+        function checkCollisions() {
+            const angleUpgradeLvl = savedData.upgrades.angle || 0;
+            const catchTolerance = (Math.PI / 3) + (angleUpgradeLvl * (Math.PI / 12)); 
+            const boostLvl = savedData.upgrades.boost || 0;
+            const spinGain = 8 + (boostLvl * 3);
+
+            for (let g of gusts) {
+                if (!g.active) continue;
+
+                for (let w of windmills) {
+                    let dx = g.x - w.x;
+                    let dy = g.y - (w.y - 80);
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < 120) {
+                        // Wind blows along g.angle. To face it perfectly, windmill should look at g.angle + PI
+                        let optimalAngle = g.angle + Math.PI;
+                        let diff = Math.abs(angleDiff(w.headAngle, optimalAngle));
+
+                        if (diff < catchTolerance) {
+                            g.active = false;
+                            w.spinVelocity += spinGain;
+                            if (w.spinVelocity > 25) w.spinVelocity = 25; 
+                            
+                            power += 25; // Good boost
+                            if (power > MAX_POWER) power = MAX_POWER;
+                            score += 100;
+                            
+                            sessionGustsCaught++;
+                            floatingTexts.push(new FloatingText(w.x, w.y - 120, "+Power!", "#4ade80"));
+                            checkEconomyTriggers();
+
+                            for(let i=0; i<20; i++) {
+                                particles.push(new Particle(
+                                    w.x, w.y - 80, 
+                                    Math.cos(w.headAngle)*50 + (Math.random()-0.5)*40, 
+                                    Math.sin(w.headAngle)*50 + (Math.random()-0.5)*40, 
+                                    '#38bdf8', 1, Math.random()*4 + 2
+                                ));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkEconomyTriggers() {
+            if (!firstRewardGiven && sessionGustsCaught >= 3) { // Even earlier first reward
+                firstRewardGiven = true;
+                awardSimgaBucks(2, "First Catches!");
+            }
+            if (sessionGustsCaught > 0 && sessionGustsCaught % 10 === 0) {
+                awardSimgaBucks(1, "Wind Catcher");
+            }
+        }
+
+        function updateShopUI() {
+            const container = document.getElementById('shop-container');
+            container.innerHTML = '';
+
+            SHOP_ITEMS.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'shop-item';
+                
+                let isMaxed = false, isOwned = false, costStr = "", actionStr = "", btnClass = "btn btn-primary";
+
+                if (item.type === 'upgrade') {
+                    let lvl = savedData.upgrades[item.category] || 0;
+                    isMaxed = lvl >= item.max;
+                    costStr = isMaxed ? "MAX" : `<span class="currency-icon">$S</span> ${item.costs[lvl]}`;
+                    actionStr = isMaxed ? "Maxed" : "Upgrade";
+                    if (isMaxed) btnClass = "btn btn-disabled";
+                } else if (item.type === 'skin' || item.type === 'theme') {
+                    let arr = item.type === 'skin' ? savedData.unlockedSkins : savedData.unlockedThemes;
+                    let curr = item.type === 'skin' ? savedData.currentSkin : savedData.currentTheme;
+                    isOwned = arr.includes(item.category);
+                    costStr = isOwned ? "Owned" : `<span class="currency-icon">$S</span> ${item.cost}`;
+                    
+                    if (curr === item.category) { actionStr = "Equipped"; btnClass = "btn btn-disabled"; }
+                    else if (isOwned) { actionStr = "Equip"; btnClass = "btn"; }
+                    else { actionStr = "Buy"; }
+                }
+
+                div.innerHTML = `
+                    <div class="shop-item-info">
+                        <h3>${item.name}</h3>
+                        <span>${item.desc}</span>
+                        <div style="margin-top: 5px; font-weight: bold;">${costStr}</div>
+                    </div>
+                    <button class="${btnClass}" ${isProcessingPurchase || actionStr === 'Equipped' || actionStr === 'Maxed' ? 'disabled' : ''}>
+                        ${isProcessingPurchase && pendingPurchaseItem === item ? 'Loading...' : actionStr}
+                    </button>
+                `;
+
+                const btn = div.querySelector('button');
+                if (!btn.disabled) {
+                    btn.addEventListener('click', () => {
+                        if (actionStr === 'Equip') {
+                            if (item.type === 'skin') savedData.currentSkin = item.category;
+                            if (item.type === 'theme') savedData.currentTheme = item.category;
+                            saveGameData(); updateShopUI();
+                        } else if (actionStr === 'Buy' || actionStr === 'Upgrade') {
+                            requestPurchase(item);
+                        }
+                    });
+                }
+                container.appendChild(div);
+            });
+        }
+
+        function showNotification(text, color) {
+            const container = document.getElementById('notification-container');
+            const notif = document.createElement('div');
+            notif.className = 'notification';
+            notif.innerHTML = text;
+            if (color) notif.style.borderColor = color;
+            container.appendChild(notif);
+            setTimeout(() => { if (container.contains(notif)) container.removeChild(notif); }, 3000);
+        }
+
+        function drawBackground(dt, time) {
+            const theme = THEMES[savedData.currentTheme] || THEMES.day;
+            let bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+            bgGrad.addColorStop(0, theme.bgTop); bgGrad.addColorStop(1, theme.bgBottom);
+            ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, width, height);
+
+            if (theme.hasStars) {
+                ctx.fillStyle = 'white';
+                stars.forEach(s => {
+                    ctx.globalAlpha = 0.5 + Math.sin(time*0.002 + s.x)*0.5;
+                    ctx.beginPath(); ctx.arc(s.x % width, s.y % (height*0.7), s.s, 0, Math.PI*2); ctx.fill();
+                });
+                ctx.globalAlpha = 1.0;
+            }
+
+            clouds.forEach(c => c.draw(ctx, theme.cloudColor));
+
+            const drawHills = (color, offset, amp, freq, yBase) => {
+                ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, height);
+                for(let x=0; x<=width; x+=20) ctx.lineTo(x, yBase + Math.sin(x * freq + offset) * amp);
+                ctx.lineTo(width, height); ctx.closePath(); ctx.fill();
+            };
+
+            drawHills(theme.hillBack, time * 0.0005, 50, 0.003, height - 150);
+            drawHills(theme.hillFront, time * 0.001, 30, 0.005, height - 80);
+        }
+
+        function update(dt) {
+            if (gameState !== 'playing') return;
+
+            playTime += dt;
+            let drainRate = BASE_POWER_DRAIN + (score / 2500); 
+            power -= drainRate * dt;
+            
+            if (playTime >= nextTimeRewardAt) {
+                awardSimgaBucks(2, "Time Survived");
+                nextTimeRewardAt += 60;
+            }
+
+            if (score >= nextWindmillScore && windmills.length < 4) {
+                let padding = width > 800 ? 200 : 80;
+                let spacing = (width - padding*2) / (windmills.length + 1);
+                
+                let newArr = [];
+                for(let i=0; i<=windmills.length; i++) {
+                    let wx = padding + (i * spacing);
+                    let wy = height/2 + 50 + (Math.random()*60 - 30);
+                    
+                    if (i < windmills.length) {
+                        windmills[i].x = wx; 
+                        newArr.push(windmills[i]);
+                    } else {
+                        newArr.push(new Windmill(wx, wy));
+                        floatingTexts.push(new FloatingText(wx, wy - 50, "New Mill!", "#facc15"));
+                        awardSimgaBucks(3, "Milestone Reached!");
+                    }
+                }
+                windmills = newArr;
+                nextWindmillScore *= 2.5; 
+            }
+
+            if (power <= 0) {
+                power = 0; gameState = 'gameover';
+                document.getElementById('go-score').innerText = Math.floor(score);
+                if (score > savedData.highScore) {
+                    savedData.highScore = Math.floor(score);
+                    document.getElementById('go-highscore-msg').style.display = 'block';
+                } else {
+                    document.getElementById('go-highscore-msg').style.display = 'none';
+                }
+                saveGameData(); setScreen('gameover'); return;
+            }
+
+            document.getElementById('score-val').innerText = Math.floor(score);
+            document.getElementById('power-bar').style.width = `${Math.max(0, power)}%`;
+            
+            let pb = document.getElementById('power-bar');
+            if (power > 60) pb.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)';
+            else if (power > 30) pb.style.background = 'linear-gradient(90deg, #facc15, #eab308)';
+            else pb.style.background = 'linear-gradient(90deg, #f87171, #ef4444)';
+
+            // Slower, more deliberate spawns
+            let spawnChance = 0.005 + (score / 150000); 
+            // Limit max gusts on screen to prevent chaos
+            if (gusts.length < 4 && Math.random() < spawnChance * (dt * 60)) {
+                let target = windmills.length > 0 ? windmills[Math.floor(Math.random() * windmills.length)] : null;
+                gusts.push(new Gust(target));
+            }
+
+            windmills.forEach(w => w.update(dt));
+            for (let i = gusts.length - 1; i >= 0; i--) { gusts[i].update(dt); if (!gusts[i].active) gusts.splice(i, 1); }
+            for (let i = particles.length - 1; i >= 0; i--) { particles[i].update(dt); if (particles[i].life <= 0) particles.splice(i, 1); }
+            for (let i = floatingTexts.length - 1; i >= 0; i--) { floatingTexts[i].update(dt); if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1); }
+            clouds.forEach(c => c.update(dt));
+
+            checkCollisions();
+        }
+
+        function draw(time) {
+            ctx.clearRect(0, 0, width, height);
+            drawBackground(0, time);
+
+            ctx.globalCompositeOperation = 'source-over';
+            windmills.forEach(w => w.draw(ctx, savedData.currentSkin));
+
+            ctx.globalCompositeOperation = 'lighter';
+            gusts.forEach(g => g.draw(ctx, time * 0.001));
+            particles.forEach(p => p.draw(ctx));
+            
+            ctx.globalCompositeOperation = 'source-over';
+            floatingTexts.forEach(f => f.draw(ctx));
+
+            // Draw Virtual Joystick
+            if (pointer.active && gameState === 'playing') {
+                ctx.save();
+                
+                // Base
+                ctx.beginPath();
+                ctx.arc(dragStart.x, dragStart.y, 40, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+
+                // Stick
+                ctx.beginPath();
+                ctx.moveTo(dragStart.x, dragStart.y);
+                ctx.lineTo(pointer.x, pointer.y);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Knob
+                ctx.beginPath();
+                ctx.arc(pointer.x, pointer.y, 15, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        function gameLoop(timestamp) {
+            let dt = (timestamp - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1; 
+            lastTime = timestamp;
+
+            update(dt); draw(timestamp);
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        init();
+    </script>
+</body>
+</html>

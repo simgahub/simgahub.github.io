@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magnet Drop</title>
+    <style>
+        :root {
+            --ui-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --primary: #00f3ff;
+            --secondary: #ff00c8;
+            --bg-dark: rgba(10, 15, 30, 0.85);
+            --panel-bg: rgba(15, 20, 40, 0.95);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #050510;
+            overflow: hidden;
+            font-family: var(--ui-font);
+            color: white;
+            touch-action: none; /* Prevent scroll on touch */
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas when playing */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Screen States */
+        .screen {
+            display: none;
+            pointer-events: auto;
+            flex-direction: column;
+            align-items: center;
+            background: var(--panel-bg);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+        }
+
+        .screen.active {
+            display: flex;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 8px rgba(255,255,255,0.5);
+        }
+
+        p.subtitle {
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, rgba(0, 243, 255, 0.2), rgba(0, 243, 255, 0.5));
+            border: 2px solid var(--primary);
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            width: 100%;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .btn.shop-btn {
+            background: linear-gradient(45deg, rgba(255, 0, 200, 0.2), rgba(255, 0, 200, 0.5));
+            border-color: var(--secondary);
+            color: white;
+        }
+        
+        .btn.shop-btn:hover {
+            background: var(--secondary);
+            color: white;
+            box-shadow: 0 0 20px var(--secondary);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            background: rgba(100,100,100,0.3);
+            border-color: #555;
+            color: #888;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            justify-content: space-between;
+            pointer-events: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--primary);
+        }
+        
+        .hud-stat {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+        }
+
+        /* Controls Hint */
+        #controls-hint {
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.5);
+            pointer-events: none;
+            display: none;
+        }
+
+        /* Shop Layout */
+        .shop-items {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .shop-items::-webkit-scrollbar { width: 8px; }
+        .shop-items::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .shop-items::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+        }
+
+        .item-info h3 { margin-bottom: 5px; font-size: 1.1rem; color: #fff; }
+        .item-info p { font-size: 0.9rem; color: #aaa; }
+        .item-cost { color: #00ff88; font-weight: bold; }
+        
+        .buy-btn {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .buy-btn:hover { background: #00cc6a; box-shadow: 0 0 10px #00ff88; }
+        .buy-btn.equipped { background: #555; color: #aaa; cursor: default; box-shadow: none; }
+
+        /* Toast */
+        #toast {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <div id="hud">
+            <div class="hud-stat" id="scoreDisplay">Score: 0</div>
+            <div class="hud-stat" id="waveDisplay">Wave: 1</div>
+        </div>
+        
+        <div id="controls-hint">Hold Left/Right side of screen to activate magnets!</div>
+
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="screen active">
+            <h1>Magnet Drop</h1>
+            <p class="subtitle">Guide the orbs. Avoid the hazards.</p>
+            <button class="btn" id="startBtn">Play Game</button>
+            <button class="btn shop-btn" id="shopBtn">Upgrades</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shopScreen" class="screen">
+            <h2>Upgrades & Skins</h2>
+            <div class="shop-items" id="shopContainer">
+                <!-- Shop items generated by JS -->
+            </div>
+            <button class="btn" id="closeShopBtn" style="margin-top: 20px;">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen">
+            <h1 style="color: #ff0055; text-shadow: 0 0 10px #ff0055;">SYSTEM FAILURE</h1>
+            <h2 id="finalScoreDisplay">Score: 0</h2>
+            <p class="subtitle" id="highScoreDisplay">High Score: 0</p>
+            <button class="btn" id="restartBtn">Try Again</button>
+            <button class="btn shop-btn" id="gameOverShopBtn">Upgrades</button>
+        </div>
+
+    </div>
+
+    <div id="toast"></div>
+
+<script>
+    /** --- CONSTANTS & CONFIG --- */
+    const GAME_ID = "magnet_drop";
+    const CANVAS = document.getElementById("gameCanvas");
+    const CTX = CANVAS.getContext("2d");
+    
+    // UI Elements
+    const screenMenu = document.getElementById("menuScreen");
+    const screenShop = document.getElementById("shopScreen");
+    const screenGameOver = document.getElementById("gameOverScreen");
+    const hud = document.getElementById("hud");
+    const controlsHint = document.getElementById("controls-hint");
+    const uiScore = document.getElementById("scoreDisplay");
+    const uiWave = document.getElementById("waveDisplay");
+    const toastEl = document.getElementById("toast");
+
+    // Colors
+    const COLORS = {
+        primary: "#00f3ff",
+        secondary: "#ff00c8",
+        danger: "#ff3300",
+        success: "#00ff88",
+        ball: "#ffffff"
+    };
+
+    /** --- STATE & DATA --- */
+    let GAME_STATE = "MENU"; // MENU, PLAYING, SHOP, GAMEOVER
+    let lastTime = 0;
+    
+    let saveData = {
+        highScore: 0,
+        upgrades: {
+            pullPower: 1, // Max 5
+            magnetSkin: "cyan", // cyan, purple, gold
+            trailStyle: "spark", // spark, rainbow
+            unlockedSkins: ["cyan"],
+            unlockedTrails: ["spark"]
+        }
+    };
+
+    // Economy Tracking to meet prompt requirements
+    let sessionBucksEarned = 0;
+    let ballsScoredTotal = 0;
+    let hasEarnedFirstReward = false;
+
+    // Platform Interop
+    let pendingPurchases = {}; // mapping msgId -> callback
+
+    /** --- PLATFORM INTEGRATION --- */
+    function awardSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+        sessionBucksEarned += amount;
+        showToast(`+${amount} SimgaBucks!`);
+    }
+
+    function spendSimgaBucks(amount, onSuccess) {
+        const msgId = Math.random().toString(36).substr(2, 9);
+        pendingPurchases[msgId] = onSuccess;
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: amount,
+            msgId: msgId
+        }, "*");
+    }
+
+    function saveGameData() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    function loadGameData() {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+        return loadMsgId;
+    }
+
+    let activeLoadMsgId = loadGameData();
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse" && data.msgId === activeLoadMsgId) {
+            if (data.data) {
+                // Merge loaded data
+                if(data.data.highScore) saveData.highScore = data.data.highScore;
+                if(data.data.upgrades) {
+                    saveData.upgrades = { ...saveData.upgrades, ...data.data.upgrades };
+                }
+            }
+            populateShop();
+        }
+
+        if (data.type === "spendResponse") {
+            const callback = pendingPurchases[data.msgId];
+            if (callback) {
+                if (data.success) {
+                    callback();
+                    saveGameData();
+                    populateShop();
+                } else {
+                    showToast("Not enough SimgaBucks!");
+                }
+                delete pendingPurchases[data.msgId];
+            }
+        }
+    });
+
+    function showToast(msg) {
+        toastEl.innerText = msg;
+        toastEl.style.opacity = 1;
+        setTimeout(() => toastEl.style.opacity = 0, 2000);
+    }
+
+    /** --- SHOP CONFIGURATION --- */
+    const SHOP_CATALOG = [
+        {
+            id: "pullPower",
+            name: "Electromagnet Power",
+            desc: "Increases the pull strength of your magnets.",
+            type: "upgrade",
+            maxLevel: 5,
+            baseCost: 10,
+            getCost: (lvl) => lvl * 15
+        },
+        {
+            id: "purple",
+            name: "Plasma Pink Skin",
+            desc: "Change magnet and lightning color to Pink.",
+            type: "skin",
+            cost: 30
+        },
+        {
+            id: "gold",
+            name: "Overload Gold Skin",
+            desc: "Change magnet and lightning color to Gold.",
+            type: "skin",
+            cost: 60
+        },
+        {
+            id: "rainbow",
+            name: "Rainbow Thrusters",
+            desc: "Balls leave a rainbow trail.",
+            type: "trail",
+            cost: 40
+        }
+    ];
+
+    function populateShop() {
+        const container = document.getElementById("shopContainer");
+        container.innerHTML = "";
+
+        SHOP_CATALOG.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "shop-item";
+
+            let isMaxed = false;
+            let isUnlocked = false;
+            let isEquipped = false;
+            let cost = 0;
+            let btnText = "Buy";
+
+            if (item.type === "upgrade") {
+                const currentLvl = saveData.upgrades.pullPower;
+                cost = item.getCost(currentLvl);
+                isMaxed = currentLvl >= item.maxLevel;
+                btnText = isMaxed ? "MAX" : `Buy`;
+                
+                div.innerHTML = `
+                    <div class="item-info">
+                        <h3>${item.name} (Lv ${currentLvl}/${item.maxLevel})</h3>
+                        <p>${item.desc}</p>
+                        ${!isMaxed ? `<p class="item-cost">${cost} SB</p>` : ''}
+                    </div>
+                `;
+            } else if (item.type === "skin") {
+                cost = item.cost;
+                isUnlocked = saveData.upgrades.unlockedSkins.includes(item.id);
+                isEquipped = saveData.upgrades.magnetSkin === item.id;
+                btnText = isEquipped ? "Equipped" : (isUnlocked ? "Equip" : `Buy`);
+
+                div.innerHTML = `
+                    <div class="item-info">
+                        <h3>${item.name}</h3>
+                        <p>${item.desc}</p>
+                        ${!isUnlocked ? `<p class="item-cost">${cost} SB</p>` : ''}
+                    </div>
+                `;
+            } else if (item.type === "trail") {
+                cost = item.cost;
+                isUnlocked = saveData.upgrades.unlockedTrails.includes(item.id);
+                isEquipped = saveData.upgrades.trailStyle === item.id;
+                btnText = isEquipped ? "Equipped" : (isUnlocked ? "Equip" : `Buy`);
+
+                div.innerHTML = `
+                    <div class="item-info">
+                        <h3>${item.name}</h3>
+                        <p>${item.desc}</p>
+                        ${!isUnlocked ? `<p class="item-cost">${cost} SB</p>` : ''}
+                    </div>
+                `;
+            }
+
+            const btn = document.createElement("button");
+            btn.className = `buy-btn ${isEquipped || isMaxed ? 'equipped' : ''}`;
+            btn.innerText = btnText;
+            
+            if (isMaxed || isEquipped) {
+                btn.disabled = true;
+            } else {
+                btn.onclick = () => handleShopClick(item, cost, isUnlocked);
+            }
+
+            div.appendChild(btn);
+            container.appendChild(div);
+        });
+    }
+
+    function handleShopClick(item, cost, isUnlocked) {
+        if (item.type === "upgrade") {
+            spendSimgaBucks(cost, () => {
+                saveData.upgrades.pullPower++;
+                showToast("Upgrade Successful!");
+            });
+        } else if (item.type === "skin") {
+            if (isUnlocked) {
+                saveData.upgrades.magnetSkin = item.id;
+                saveGameData();
+                populateShop();
+            } else {
+                spendSimgaBucks(cost, () => {
+                    saveData.upgrades.unlockedSkins.push(item.id);
+                    saveData.upgrades.magnetSkin = item.id;
+                    showToast("Skin Unlocked!");
+                });
+            }
+        } else if (item.type === "trail") {
+            if (isUnlocked) {
+                saveData.upgrades.trailStyle = item.id;
+                saveGameData();
+                populateShop();
+            } else {
+                spendSimgaBucks(cost, () => {
+                    saveData.upgrades.unlockedTrails.push(item.id);
+                    saveData.upgrades.trailStyle = item.id;
+                    showToast("Trail Unlocked!");
+                });
+            }
+        }
+    }
+
+
+    /** --- GAMEPLAY VARIABLES --- */
+    let cw, ch;
+    let cameraShake = 0;
+    
+    // Input
+    let keys = {};
+    let pointers = [];
+
+    // Entities
+    let balls = [];
+    let bins = [];
+    let hazards = [];
+    let particles = [];
+    let floatingTexts = [];
+    let stars = [];
+
+    // Mechanics
+    let score = 0;
+    let wave = 1;
+    let ballSpawnTimer = 0;
+    let ballSpawnInterval = 1500;
+    let ballsSpawnedInWave = 0;
+    let ballsToSpawn = 10;
+    let lives = 3; // allowed mistakes per wave
+    let isTransitioning = false;
+
+    // Colors mappings
+    const SKIN_COLORS = {
+        "cyan": "#00f3ff",
+        "purple": "#ff00c8",
+        "gold": "#ffdd00"
+    };
+
+    /** --- RESIZE & SETUP --- */
+    function resize() {
+        cw = CANVAS.width = window.innerWidth;
+        ch = CANVAS.height = window.innerHeight;
+        initStars();
+        setupBins();
+    }
+    window.addEventListener('resize', resize);
+
+    function initStars() {
+        stars = [];
+        for(let i=0; i<100; i++) {
+            stars.push({
+                x: Math.random() * cw,
+                y: Math.random() * ch,
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 0.5 + 0.1,
+                alpha: Math.random()
+            });
+        }
+    }
+
+    function setupBins() {
+        bins = [];
+        const binWidth = Math.min(120, cw * 0.25);
+        const binHeight = 40;
+        const y = ch - binHeight - 20;
+        
+        // 3 bins: Left, Center, Right
+        bins.push({ x: cw*0.2 - binWidth/2, y: y, w: binWidth, h: binHeight, type: "normal", points: 10 });
+        bins.push({ x: cw*0.5 - binWidth/2, y: y, w: binWidth, h: binHeight, type: "bonus", points: 25 });
+        bins.push({ x: cw*0.8 - binWidth/2, y: y, w: binWidth, h: binHeight, type: "normal", points: 10 });
+    }
+
+    function initGame() {
+        score = 0;
+        wave = 1;
+        sessionBucksEarned = 0;
+        ballsScoredTotal = 0;
+        balls = [];
+        hazards = [];
+        particles = [];
+        floatingTexts = [];
+        isTransitioning = false;
+        startWave();
+        updateHUD();
+        hud.style.display = "flex";
+        controlsHint.style.display = "block";
+        setTimeout(() => controlsHint.style.display = "none", 4000);
+    }
+
+    function startWave() {
+        isTransitioning = false;
+        ballsSpawnedInWave = 0;
+        ballSpawnInterval = Math.max(500, 1500 - (wave * 150));
+        ballsToSpawn = 10 + (wave * 5);
+        
+        // Setup Hazards based on wave
+        hazards = [];
+        if (wave > 1) {
+            let numHazards = Math.min(wave, 5);
+            for(let i=0; i<numHazards; i++) {
+                let hx = cw * (0.2 + Math.random() * 0.6);
+                let hy = ch * (0.3 + Math.random() * 0.4);
+                hazards.push(new Hazard(hx, hy));
+            }
+        }
+
+        // SimgaBucks Reward for reaching waves (starting wave 2)
+        if (wave > 1) {
+            awardSimgaBucks(Math.min(4, wave)); // 2-4 SB for waves
+        }
+    }
+
+    /** --- INPUT HANDLING --- */
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    
+    CANVAS.addEventListener('mousedown', e => addPointer(e.clientX, e.clientY, 'mouse'));
+    CANVAS.addEventListener('mousemove', e => updatePointer(e.clientX, e.clientY, 'mouse'));
+    window.addEventListener('mouseup', () => removePointer('mouse'));
+    
+    CANVAS.addEventListener('touchstart', e => {
+        for(let i=0; i<e.changedTouches.length; i++) {
+            addPointer(e.changedTouches[i].clientX, e.changedTouches[i].clientY, e.changedTouches[i].identifier);
+        }
+    }, {passive: false});
+    
+    CANVAS.addEventListener('touchmove', e => {
+        for(let i=0; i<e.changedTouches.length; i++) {
+            updatePointer(e.changedTouches[i].clientX, e.changedTouches[i].clientY, e.changedTouches[i].identifier);
+        }
+    }, {passive: false});
+    
+    window.addEventListener('touchend', e => {
+        for(let i=0; i<e.changedTouches.length; i++) {
+            removePointer(e.changedTouches[i].identifier);
+        }
+    });
+
+    function addPointer(x, y, id) {
+        if(GAME_STATE !== "PLAYING") return;
+        pointers.push({ id, x, y });
+    }
+    function updatePointer(x, y, id) {
+        let p = pointers.find(p => p.id === id);
+        if(p) { p.x = x; p.y = y; }
+    }
+    function removePointer(id) {
+        pointers = pointers.filter(p => p.id !== id);
+    }
+
+    function isLeftActive() {
+        return keys['ArrowLeft'] || keys['KeyA'] || pointers.some(p => p.x < cw/2);
+    }
+    function isRightActive() {
+        return keys['ArrowRight'] || keys['KeyD'] || pointers.some(p => p.x >= cw/2);
+    }
+
+    /** --- ENTITIES --- */
+
+    class Ball {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = 0;
+            this.radius = Math.min(cw * 0.03, 15);
+            this.trail = [];
+            this.dead = false;
+        }
+
+        update(dt) {
+            // Physics
+            this.vy += 400 * dt; // Gravity
+            this.vy *= 0.99; // Air friction
+            this.vx *= 0.98;
+
+            // Magnet Force
+            const pullForce = 600 + (saveData.upgrades.pullPower * 150);
+            if (isLeftActive()) this.vx -= pullForce * dt;
+            if (isRightActive()) this.vx += pullForce * dt;
+
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+
+            // Trail
+            this.trail.push({x: this.x, y: this.y});
+            if (this.trail.length > 15) this.trail.shift();
+
+            // Wall collisions
+            if (this.x < this.radius) { this.x = this.radius; this.vx *= -0.5; }
+            if (this.x > cw - this.radius) { this.x = cw - this.radius; this.vx *= -0.5; }
+
+            // Bottom bounds
+            if (this.y > ch + 50) {
+                this.dead = true;
+                cameraShake = 5;
+                // Missed entirely
+                spawnText("Miss!", this.x, ch - 50, COLORS.danger);
+                checkWaveProgress();
+            }
+        }
+
+        draw(ctx) {
+            // Trail
+            if (this.trail.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                for(let i=1; i<this.trail.length; i++) {
+                    ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                }
+                
+                if (saveData.upgrades.trailStyle === "rainbow") {
+                    ctx.strokeStyle = `hsl(${(Date.now()/5 + this.x) % 360}, 100%, 50%)`;
+                } else {
+                    ctx.strokeStyle = "rgba(0, 243, 255, 0.4)";
+                }
+                
+                ctx.lineWidth = this.radius * 0.8;
+                ctx.lineCap = "round";
+                ctx.stroke();
+            }
+
+            // Metallic Sphere
+            let grad = ctx.createRadialGradient(
+                this.x - this.radius*0.3, this.y - this.radius*0.3, this.radius*0.1,
+                this.x, this.y, this.radius
+            );
+            grad.addColorStop(0, "#ffffff");
+            grad.addColorStop(0.4, "#88bbee");
+            grad.addColorStop(1, "#113355");
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            
+            // Rim light
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+    }
+
+    class Hazard {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.radius = Math.min(cw * 0.05, 30);
+            this.angle = 0;
+            this.rotSpeed = (Math.random() - 0.5) * 5;
+            this.baseY = y;
+            this.oscillation = Math.random() * Math.PI * 2;
+        }
+
+        update(dt) {
+            this.angle += this.rotSpeed * dt;
+            this.oscillation += dt * 2;
+            this.y = this.baseY + Math.sin(this.oscillation) * 20;
+        }
+
+        draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle);
+
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = COLORS.danger;
+            
+            ctx.fillStyle = "#220000";
+            ctx.strokeStyle = COLORS.danger;
+            ctx.lineWidth = 3;
+
+            // Spiked Gear
+            ctx.beginPath();
+            let spikes = 8;
+            for(let i=0; i<spikes*2; i++) {
+                let r = i%2 === 0 ? this.radius : this.radius * 0.5;
+                let a = (Math.PI / spikes) * i;
+                let px = Math.cos(a) * r;
+                let py = Math.sin(a) * r;
+                if(i===0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius*0.3, 0, Math.PI*2);
+            ctx.fillStyle = COLORS.danger;
+            ctx.fill();
+
+            ctx.restore();
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color, speedScale = 1) {
+            this.x = x;
+            this.y = y;
+            let a = Math.random() * Math.PI * 2;
+            let s = Math.random() * 150 * speedScale;
+            this.vx = Math.cos(a) * s;
+            this.vy = Math.sin(a) * s;
+            this.life = 1.0;
+            this.decay = Math.random() * 0.02 + 0.01;
+            this.color = color;
+            this.size = Math.random() * 4 + 1;
+        }
+        update(dt) {
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+            this.life -= this.decay;
+        }
+        draw(ctx) {
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function spawnExplosion(x, y, color, count, scale = 1) {
+        for(let i=0; i<count; i++) {
+            particles.push(new Particle(x, y, color, scale));
+        }
+    }
+
+    function spawnText(text, x, y, color) {
+        floatingTexts.push({
+            text, x, y, color,
+            life: 1.0,
+            vy: -50
+        });
+    }
+
+    /** --- CORE ENGINE --- */
+    function checkWaveProgress() {
+        // If all spawned balls are dead/collected and we spawned all for the wave
+        if (!isTransitioning && ballsSpawnedInWave >= ballsToSpawn && balls.length === 0) {
+            isTransitioning = true;
+            wave++;
+            updateHUD();
+            spawnText(`WAVE ${wave}`, cw/2, ch/2, COLORS.primary);
+            setTimeout(startWave, 2000);
+        }
+    }
+
+    function checkCollisions() {
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let b = balls[i];
+
+            // vs Hazards
+            for (let h of hazards) {
+                let dx = b.x - h.x;
+                let dy = b.y - h.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < b.radius + h.radius * 0.8) { // small forgiveness buffer
+                    b.dead = true;
+                    spawnExplosion(b.x, b.y, COLORS.danger, 30, 2);
+                    cameraShake = 10;
+                    spawnText("-1 Life", b.x, b.y - 20, COLORS.danger);
+                    break;
+                }
+            }
+
+            if (b.dead) continue;
+
+            // vs Bins
+            for (let bin of bins) {
+                if (b.y + b.radius > bin.y && b.y < bin.y + bin.h &&
+                    b.x > bin.x && b.x < bin.x + bin.w) {
+                    
+                    // Scored!
+                    b.dead = true;
+                    score += bin.points;
+                    ballsScoredTotal++;
+                    
+                    spawnExplosion(b.x, bin.y, COLORS.success, 20);
+                    spawnText(`+${bin.points}`, b.x, bin.y - 20, COLORS.success);
+                    
+                    // Early session reward check (20-30s first reward)
+                    if (!hasEarnedFirstReward) {
+                        hasEarnedFirstReward = true;
+                        awardSimgaBucks(2); 
+                    } 
+                    // Steady rewards (approx 1 SB per 5 balls)
+                    else if (ballsScoredTotal % 5 === 0) {
+                        awardSimgaBucks(1);
+                    }
+
+                    updateHUD();
+                    break;
+                }
+            }
+        }
+
+        // Cleanup dead balls
+        balls = balls.filter(b => !b.dead);
+    }
+
+    function updateHUD() {
+        uiScore.innerText = `Score: ${score}`;
+        uiWave.innerText = `Wave: ${wave}`;
+    }
+
+    function gameOver() {
+        GAME_STATE = "GAMEOVER";
+        hud.style.display = "none";
+        document.getElementById("finalScoreDisplay").innerText = `Score: ${score}`;
+        
+        if (score > saveData.highScore) {
+            saveData.highScore = score;
+            saveGameData();
+        }
+        document.getElementById("highScoreDisplay").innerText = `High Score: ${saveData.highScore}`;
+        
+        // Final reward for session ending
+        if (score > 100) awardSimgaBucks(2);
+        
+        screenGameOver.classList.add("active");
+    }
+
+    function update(dt) {
+        if (dt > 0.1) dt = 0.1; // Cap delta to prevent massive jumps
+
+        if (GAME_STATE === "PLAYING") {
+            // Spawn Balls
+            ballSpawnTimer += dt * 1000;
+            if (ballSpawnTimer > ballSpawnInterval && ballsSpawnedInWave < ballsToSpawn) {
+                ballSpawnTimer = 0;
+                ballsSpawnedInWave++;
+                balls.push(new Ball(cw * (0.2 + Math.random() * 0.6), -20));
+            }
+
+            balls.forEach(b => b.update(dt));
+            hazards.forEach(h => h.update(dt));
+            checkCollisions();
+            checkWaveProgress();
+        }
+
+        // Visual Updates
+        stars.forEach(s => {
+            s.y += s.speed * 60 * dt;
+            if(s.y > ch) s.y = 0;
+        });
+
+        particles.forEach(p => p.update(dt));
+        particles = particles.filter(p => p.life > 0);
+
+        floatingTexts.forEach(t => {
+            t.y += t.vy * dt;
+            t.life -= dt;
+        });
+        floatingTexts = floatingTexts.filter(t => t.life > 0);
+
+        if (cameraShake > 0) {
+            cameraShake -= dt * 30;
+            if (cameraShake < 0) cameraShake = 0;
+        }
+    }
+
+    function drawLightning(x1, y1, x2, y2, color) {
+        CTX.strokeStyle = color;
+        CTX.lineWidth = 2;
+        CTX.shadowBlur = 10;
+        CTX.shadowColor = color;
+        CTX.beginPath();
+        CTX.moveTo(x1, y1);
+        
+        let segments = 6;
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        
+        for(let i=1; i<=segments; i++) {
+            let nx = x1 + dx*(i/segments);
+            let ny = y1 + dy*(i/segments);
+            if(i < segments) {
+                nx += (Math.random()-0.5)*30;
+                ny += (Math.random()-0.5)*30;
+            }
+            CTX.lineTo(nx, ny);
+        }
+        CTX.stroke();
+        CTX.shadowBlur = 0;
+    }
+
+    function draw() {
+        // Clear Background
+        CTX.fillStyle = "#050510";
+        CTX.fillRect(0, 0, cw, ch);
+
+        CTX.save();
+        if (cameraShake > 0) {
+            let sx = (Math.random()-0.5) * cameraShake;
+            let sy = (Math.random()-0.5) * cameraShake;
+            CTX.translate(sx, sy);
+        }
+
+        // Draw Background Layers
+        CTX.globalCompositeOperation = "lighter";
+        
+        // Nebulas
+        let bgGrad1 = CTX.createRadialGradient(cw*0.2, ch*0.2, 0, cw*0.2, ch*0.2, cw*0.6);
+        bgGrad1.addColorStop(0, "rgba(0, 50, 100, 0.2)");
+        bgGrad1.addColorStop(1, "transparent");
+        CTX.fillStyle = bgGrad1;
+        CTX.fillRect(0,0,cw,ch);
+
+        let bgGrad2 = CTX.createRadialGradient(cw*0.8, ch*0.8, 0, cw*0.8, ch*0.8, cw*0.6);
+        bgGrad2.addColorStop(0, "rgba(50, 0, 100, 0.2)");
+        bgGrad2.addColorStop(1, "transparent");
+        CTX.fillStyle = bgGrad2;
+        CTX.fillRect(0,0,cw,ch);
+
+        // Stars
+        CTX.fillStyle = "white";
+        stars.forEach(s => {
+            CTX.globalAlpha = s.alpha;
+            CTX.beginPath();
+            CTX.arc(s.x, s.y, s.size, 0, Math.PI*2);
+            CTX.fill();
+        });
+        CTX.globalAlpha = 1.0;
+
+        if (GAME_STATE === "PLAYING" || GAME_STATE === "GAMEOVER") {
+            const magColor = SKIN_COLORS[saveData.upgrades.magnetSkin] || COLORS.primary;
+
+            // Draw Magnets Base
+            CTX.globalCompositeOperation = "source-over";
+            
+            // Left Magnet
+            CTX.fillStyle = "#111";
+            CTX.strokeStyle = isLeftActive() ? magColor : "#444";
+            CTX.lineWidth = 4;
+            CTX.beginPath();
+            CTX.roundRect(-20, ch/2 - 100, 40, 200, 10);
+            CTX.fill(); CTX.stroke();
+
+            // Right Magnet
+            CTX.beginPath();
+            CTX.roundRect(cw - 20, ch/2 - 100, 40, 200, 10);
+            CTX.fill(); CTX.stroke();
+
+            // Draw Pull Effects (Lightning)
+            CTX.globalCompositeOperation = "lighter";
+            if (isLeftActive()) {
+                balls.forEach(b => {
+                    if(b.x < cw * 0.7) drawLightning(0, ch/2, b.x, b.y, magColor);
+                });
+            }
+            if (isRightActive()) {
+                balls.forEach(b => {
+                    if(b.x > cw * 0.3) drawLightning(cw, ch/2, b.x, b.y, magColor);
+                });
+            }
+
+            CTX.globalCompositeOperation = "source-over";
+
+            // Draw Bins
+            bins.forEach(bin => {
+                let glowColor = bin.type === "bonus" ? "#aaff00" : COLORS.primary;
+                CTX.shadowBlur = 15;
+                CTX.shadowColor = glowColor;
+                CTX.strokeStyle = glowColor;
+                CTX.lineWidth = 3;
+                CTX.fillStyle = "rgba(0,0,0,0.8)";
+                
+                CTX.beginPath();
+                CTX.rect(bin.x, bin.y, bin.w, bin.h);
+                CTX.fill();
+                CTX.stroke();
+
+                // Open top
+                CTX.beginPath();
+                CTX.moveTo(bin.x, bin.y);
+                CTX.lineTo(bin.x + bin.w, bin.y);
+                CTX.strokeStyle = "rgba(0,0,0,1)";
+                CTX.stroke();
+
+                CTX.shadowBlur = 0;
+            });
+
+            // Entities
+            hazards.forEach(h => h.draw(CTX));
+            balls.forEach(b => b.draw(CTX));
+            
+            // Particles
+            CTX.globalCompositeOperation = "lighter";
+            particles.forEach(p => p.draw(CTX));
+            CTX.globalCompositeOperation = "source-over";
+
+            // Floating Texts
+            CTX.font = "bold 20px 'Segoe UI', sans-serif";
+            CTX.textAlign = "center";
+            floatingTexts.forEach(t => {
+                CTX.fillStyle = t.color;
+                CTX.globalAlpha = t.life;
+                CTX.shadowBlur = 5;
+                CTX.shadowColor = t.color;
+                CTX.fillText(t.text, t.x, t.y);
+            });
+            CTX.globalAlpha = 1.0;
+            CTX.shadowBlur = 0;
+        }
+
+        CTX.restore();
+    }
+
+    function gameLoop(time) {
+        let dt = (time - lastTime) / 1000;
+        lastTime = time;
+        if(dt > 0) {
+            update(dt);
+            draw();
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    /** --- UI EVENT LISTENERS --- */
+    
+    function hideAllScreens() {
+        screenMenu.classList.remove("active");
+        screenShop.classList.remove("active");
+        screenGameOver.classList.remove("active");
+    }
+
+    document.getElementById("startBtn").addEventListener("click", () => {
+        hideAllScreens();
+        GAME_STATE = "PLAYING";
+        initGame();
+    });
+
+    document.getElementById("restartBtn").addEventListener("click", () => {
+        hideAllScreens();
+        GAME_STATE = "PLAYING";
+        initGame();
+    });
+
+    document.getElementById("shopBtn").addEventListener("click", () => {
+        hideAllScreens();
+        GAME_STATE = "SHOP";
+        populateShop();
+        screenShop.classList.add("active");
+    });
+    
+    document.getElementById("gameOverShopBtn").addEventListener("click", () => {
+        hideAllScreens();
+        GAME_STATE = "SHOP";
+        populateShop();
+        screenShop.classList.add("active");
+    });
+
+    document.getElementById("closeShopBtn").addEventListener("click", () => {
+        hideAllScreens();
+        GAME_STATE = "MENU";
+        screenMenu.classList.add("active");
+    });
+
+    /** --- INIT --- */
+    resize();
+    populateShop();
+    requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

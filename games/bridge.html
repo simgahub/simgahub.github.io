@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Bridge Builder</title>
+    <style>
+        :root {
+            --primary: #00e5ff;
+            --secondary: #ff007f;
+            --dark: #0a0a1a;
+            --panel: rgba(10, 10, 26, 0.85);
+            --text: #ffffff;
+            --font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: var(--font);
+            color: var(--text);
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none !important;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .score-box {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Notifications */
+        #notification-area {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .toast {
+            background: rgba(0, 229, 255, 0.2);
+            border: 1px solid var(--primary);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #fff;
+            animation: slideUpFade 2s ease forwards;
+        }
+
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Typography & Components */
+        h1 {
+            font-size: 48px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: var(--secondary);
+            text-shadow: 0 0 15px var(--secondary);
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0, 229, 255, 0.1);
+            max-width: 90%;
+            width: 450px;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            font-size: 18px;
+            font-weight: bold;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.2), inset 0 0 10px rgba(0, 229, 255, 0.1);
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: var(--dark);
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        button.secondary {
+            border-color: var(--secondary);
+            color: var(--secondary);
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.2), inset 0 0 10px rgba(255, 0, 127, 0.1);
+        }
+
+        button.secondary:hover {
+            background: var(--secondary);
+            color: var(--dark);
+            box-shadow: 0 0 20px var(--secondary);
+        }
+        
+        button:disabled {
+            border-color: #555;
+            color: #555;
+            box-shadow: none;
+            cursor: not-allowed;
+            background: transparent;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        /* Scrollbar for shop */
+        .shop-grid::-webkit-scrollbar { width: 6px; }
+        .shop-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+        .shop-grid::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.2s;
+        }
+        .shop-item:hover {
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .shop-item-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .shop-item-desc {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 10px;
+            line-height: 1.3;
+            flex-grow: 1;
+        }
+
+        .buy-btn {
+            width: 100%;
+            margin: 0;
+            padding: 8px;
+            font-size: 14px;
+        }
+
+        .stat-text {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .high-score {
+            color: var(--secondary);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    
+    <div id="ui-layer">
+        
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div class="score-box">SCORE: <span id="score-display">0</span></div>
+            <div class="score-box" style="font-size: 20px; color: #aaa;">BEST: <span id="hud-highscore">0</span></div>
+        </div>
+
+        <div id="notification-area"></div>
+
+        <!-- Main Menu -->
+        <div id="main-menu" class="screen">
+            <div class="panel">
+                <h1>Bridge Builder</h1>
+                <p class="stat-text">Hold to build. Release to cross.</p>
+                <p class="stat-text">High Score: <span id="menu-highscore" class="high-score">0</span></p>
+                
+                <button id="btn-play">Play Game</button>
+                <button id="btn-shop" class="secondary">Shop & Upgrades</button>
+            </div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop" class="screen hidden">
+            <div class="panel" style="width: 600px;">
+                <h2>Upgrades & Skins</h2>
+                
+                <div class="shop-grid" id="shop-items-container">
+                    <!-- Populated by JS -->
+                </div>
+                
+                <button id="btn-shop-back" class="secondary">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over" class="screen hidden">
+            <div class="panel">
+                <h1 style="color: var(--secondary); text-shadow: 0 0 20px var(--secondary);">GAME OVER</h1>
+                <h2 style="font-size: 24px; color: #fff;">Score: <span id="go-score">0</span></h2>
+                <p class="stat-text" id="go-new-best" style="display: none; color: var(--primary); font-weight: bold; text-shadow: 0 0 10px var(--primary);">NEW RECORD!</p>
+                
+                <div style="margin-top: 20px;">
+                    <button id="btn-retry">Try Again</button>
+                    <button id="btn-menu" class="secondary">Main Menu</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    /**
+     * NEON BRIDGE BUILDER
+     * Integrated with SimgaBucks API.
+     */
+
+    // --- PLATFORM API INTEGRATION ---
+    const GAME_ID = "bridge";
+    let pendingPurchases = {}; // Maps msgId to item object
+    let loadCallbacks = {};
+
+    function addSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+    }
+
+    function spendSimgaBucks(amount, itemObj) {
+        const msgId = Math.random().toString(36).substring(2, 15);
+        pendingPurchases[msgId] = itemObj;
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: amount,
+            msgId: msgId
+        }, "*");
+    }
+
+    function saveGameData() {
+        const saveObject = {
+            highScore: gameState.highScore,
+            upgrades: gameState.upgrades,
+            unlocked: gameState.unlocked
+        };
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveObject
+        }, "*");
+    }
+
+    function loadGameData(callback) {
+        const loadMsgId = "load_" + Date.now();
+        loadCallbacks[loadMsgId] = callback;
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+        
+        // Timeout fallback for local testing without platform
+        setTimeout(() => {
+            if (loadCallbacks[loadMsgId]) {
+                console.log("Load timeout fallback - running local context.");
+                callback(null);
+                delete loadCallbacks[loadMsgId];
+            }
+        }, 1000);
+    }
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "spendResponse") {
+            const item = pendingPurchases[data.msgId];
+            if (item) {
+                if (data.success) {
+                    applyPurchase(item);
+                    showToast("Purchase Successful!", "#00e5ff");
+                } else {
+                    alert("Not enough SimgaBucks to purchase this item.");
+                }
+                delete pendingPurchases[data.msgId];
+                renderShop(); // Refresh UI
+            }
+        }
+        
+        if (data.type === "loadResponse") {
+            if (loadCallbacks[data.msgId]) {
+                loadCallbacks[data.msgId](data.data);
+                delete loadCallbacks[data.msgId];
+            }
+        }
+    });
+
+    // --- GAME STATE & CONFIG ---
+    const gameState = {
+        highScore: 0,
+        upgrades: {
+            previewLevel: 0, // 0, 1, 2
+            stabilityLevel: 0, // 0, 1, 2
+            equippedSkin: 'neon',
+            equippedBg: 'cyber'
+        },
+        unlocked: {
+            skins: ['neon'], // 'neon', 'gold', 'plasma'
+            bgs: ['cyber'] // 'cyber', 'sunset', 'forest'
+        }
+    };
+
+    const SHOP_CATALOG = [
+        { id: 'prev1', type: 'upgrade', category: 'previewLevel', level: 1, cost: 15, name: 'Hologram Sight I', desc: 'Shows a faint preview of the bridge length.' },
+        { id: 'prev2', type: 'upgrade', category: 'previewLevel', level: 2, cost: 35, name: 'Hologram Sight II', desc: 'Shows a clear, bright preview of the bridge.' },
+        { id: 'stab1', type: 'upgrade', category: 'stabilityLevel', level: 1, cost: 20, name: 'Magnetic Boots I', desc: 'Slightly wider landing forgiveness zone.' },
+        { id: 'stab2', type: 'upgrade', category: 'stabilityLevel', level: 2, cost: 50, name: 'Magnetic Boots II', desc: 'Massive landing forgiveness zone.' },
+        { id: 'skin_gold', type: 'skin', category: 'skins', value: 'gold', cost: 25, name: 'Golden Bridge', desc: 'A luxurious, shining golden bridge skin.' },
+        { id: 'skin_plasma', type: 'skin', category: 'skins', value: 'plasma', cost: 40, name: 'Plasma Bridge', desc: 'A volatile, pulsing cyan plasma bridge.' },
+        { id: 'bg_sunset', type: 'bg', category: 'bgs', value: 'sunset', cost: 30, name: 'Vaporwave Sunset', desc: 'A beautiful retro sunset background.' },
+        { id: 'bg_forest', type: 'bg', category: 'bgs', value: 'forest', cost: 50, name: 'Neon Forest', desc: 'A mysterious bio-luminescent forest.' }
+    ];
+
+    function applyPurchase(item) {
+        if (item.type === 'upgrade') {
+            gameState.upgrades[item.category] = item.level;
+        } else if (item.type === 'skin') {
+            gameState.unlocked.skins.push(item.value);
+            gameState.upgrades.equippedSkin = item.value;
+        } else if (item.type === 'bg') {
+            gameState.unlocked.bgs.push(item.value);
+            gameState.upgrades.equippedBg = item.value;
+        }
+        saveGameData();
+    }
+
+    function equipItem(type, value) {
+        if (type === 'skin') gameState.upgrades.equippedSkin = value;
+        if (type === 'bg') gameState.upgrades.equippedBg = value;
+        saveGameData();
+        renderShop();
+    }
+
+    // --- ENGINE SETUP ---
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let screenW, screenH;
+
+    function resize() {
+        screenW = window.innerWidth;
+        screenH = window.innerHeight;
+        canvas.width = screenW;
+        canvas.height = screenH;
+        // Adjust base platform Y
+        engine.baseY = screenH * 0.75;
+    }
+    window.addEventListener('resize', resize);
+
+    // --- GAMEPLAY VARIABLES ---
+    const engine = {
+        state: 'menu', // menu, idle, growing, falling, walking, perfect, pan, gameover
+        lastTime: 0,
+        cameraX: 0,
+        score: 0,
+        streak: 0,
+        shakeAmount: 0,
+        baseY: 0,
+        entities: {
+            pillars: [],
+            player: null,
+            bridge: null,
+            particles: [],
+            bgElements: []
+        }
+    };
+
+    // --- ENTITY CLASSES ---
+
+    class Particle {
+        constructor(x, y, vx, vy, color, life, size) {
+            this.x = x; this.y = y;
+            this.vx = vx; this.vy = vy;
+            this.color = color;
+            this.life = life; this.maxLife = life;
+            this.size = size;
+        }
+        update(dt) {
+            this.x += this.vx * dt * 60;
+            this.y += this.vy * dt * 60;
+            this.vy += 0.2 * dt * 60; // gravity
+            this.life -= dt;
+        }
+        draw(ctx) {
+            const alpha = Math.max(0, this.life / this.maxLife);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = this.color;
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    class Pillar {
+        constructor(x, width) {
+            this.x = x;
+            this.width = width;
+            this.perfectCenter = this.x + this.width / 2;
+        }
+        draw(ctx) {
+            ctx.save();
+            // Gradient fill
+            const grad = ctx.createLinearGradient(this.x, engine.baseY, this.x, screenH);
+            if (gameState.upgrades.equippedBg === 'cyber') {
+                grad.addColorStop(0, '#1a0b2e');
+                grad.addColorStop(1, '#000');
+                ctx.fillStyle = grad;
+                ctx.strokeStyle = '#ff007f';
+            } else if (gameState.upgrades.equippedBg === 'sunset') {
+                grad.addColorStop(0, '#2c003e');
+                grad.addColorStop(1, '#000');
+                ctx.fillStyle = grad;
+                ctx.strokeStyle = '#ff9900';
+            } else {
+                grad.addColorStop(0, '#0a2e1f');
+                grad.addColorStop(1, '#000');
+                ctx.fillStyle = grad;
+                ctx.strokeStyle = '#00ffaa';
+            }
+            
+            ctx.shadowColor = ctx.strokeStyle;
+            ctx.shadowBlur = 5;
+            ctx.lineWidth = 2;
+            
+            ctx.fillRect(this.x, engine.baseY, this.width, screenH - engine.baseY);
+            ctx.strokeRect(this.x, engine.baseY, this.width, screenH - engine.baseY);
+
+            // Draw perfect zone (Red Bullseye)
+            ctx.fillStyle = '#ff0000';
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(this.perfectCenter - 5, engine.baseY, 10, 5);
+
+            ctx.restore();
+        }
+    }
+
+    class Bridge {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.length = 0;
+            this.angle = -Math.PI / 2; // Pointing up
+            this.growthSpeed = 400; // pixels per second
+            this.fallSpeed = 0;
+        }
+        grow(dt) {
+            this.length += this.growthSpeed * dt;
+        }
+        fall(dt) {
+            this.fallSpeed += 5 * dt; // angular acceleration
+            this.angle += this.fallSpeed * dt;
+            if (this.angle >= 0) {
+                this.angle = 0;
+                return true; // Finished falling
+            }
+            return false;
+        }
+        draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle);
+
+            // Skin styles
+            const skin = gameState.upgrades.equippedSkin;
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+
+            if (skin === 'neon') {
+                ctx.strokeStyle = '#ffffff';
+                ctx.shadowColor = '#ff007f';
+                ctx.shadowBlur = 15;
+            } else if (skin === 'gold') {
+                ctx.strokeStyle = '#fff0a8';
+                ctx.shadowColor = '#ffb700';
+                ctx.shadowBlur = 15;
+            } else if (skin === 'plasma') {
+                ctx.strokeStyle = '#e0ffff';
+                ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 20;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.length, 0);
+            ctx.stroke();
+
+            // Core line for extra punch
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.length, 0);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    }
+
+    class Player {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.size = 20;
+            this.speed = 250;
+            this.rotation = 0;
+            this.fallingVy = 0;
+        }
+        draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y - this.size/2);
+            
+            // Wobble when walking
+            if (engine.state === 'walking') {
+                this.rotation += 0.1;
+                ctx.rotate(Math.sin(this.rotation) * 0.1);
+            } else if (engine.state === 'gameover') {
+                ctx.rotate(this.rotation);
+            }
+
+            // Draw Robot Sprite
+            ctx.shadowBlur = 10;
+            
+            // Wheel
+            ctx.fillStyle = '#333';
+            ctx.shadowColor = 'transparent';
+            ctx.beginPath();
+            ctx.arc(0, this.size/2, this.size/3, 0, Math.PI*2);
+            ctx.fill();
+
+            // Body
+            const skin = gameState.upgrades.equippedSkin;
+            if(skin === 'neon') { ctx.fillStyle = '#ff007f'; ctx.shadowColor = '#ff007f'; }
+            else if(skin === 'gold') { ctx.fillStyle = '#ffcc00'; ctx.shadowColor = '#ffcc00'; }
+            else { ctx.fillStyle = '#00e5ff'; ctx.shadowColor = '#00e5ff'; }
+            
+            ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.fillRect(this.size/4, -this.size/4, this.size/4, this.size/4);
+
+            ctx.restore();
+        }
+    }
+
+    class BackgroundElement {
+        constructor(type, x, y, speed, size) {
+            this.type = type;
+            this.x = x; this.y = y;
+            this.speed = speed;
+            this.size = size;
+        }
+        update(dt, cameraDx) {
+            this.x -= cameraDx * this.speed;
+            if (this.x < -this.size * 2) this.x += screenW + this.size * 4;
+        }
+        draw(ctx) {
+            ctx.save();
+            if (this.type === 'star') {
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.shadowColor = '#fff';
+                ctx.shadowBlur = 5;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+            } else if (this.type === 'building') {
+                ctx.fillStyle = '#050510';
+                ctx.strokeStyle = '#ff007f';
+                ctx.lineWidth = 1;
+                ctx.fillRect(this.x, this.y, this.size, screenH - this.y);
+                if (gameState.upgrades.equippedBg === 'cyber') {
+                    ctx.strokeRect(this.x, this.y, this.size, screenH - this.y);
+                }
+            } else if (this.type === 'tree') {
+                ctx.fillStyle = '#0a2e1f';
+                ctx.strokeStyle = '#00ffaa';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(this.x, engine.baseY);
+                ctx.lineTo(this.x + this.size/2, this.y);
+                ctx.lineTo(this.x + this.size, engine.baseY);
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+
+    // --- GAME FUNCTIONS ---
+
+    function initGame() {
+        engine.score = 0;
+        engine.streak = 0;
+        engine.cameraX = 0;
+        engine.entities.pillars = [];
+        engine.entities.particles = [];
+        engine.entities.bgElements = [];
+        engine.state = 'idle';
+
+        updateScoreHUD();
+        
+        // Spawn initial background
+        spawnBackgrounds();
+
+        // Initial Pillars
+        const p1 = new Pillar(100, 80);
+        const p2 = generateNextPillar(p1);
+        engine.entities.pillars.push(p1, p2);
+
+        // Player
+        engine.entities.player = new Player(p1.x + p1.width - 20, engine.baseY);
+    }
+
+    function spawnBackgrounds() {
+        engine.entities.bgElements = [];
+        const bgType = gameState.upgrades.equippedBg;
+
+        // Stars/Particles layer
+        for(let i=0; i<30; i++) {
+            engine.entities.bgElements.push(new BackgroundElement('star', Math.random()*screenW, Math.random()*(screenH*0.7), 0.05, Math.random()*2+1));
+        }
+
+        // Parallax Objects
+        let x = 0;
+        while(x < screenW * 1.5) {
+            let width = Math.random() * 80 + 40;
+            if (bgType === 'cyber') {
+                let height = screenH * 0.4 + Math.random() * screenH * 0.3;
+                engine.entities.bgElements.push(new BackgroundElement('building', x, height, 0.2, width));
+            } else if (bgType === 'forest') {
+                let height = engine.baseY - (Math.random() * 150 + 50);
+                engine.entities.bgElements.push(new BackgroundElement('tree', x, height, 0.2, width));
+            } else if (bgType === 'sunset') {
+                // Sunset has empty midground, just a sun drawn in the main render loop
+            }
+            x += width + Math.random() * 50;
+        }
+    }
+
+    function generateNextPillar(currentPillar) {
+        const minGap = 50;
+        const maxGap = Math.min(screenW - 150, 400); // Dynamic max based on screen size
+        const gap = minGap + Math.random() * (maxGap - minGap);
+        const width = 30 + Math.random() * 60;
+        return new Pillar(currentPillar.x + currentPillar.width + gap, width);
+    }
+
+    function spawnParticles(x, y, color, count, burstForce = 1) {
+        for(let i=0; i<count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 4 * burstForce;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed - 2; // upward bias
+            const life = 0.5 + Math.random() * 0.5;
+            const size = Math.random() * 3 + 2;
+            engine.entities.particles.push(new Particle(x, y, vx, vy, color, life, size));
+        }
+    }
+
+    function screenShake(amount) {
+        engine.shakeAmount = amount;
+    }
+
+    // --- INPUT HANDLING ---
+    function handlePointerDown(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        if (engine.state === 'idle') {
+            engine.state = 'growing';
+            const p1 = engine.entities.pillars[0];
+            engine.entities.bridge = new Bridge(p1.x + p1.width, engine.baseY);
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        if (engine.state === 'growing') {
+            engine.state = 'falling';
+        }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('touchstart', handlePointerDown);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchend', handlePointerUp);
+
+    // --- ECONOMY REWARDS ---
+    function checkRewards(isPerfect) {
+        let earned = 0;
+        
+        // Small action: +1 for Perfect
+        if (isPerfect) {
+            earned += 1;
+            showToast("PERFECT! +1 SimgaBuck", "#ffcc00");
+        }
+
+        // Streaks (every 3) -> +1
+        if (engine.streak > 0 && engine.streak % 3 === 0) {
+            earned += 1;
+            showToast(`STREAK ${engine.streak}! +1 SB`, "#00ffaa");
+        }
+
+        // Milestones
+        if (engine.score === 10) {
+            earned += 3;
+            showToast("MILESTONE 10! +3 SB", "#ff007f");
+        } else if (engine.score === 25) {
+            earned += 5;
+            showToast("MILESTONE 25! +5 SB", "#00e5ff");
+        }
+
+        if (earned > 0) {
+            addSimgaBucks(earned);
+        }
+    }
+
+    function showToast(text, color) {
+        const area = document.getElementById('notification-area');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.borderColor = color;
+        toast.style.boxShadow = `0 0 15px ${color}`;
+        toast.style.color = color;
+        toast.innerText = text;
+        area.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    }
+
+    // --- GAME LOOP ---
+    function update(dt) {
+        if (dt > 0.1) dt = 0.1; // clamp dt
+
+        // Shake logic
+        if (engine.shakeAmount > 0) {
+            engine.shakeAmount -= dt * 30;
+            if (engine.shakeAmount < 0) engine.shakeAmount = 0;
+        }
+
+        // Particles
+        for (let i = engine.entities.particles.length - 1; i >= 0; i--) {
+            let p = engine.entities.particles[i];
+            p.update(dt);
+            if (p.life <= 0) engine.entities.particles.splice(i, 1);
+        }
+
+        const player = engine.entities.player;
+        const bridge = engine.entities.bridge;
+        const p1 = engine.entities.pillars[0];
+        const p2 = engine.entities.pillars[1];
+
+        if (engine.state === 'growing') {
+            bridge.grow(dt);
+        } 
+        else if (engine.state === 'falling') {
+            if (bridge.fall(dt)) {
+                screenShake(5);
+                engine.state = 'walking';
+                spawnParticles(bridge.x + bridge.length, engine.baseY, '#fff', 10, 0.5);
+            }
+        } 
+        else if (engine.state === 'walking') {
+            player.x += player.speed * dt;
+            
+            // Check end of bridge
+            const bridgeTip = bridge.x + bridge.length;
+            
+            // Calculate stability leeway
+            const stabilityLeeway = gameState.upgrades.stabilityLevel * 12;
+
+            if (player.x > bridgeTip) {
+                // Determine if successful
+                if (bridgeTip >= p2.x - stabilityLeeway && bridgeTip <= p2.x + p2.width + stabilityLeeway) {
+                    // Success! Keep walking to end of p2
+                    if (player.x >= p2.x + p2.width - 20) {
+                        player.x = p2.x + p2.width - 20;
+                        
+                        // Check Perfect
+                        const distToCenter = Math.abs(bridgeTip - p2.perfectCenter);
+                        const isPerfect = distToCenter < 10;
+                        
+                        if (isPerfect) {
+                            spawnParticles(p2.perfectCenter, engine.baseY, '#ff0000', 30, 2);
+                            screenShake(8);
+                        }
+
+                        engine.score++;
+                        engine.streak++;
+                        updateScoreHUD();
+                        checkRewards(isPerfect);
+                        
+                        engine.state = 'pan';
+                    }
+                } else {
+                    // Fall
+                    engine.state = 'gameover';
+                    engine.streak = 0;
+                    player.fallingVy = 0;
+                    screenShake(10);
+                }
+            }
+        } 
+        else if (engine.state === 'pan') {
+            const targetCamX = p2.x + p2.width - 100;
+            const panSpeed = (targetCamX - engine.cameraX) * 5 * dt;
+            engine.cameraX += panSpeed;
+            
+            // Move backgrounds
+            engine.entities.bgElements.forEach(bg => bg.update(dt, panSpeed));
+
+            if (targetCamX - engine.cameraX < 1) {
+                engine.cameraX = 0;
+                
+                // Shift world left
+                const shift = targetCamX;
+                p2.x -= shift;
+                p2.perfectCenter -= shift;
+                player.x -= shift;
+                
+                // Generate next
+                engine.entities.pillars.shift(); // Remove old p1
+                engine.entities.pillars.push(generateNextPillar(p2));
+                engine.entities.bridge = null;
+                
+                engine.state = 'idle';
+            }
+        } 
+        else if (engine.state === 'gameover') {
+            player.y += player.fallingVy * dt;
+            player.fallingVy += 1000 * dt; // Gravity
+            player.rotation += 5 * dt;
+
+            if (player.y > screenH + 100) {
+                endGame();
+            }
+        }
+    }
+
+    function draw() {
+        // Clear background
+        const bgType = gameState.upgrades.equippedBg;
+        if (bgType === 'sunset') {
+            const grad = ctx.createLinearGradient(0, 0, 0, screenH);
+            grad.addColorStop(0, '#ff007f');
+            grad.addColorStop(1, '#ff9900');
+            ctx.fillStyle = grad;
+        } else {
+            ctx.fillStyle = '#050510';
+        }
+        ctx.fillRect(0, 0, screenW, screenH);
+
+        // Draw Sunset Sun (Special BG Case)
+        if (bgType === 'sunset') {
+            ctx.save();
+            ctx.fillStyle = '#ffde00';
+            ctx.shadowColor = '#ffde00';
+            ctx.shadowBlur = 50;
+            ctx.beginPath();
+            ctx.arc(screenW/2, engine.baseY - 50, 150, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Sun grid lines
+            ctx.globalCompositeOperation = 'destination-out';
+            for(let i=0; i<10; i++) {
+                let yOff = 150 - i*15;
+                ctx.fillRect(screenW/2 - 160, engine.baseY - 50 + yOff, 320, i*2);
+            }
+            ctx.restore();
+        }
+
+        ctx.save();
+        
+        // Apply Camera & Shake
+        let cx = -engine.cameraX;
+        let sx = (Math.random() - 0.5) * engine.shakeAmount;
+        let sy = (Math.random() - 0.5) * engine.shakeAmount;
+        ctx.translate(cx + sx, sy);
+
+        // Draw Parallax BGs
+        engine.entities.bgElements.forEach(bg => {
+            // Counter-adjust translation to apply custom parallax speed internally
+            ctx.save();
+            ctx.translate(-cx, 0); // Reset cam for BG
+            bg.draw(ctx);
+            ctx.restore();
+        });
+
+        // Draw Preview (Upgrade Logic)
+        if (engine.state === 'growing' && gameState.upgrades.previewLevel > 0) {
+            const p1 = engine.entities.pillars[0];
+            const p2 = engine.entities.pillars[1];
+            const bridge = engine.entities.bridge;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(p1.x + p1.width, engine.baseY);
+            ctx.lineTo(p1.x + p1.width + bridge.length, engine.baseY);
+            
+            ctx.lineWidth = 2;
+            if (gameState.upgrades.previewLevel === 1) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.setLineDash([10, 10]);
+            } else {
+                ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+                ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 10;
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw Entities
+        engine.entities.pillars.forEach(p => p.draw(ctx));
+        if (engine.entities.bridge) engine.entities.bridge.draw(ctx);
+        if (engine.entities.player) engine.entities.player.draw(ctx);
+        engine.entities.particles.forEach(p => p.draw(ctx));
+
+        // Draw Cyber Grid floor overlay
+        if (bgType === 'cyber') {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 0, 127, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let i=0; i<screenW*2; i+=40) {
+                ctx.moveTo(i + cx%40, engine.baseY);
+                ctx.lineTo(i - 200 + cx%40, screenH);
+            }
+            for(let j=engine.baseY; j<screenH; j+=20) {
+                ctx.moveTo(-cx, j);
+                ctx.lineTo(screenW-cx, j);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    function loop(timestamp) {
+        const dt = (timestamp - engine.lastTime) / 1000;
+        engine.lastTime = timestamp;
+
+        if (engine.state !== 'menu') {
+            update(dt);
+            draw();
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    // --- UI CONTROLS ---
+
+    function showMenu() {
+        engine.state = 'menu';
+        document.getElementById('main-menu').classList.remove('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('shop').classList.add('hidden');
+        document.getElementById('menu-highscore').innerText = gameState.highScore;
+        
+        // Draw background scene for menu
+        spawnBackgrounds();
+        draw(); 
+    }
+
+    function startGame() {
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('shop').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        
+        initGame();
+    }
+
+    function endGame() {
+        engine.state = 'menu'; // halt updates
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('game-over').classList.remove('hidden');
+        
+        document.getElementById('go-score').innerText = engine.score;
+        
+        if (engine.score > gameState.highScore) {
+            gameState.highScore = engine.score;
+            document.getElementById('go-new-best').style.display = 'block';
+            saveGameData();
+        } else {
+            document.getElementById('go-new-best').style.display = 'none';
+        }
+    }
+
+    function updateScoreHUD() {
+        document.getElementById('score-display').innerText = engine.score;
+        document.getElementById('hud-highscore').innerText = Math.max(gameState.highScore, engine.score);
+    }
+
+    // --- SHOP UI LOGIC ---
+
+    function openShop() {
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('shop').classList.remove('hidden');
+        renderShop();
+    }
+
+    function closeShop() {
+        document.getElementById('shop').classList.add('hidden');
+        showMenu();
+    }
+
+    function renderShop() {
+        const container = document.getElementById('shop-items-container');
+        container.innerHTML = '';
+
+        SHOP_CATALOG.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let html = `
+                <div>
+                    <div class="shop-item-title">${item.name}</div>
+                    <div class="shop-item-desc">${item.desc}</div>
+                </div>
+            `;
+
+            let isUnlocked = false;
+            let isEquipped = false;
+            let isMaxLevel = false;
+
+            if (item.type === 'upgrade') {
+                if (gameState.upgrades[item.category] >= item.level) {
+                    isUnlocked = true;
+                    if (gameState.upgrades[item.category] > item.level) isMaxLevel = true;
+                }
+            } else if (item.type === 'skin') {
+                isUnlocked = gameState.unlocked.skins.includes(item.value);
+                isEquipped = gameState.upgrades.equippedSkin === item.value;
+            } else if (item.type === 'bg') {
+                isUnlocked = gameState.unlocked.bgs.includes(item.value);
+                isEquipped = gameState.upgrades.equippedBg === item.value;
+            }
+
+            if (isEquipped) {
+                html += `<button class="buy-btn secondary" disabled>Equipped</button>`;
+            } else if (isUnlocked && (item.type === 'skin' || item.type === 'bg')) {
+                html += `<button class="buy-btn" onclick="equipItem('${item.type}', '${item.value}')">Equip</button>`;
+            } else if (isUnlocked && item.type === 'upgrade') {
+                 html += `<button class="buy-btn" disabled>Purchased</button>`;
+            } else {
+                // Must enforce ordering for upgrades (e.g. need level 1 to buy level 2)
+                let canBuy = true;
+                if (item.type === 'upgrade' && item.level > 1) {
+                    if (gameState.upgrades[item.category] < item.level - 1) {
+                        canBuy = false;
+                    }
+                }
+                
+                if (canBuy) {
+                    html += `<button class="buy-btn" onclick='buyItem(${JSON.stringify(item)})'>Buy: ${item.cost} SB</button>`;
+                } else {
+                    html += `<button class="buy-btn" disabled>Requires Prev Lvl</button>`;
+                }
+            }
+
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+    }
+
+    // Expose for inline HTML onclick
+    window.equipItem = equipItem;
+    window.buyItem = function(item) {
+        spendSimgaBucks(item.cost, item);
+        showToast("Processing transaction...", "#aaa");
+    };
+
+    // --- INITIALIZATION ---
+    document.getElementById('btn-play').addEventListener('click', startGame);
+    document.getElementById('btn-retry').addEventListener('click', startGame);
+    document.getElementById('btn-menu').addEventListener('click', showMenu);
+    document.getElementById('btn-shop').addEventListener('click', openShop);
+    document.getElementById('btn-shop-back').addEventListener('click', closeShop);
+
+    window.onload = () => {
+        resize();
+        
+        // Request saved data
+        loadGameData((savedData) => {
+            if (savedData) {
+                gameState.highScore = savedData.highScore || 0;
+                
+                // Deep merge upgrades to support legacy saves without breaking
+                if (savedData.upgrades) {
+                    Object.assign(gameState.upgrades, savedData.upgrades);
+                }
+                if (savedData.unlocked) {
+                    if (savedData.unlocked.skins) gameState.unlocked.skins = savedData.unlocked.skins;
+                    if (savedData.unlocked.bgs) gameState.unlocked.bgs = savedData.unlocked.bgs;
+                }
+            }
+            showMenu();
+        });
+
+        // Start render loop
+        engine.lastTime = performance.now();
+        requestAnimationFrame(loop);
+    };
+
+</script>
+</body>
+</html>

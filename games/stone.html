@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stone Stack</title>
+    <style>
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --bg-dark: #0f172a;
+            --glass: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            touch-action: none; /* Prevent scroll on mobile */
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: opacity 0.3s ease;
+            pointer-events: auto; /* Re-enable clicks for UI panels */
+        }
+
+        .hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px var(--primary), 0 4px 10px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 15px 40px;
+            margin: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.3);
+            transition: transform 0.1s, box-shadow 0.2s;
+            font-family: inherit;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            background: #475569;
+            box-shadow: none;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        /* Shop Grid */
+        .shop-container {
+            width: 90%;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            background: var(--glass);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .shop-card {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .shop-card h3 {
+            margin: 0 0 5px 0;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .shop-card p {
+            margin: 0 0 10px 0;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            flex-grow: 1;
+        }
+
+        .shop-level {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .shop-card button {
+            font-size: 1rem;
+            padding: 10px;
+            margin: 0;
+            width: 100%;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 20px;
+        }
+
+        #score-display {
+            font-size: 4rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            transition: transform 0.1s;
+        }
+
+        /* Scrollbar styling for shop */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+        
+        .stat-box {
+            background: rgba(0,0,0,0.5);
+            padding: 15px 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-box span { display: block; color: var(--primary); font-size: 2rem; font-weight: bold; }
+        .stat-box p { margin: 0; color: white; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen">
+            <h1>Stone Stack</h1>
+            <button id="btn-play">Play Game</button>
+            <button id="btn-shop">Upgrades & Shop</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen hidden">
+            <h2>Upgrades</h2>
+            <div class="shop-container">
+                <div class="shop-grid" id="shop-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+            <button id="btn-shop-back">Back to Menu</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameover-screen" class="screen hidden">
+            <h2>Stack Collapsed</h2>
+            <div class="stat-box">
+                <p>Final Height</p>
+                <span id="final-score">0</span>
+            </div>
+            <div class="stat-box">
+                <p>SimgaBucks Earned</p>
+                <span id="earned-bucks">0</span>
+            </div>
+            <p style="color: white; margin-bottom: 20px;">Best Height: <b id="best-score" style="color:var(--primary)">0</b></p>
+            <button id="btn-restart">Play Again</button>
+            <button id="btn-menu">Main Menu</button>
+        </div>
+
+        <!-- In-Game HUD -->
+        <div id="hud" class="hidden">
+            <div id="score-display">0</div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * PLATFORM INTEGRATION & ECONOMY
+         */
+        const GAME_ID = "stone";
+        let saveObject = {
+            upgrades: {},
+            highScore: 0
+        };
+        
+        let pendingPurchases = {};
+        const loadMsgId = "load_" + Date.now();
+        let isDataLoaded = false;
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+
+            // Load Response
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    saveObject = Object.assign(saveObject, data.data);
+                    if (!saveObject.upgrades) saveObject.upgrades = {};
+                }
+                isDataLoaded = true;
+                updateShopUI();
+            }
+
+            // Spend Response
+            if (data.type === "spendResponse") {
+                let pending = pendingPurchases[data.msgId];
+                if (pending) {
+                    if (data.success) {
+                        saveObject.upgrades[pending.type] = pending.level;
+                        saveGame();
+                        updateShopUI();
+                        showFloatingText("Purchase Successful!", canvas.width/2, canvas.height/2, "#0f0");
+                    } else {
+                        alert("Not enough SimgaBucks");
+                    }
+                    delete pendingPurchases[data.msgId];
+                }
+            }
+        });
+
+        // Request initial load
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+
+        function saveGame() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveObject
+            }, "*");
+        }
+
+        let bucksEarnedThisRun = 0;
+        function awardSimgaBucks(amount, reason) {
+            bucksEarnedThisRun += amount;
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+            showFloatingText(`+${amount} SB!`, canvas.width/2, cameraY + canvas.height/3, '#00ffcc');
+        }
+
+        function requestPurchase(type, cost, nextLevel) {
+            const msgId = Math.random().toString(36);
+            pendingPurchases[msgId] = { type: type, level: nextLevel };
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: msgId
+            }, "*");
+        }
+
+        /**
+         * SHOP DATA
+         */
+        const SHOP_ITEMS = {
+            textures: {
+                name: "Stone Polish",
+                desc: "Change the visual style of your stones.",
+                levels: [
+                    { cost: 0, label: "River Rock" },
+                    { cost: 30, label: "Magma Core" },
+                    { cost: 80, label: "Crystal Geode" }
+                ]
+            },
+            landscapes: {
+                name: "Atmosphere",
+                desc: "Explore new gorgeous backgrounds.",
+                levels: [
+                    { cost: 0, label: "Zen Forest" },
+                    { cost: 40, label: "Sunset Peaks" },
+                    { cost: 100, label: "Cosmic Void" }
+                ]
+            },
+            swingSpeed: {
+                name: "Crane Precision",
+                desc: "Reduces the swinging speed of the crane.",
+                levels: [
+                    { cost: 0, label: "Standard" },
+                    { cost: 15, label: "Focused (-15%)" },
+                    { cost: 30, label: "Steady (-30%)" },
+                    { cost: 60, label: "Precise (-45%)" },
+                    { cost: 120, label: "Zen (-60%)" }
+                ]
+            },
+            balance: {
+                name: "Balance Buffer",
+                desc: "Stones are less likely to topple.",
+                levels: [
+                    { cost: 0, label: "Strict" },
+                    { cost: 20, label: "Forgiving (+15%)" },
+                    { cost: 45, label: "Stable (+30%)" },
+                    { cost: 80, label: "Solid (+45%)" },
+                    { cost: 150, label: "Anchored (+60%)" }
+                ]
+            }
+        };
+
+        function updateShopUI() {
+            let grid = document.getElementById('shop-grid');
+            grid.innerHTML = '';
+            
+            for (let key in SHOP_ITEMS) {
+                let item = SHOP_ITEMS[key];
+                let currentLevel = saveObject.upgrades[key] || 0;
+                let isMax = currentLevel >= item.levels.length - 1;
+                
+                let levelData = isMax ? item.levels[currentLevel] : item.levels[currentLevel + 1];
+                let cost = isMax ? "MAX" : levelData.cost + " SB";
+                let label = levelData.label;
+                
+                let card = document.createElement('div');
+                card.className = 'shop-card';
+                card.innerHTML = `
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                    <div class="shop-level">Current: ${item.levels[currentLevel].label}</div>
+                    <button ${isMax ? 'disabled' : ''} onclick="requestPurchase('${key}', ${isMax ? 0 : levelData.cost}, ${currentLevel + 1})">
+                        ${isMax ? 'Fully Upgraded' : `Unlock ${label} (${cost})`}
+                    </button>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        /**
+         * CORE GAME ENGINE
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let state = 'MENU'; // MENU, SHOP, PLAYING, GAMEOVER_ANIM, GAMEOVER
+        let lastTime = 0;
+        let dt = 0;
+
+        let stones = [];
+        let currentStone = null;
+        let particles = [];
+        let floatingTexts = [];
+
+        let score = 0;
+        let combo = 0;
+        let cameraY = 0;
+        let targetCameraY = 0;
+        let swayAngle = 0;
+        let shakeTime = 0;
+        let rewardsGiven = {};
+
+        // DOM Elements
+        const screens = {
+            MENU: document.getElementById('menu-screen'),
+            SHOP: document.getElementById('shop-screen'),
+            GAMEOVER: document.getElementById('gameover-screen'),
+            HUD: document.getElementById('hud')
+        };
+        const scoreDisplay = document.getElementById('score-display');
+
+        function switchState(newState) {
+            state = newState;
+            screens.MENU.classList.add('hidden');
+            screens.SHOP.classList.add('hidden');
+            screens.GAMEOVER.classList.add('hidden');
+            screens.HUD.classList.add('hidden');
+
+            if (state === 'MENU') screens.MENU.classList.remove('hidden');
+            if (state === 'SHOP') {
+                updateShopUI();
+                screens.SHOP.classList.remove('hidden');
+            }
+            if (state === 'PLAYING') screens.HUD.classList.remove('hidden');
+            if (state === 'GAMEOVER') screens.GAMEOVER.classList.remove('hidden');
+        }
+
+        // Event Listeners
+        document.getElementById('btn-play').addEventListener('click', resetGame);
+        document.getElementById('btn-restart').addEventListener('click', resetGame);
+        document.getElementById('btn-shop').addEventListener('click', () => switchState('SHOP'));
+        document.getElementById('btn-shop-back').addEventListener('click', () => switchState('MENU'));
+        document.getElementById('btn-menu').addEventListener('click', () => switchState('MENU'));
+
+        window.addEventListener('resize', () => {
+            let oldW = canvas.width;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            let diff = (canvas.width - oldW) / 2;
+            
+            // Re-center stones
+            for (let s of stones) s.x += diff;
+            if (currentStone && !currentStone.isDropping) currentStone.x += diff;
+        });
+
+        // Drop Interaction (Mouse & Touch)
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'CANVAS') dropStone();
+        });
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.tagName === 'CANVAS') {
+                dropStone();
+            }
+        }, {passive: false});
+
+
+        /**
+         * GAMEPLAY LOGIC
+         */
+        function resetGame() {
+            score = 0;
+            combo = 0;
+            bucksEarnedThisRun = 0;
+            stones = [];
+            particles = [];
+            floatingTexts = [];
+            rewardsGiven = { 5: false, 15: false, 30: false, 50: false, 75: false };
+            scoreDisplay.innerText = "0";
+
+            // Base Altar
+            stones.push({
+                x: canvas.width / 2,
+                y: canvas.height - 100,
+                w: 240,
+                h: 400, // extends down
+                mass: 999999,
+                isBase: true
+            });
+
+            cameraY = stones[0].y - canvas.height;
+            targetCameraY = cameraY;
+            
+            spawnNextStone();
+            switchState('PLAYING');
+        }
+
+        function spawnNextStone() {
+            let speedLevel = saveObject.upgrades.swingSpeed || 0;
+            let speedMultiplier = 1.0 - (speedLevel * 0.15); 
+            
+            let baseWidth = Math.max(50, 150 - score * 2.5); // Stones get smaller and harder!
+            let w = baseWidth + (Math.random() * 20 - 10);
+            let h = 40 + Math.random() * 15;
+            
+            let topStone = stones[stones.length - 1];
+            let startY = topStone.y - topStone.h/2 - h/2 - 200; // Hover height
+            
+            currentStone = {
+                x: canvas.width / 2,
+                y: startY,
+                w: w,
+                h: h,
+                mass: w * h,
+                speed: (0.0025 + score * 0.00005) * speedMultiplier,
+                amplitude: canvas.width * 0.35,
+                timeOffset: Math.random() * 1000,
+                isDropping: false,
+                isFalling: false,
+                angle: 0
+            };
+        }
+
+        function dropStone() {
+            if (state !== 'PLAYING' || !currentStone || currentStone.isDropping) return;
+            
+            currentStone.isDropping = true;
+            currentStone.vy = 1.2; // Fall speed
+            stones.push(currentStone);
+            currentStone = null;
+        }
+
+        function update(dt) {
+            // Update camera smoothly
+            cameraY += (targetCameraY - cameraY) * 0.08;
+
+            // Swinging logic
+            if (state === 'PLAYING' && currentStone && !currentStone.isDropping) {
+                let time = Date.now();
+                currentStone.x = canvas.width/2 + Math.sin(time * currentStone.speed + currentStone.timeOffset) * currentStone.amplitude;
+            }
+
+            // Dropping logic
+            if (state === 'PLAYING' && stones.length > 1) {
+                let top = stones[stones.length - 1];
+                if (top.isDropping) {
+                    top.y += top.vy * dt;
+                    let prev = stones[stones.length - 2];
+                    let targetY = prev.y - prev.h/2 - top.h/2;
+                    
+                    if (top.y >= targetY) {
+                        top.y = targetY;
+                        top.isDropping = false;
+                        handleLanding(top, prev);
+                    }
+                }
+            }
+
+            // Falling physics (Game Over)
+            for (let i=0; i<stones.length; i++) {
+                let stone = stones[i];
+                if (stone.isFalling) {
+                    stone.x += stone.vx * dt;
+                    stone.vy += 0.002 * dt; // Gravity
+                    stone.y += stone.vy * dt;
+                    stone.angle += stone.vr * dt;
+                }
+            }
+
+            // Update Sway (Wobble) based on score
+            if (state === 'PLAYING' && stones.length > 4) {
+                let intensity = Math.min((stones.length - 4) * 0.001, 0.06);
+                swayAngle = Math.sin(Date.now() * 0.001) * intensity;
+            } else if (state !== 'PLAYING') {
+                swayAngle *= 0.95; // settle down
+            }
+
+            // Particles & Text
+            particles.forEach(p => p.update(dt));
+            floatingTexts.forEach(ft => ft.update(dt));
+            particles = particles.filter(p => p.life > 0);
+            floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+            if (shakeTime > 0) shakeTime -= dt;
+        }
+
+        function handleLanding(top, prev) {
+            // 1. Check Miss
+            if (top.x + top.w/2 < prev.x - prev.w/2 || top.x - top.w/2 > prev.x + prev.w/2) {
+                top.isFalling = true;
+                top.vx = (top.x - prev.x) > 0 ? 0.1 : -0.1;
+                top.vy = 0;
+                top.vr = top.vx * 0.05;
+                triggerGameOver();
+                return;
+            }
+
+            // 2. Check Perfect Placement
+            let diff = Math.abs(top.x - prev.x);
+            if (diff < 10) {
+                top.x = prev.x; // Snap
+                combo++;
+                top.isPerfect = true;
+                spawnParticles(top.x, top.y, 25, '#00f2fe');
+                showFloatingText("Perfect!", top.x, top.y, '#00f2fe');
+                
+                // Small chance for combo SimgaBucks
+                if (combo >= 3 && Math.random() < 0.2) {
+                    awardSimgaBucks(1, "Combo Bonus");
+                }
+            } else {
+                combo = 0;
+                spawnParticles(top.x, top.y + top.h/2, 15, '#ffffff'); // Dust
+            }
+
+            // Screen Shake
+            shakeTime = 150;
+            scoreDisplay.style.transform = `scale(1.3)`;
+            setTimeout(() => scoreDisplay.style.transform = `scale(1)`, 100);
+
+            // 3. Physics Balance Check
+            let breakIndex = checkBalance();
+            if (breakIndex !== -1) {
+                // Topple!
+                for(let i = breakIndex; i < stones.length; i++) {
+                    stones[i].isFalling = true;
+                    stones[i].vx = (stones[i].x - stones[breakIndex-1].x) * 0.015;
+                    stones[i].vy = -0.3; 
+                    stones[i].vr = (Math.random() - 0.5) * 0.005;
+                }
+                triggerGameOver();
+                return;
+            }
+
+            // 4. Success Progression
+            score++;
+            scoreDisplay.innerText = score;
+            if (score > saveObject.highScore) saveObject.highScore = score;
+            
+            checkScoreRewards();
+            targetCameraY = top.y - canvas.height/2;
+            spawnNextStone();
+        }
+
+        function checkBalance() {
+            let balanceLevel = saveObject.upgrades.balance || 0;
+            let buffer = 1.0 + (balanceLevel * 0.15); 
+
+            // Calculate Center of Mass from top down
+            for (let i = stones.length - 1; i >= 1; i--) {
+                let totalMass = 0;
+                let comX = 0;
+                for (let j = i; j < stones.length; j++) {
+                    totalMass += stones[j].mass;
+                    comX += stones[j].x * stones[j].mass;
+                }
+                comX /= totalMass;
+
+                let baseStone = stones[i-1];
+                let allowedDist = (baseStone.w / 2) * buffer;
+
+                if (Math.abs(comX - baseStone.x) > allowedDist) {
+                    return i; // Index where stack breaks
+                }
+            }
+            return -1;
+        }
+
+        function checkScoreRewards() {
+            // Milestone Rewards (5 - 15 total per good run)
+            let milestones = [
+                { s: 5, r: 1 },   // ~15s
+                { s: 15, r: 2 },  // ~40s
+                { s: 30, r: 3 },  // ~80s
+                { s: 50, r: 4 },  // ~130s
+                { s: 75, r: 5 }   // ~190s
+            ];
+
+            for (let m of milestones) {
+                if (score === m.s && !rewardsGiven[m.s]) {
+                    rewardsGiven[m.s] = true;
+                    awardSimgaBucks(m.r, `Reached ${m.s} stones`);
+                }
+            }
+        }
+
+        function triggerGameOver() {
+            state = 'GAMEOVER_ANIM';
+            saveGame(); // Save high score immediately
+            
+            setTimeout(() => {
+                state = 'GAMEOVER';
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('best-score').innerText = saveObject.highScore;
+                document.getElementById('earned-bucks').innerText = bucksEarnedThisRun;
+                switchState('GAMEOVER');
+            }, 2500);
+        }
+
+        /**
+         * VISUALS & RENDERING
+         */
+        function drawBackground(ctx, w, h, camY) {
+            let landscape = saveObject.upgrades.landscapes || 0;
+            let time = Date.now();
+
+            if (landscape === 0) {
+                // Zen Forest
+                let grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#0f2027');
+                grad.addColorStop(0.5, '#203a43');
+                grad.addColorStop(1, '#2c5364');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+                
+                // Glowing Orb
+                ctx.fillStyle = 'rgba(255, 255, 200, 0.05)';
+                ctx.beginPath(); ctx.arc(w/2, h/2 + camY*0.1, 150, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(w/2, h/2 + camY*0.1, 100, 0, Math.PI*2); ctx.fill();
+                
+                // Bamboo Silhouettes
+                ctx.fillStyle = 'rgba(10, 25, 20, 0.3)';
+                for(let i=0; i<12; i++) {
+                    let px = (i * 100 + camY * 0.05) % (w + 100) - 50;
+                    ctx.fillRect(px, 0, 20 + (i%3)*10, h);
+                }
+            } 
+            else if (landscape === 1) {
+                // Sunset Peaks
+                let grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#2b0f4c');
+                grad.addColorStop(0.5, '#872a5a');
+                grad.addColorStop(1, '#f77b59');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+                
+                // Sun
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
+                ctx.beginPath(); ctx.arc(w/2, h*0.6 + camY*0.2, 80, 0, Math.PI*2); ctx.fill();
+                
+                // Mountains
+                ctx.fillStyle = '#1a0b2e';
+                ctx.beginPath();
+                ctx.moveTo(-100, h);
+                ctx.lineTo(w*0.3, h*0.5 + camY*0.1);
+                ctx.lineTo(w*0.6, h*0.8 + camY*0.1);
+                ctx.lineTo(w*0.9, h*0.4 + camY*0.1);
+                ctx.lineTo(w+100, h);
+                ctx.fill();
+            } 
+            else if (landscape === 2) {
+                // Cosmic Void
+                let grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#000000');
+                grad.addColorStop(1, '#110022');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+                
+                // Procedural Stars
+                ctx.fillStyle = '#ffffff';
+                for(let i=0; i<80; i++) {
+                    let sx = (Math.sin(i*123.4) * w + w/2 + time*0.01*(i%3)) % w;
+                    let sy = (Math.cos(i*321.4) * h + h/2 + camY*0.08*(i%4)) % h;
+                    if (sx < 0) sx += w; if (sy < 0) sy += h;
+                    let size = (i%3)*0.8 + 0.5;
+                    ctx.globalAlpha = Math.sin(time*0.002 + i) * 0.5 + 0.5;
+                    ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI*2); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        function drawStoneShape(ctx, w, h, textureLvl) {
+            let r = Math.min(w, h) * 0.25; // Roundness
+            
+            // Draw slightly bumpy rounded rect path
+            ctx.beginPath();
+            ctx.moveTo(-w/2 + r, -h/2);
+            ctx.lineTo(w/2 - r, -h/2);
+            ctx.quadraticCurveTo(w/2, -h/2, w/2, -h/2 + r);
+            // bumpy side
+            ctx.quadraticCurveTo(w/2 - 2, 0, w/2, h/2 - r);
+            ctx.quadraticCurveTo(w/2, h/2, w/2 - r, h/2);
+            ctx.lineTo(-w/2 + r, h/2);
+            ctx.quadraticCurveTo(-w/2, h/2, -w/2, h/2 - r);
+            // bumpy side
+            ctx.quadraticCurveTo(-w/2 + 2, 0, -w/2, -h/2 + r);
+            ctx.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
+            ctx.closePath();
+
+            // Gradient based on Texture
+            let grad = ctx.createLinearGradient(-w/2, -h/2, w/2, h/2);
+            if (textureLvl === 0) { // River
+                grad.addColorStop(0, '#a0a5b0');
+                grad.addColorStop(1, '#505560');
+            } else if (textureLvl === 1) { // Magma
+                grad.addColorStop(0, '#3a0b00');
+                grad.addColorStop(0.5, '#111111');
+                grad.addColorStop(1, '#ff4400');
+            } else if (textureLvl === 2) { // Crystal
+                grad.addColorStop(0, '#00ffff');
+                grad.addColorStop(0.5, '#0088ff');
+                grad.addColorStop(1, '#ff00ff');
+            }
+
+            // Fill & Shadow
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetY = 8;
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Highlight (3D pop)
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.stroke();
+
+            // Texture Detailing
+            if (textureLvl === 0) {
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.beginPath(); ctx.arc(w*0.1, -h*0.2, w*0.1, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = 'rgba(0,0,0,0.05)';
+                ctx.beginPath(); ctx.arc(-w*0.2, h*0.1, w*0.15, 0, Math.PI*2); ctx.fill();
+            } else if (textureLvl === 1) { // Magma cracks
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(-w*0.2, -h*0.3); ctx.lineTo(0, 0); ctx.lineTo(-w*0.1, h*0.2); ctx.stroke();
+            } else if (textureLvl === 2) { // Crystal facets
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(-w/2, -h/2); ctx.lineTo(0,0); ctx.lineTo(w/2, -h/2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0, h/2); ctx.stroke();
+            }
+        }
+
+        function drawStone(ctx, stone) {
+            ctx.save();
+            ctx.translate(stone.x, stone.y);
+            if (stone.angle) ctx.rotate(stone.angle);
+
+            let texLvl = saveObject.upgrades.textures || 0;
+
+            if (stone.isBase) {
+                // Altar
+                let grad = ctx.createLinearGradient(0, -stone.h/2, 0, stone.h/2);
+                grad.addColorStop(0, '#222');
+                grad.addColorStop(1, '#050505');
+                ctx.fillStyle = grad;
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 20;
+                ctx.fillRect(-stone.w/2, -stone.h/2, stone.w, stone.h);
+                // Top rim
+                ctx.fillStyle = 'var(--primary)';
+                ctx.fillRect(-stone.w/2, -stone.h/2, stone.w, 15);
+            } else {
+                drawStoneShape(ctx, stone.w, stone.h, texLvl);
+
+                // Perfect Glow Outline
+                if (stone.isPerfect) {
+                    ctx.shadowColor = 'var(--primary)';
+                    ctx.shadowBlur = 15;
+                    ctx.strokeStyle = 'rgba(0, 242, 254, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function spawnParticles(x, y, count, color) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4 - 0.1,
+                    life: 600 + Math.random() * 400,
+                    maxLife: 1000,
+                    color: color,
+                    size: Math.random() * 4 + 2,
+                    update: function(dt) { this.x += this.vx*dt; this.y += this.vy*dt; this.life -= dt; },
+                    draw: function(ctx) {
+                        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                        ctx.fillStyle = this.color;
+                        ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+                        ctx.globalAlpha = 1;
+                    }
+                });
+            }
+        }
+
+        function showFloatingText(text, x, y, color) {
+            floatingTexts.push({
+                text: text, x: x, y: y, color: color,
+                life: 1200, maxLife: 1200, vy: -0.06,
+                update: function(dt) { this.y += this.vy*dt; this.life -= dt; },
+                draw: function(ctx) {
+                    ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                    ctx.fillStyle = this.color;
+                    ctx.font = "bold 26px 'Segoe UI', sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeText(this.text, this.x, this.y);
+                    ctx.fillText(this.text, this.x, this.y);
+                    ctx.globalAlpha = 1;
+                }
+            });
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Background
+            drawBackground(ctx, canvas.width, canvas.height, cameraY);
+
+            ctx.save();
+            
+            // 2. Camera & Shake Transform
+            let cx = 0, cy = 0;
+            if (shakeTime > 0) {
+                cx = (Math.random() - 0.5) * 10;
+                cy = (Math.random() - 0.5) * 10;
+            }
+            ctx.translate(cx, -cameraY + cy);
+
+            // 3. Wobble (Applies to stacked stones only)
+            ctx.save();
+            let pivotY = stones.length > 0 ? stones[0].y : 0;
+            ctx.translate(canvas.width/2, pivotY);
+            ctx.rotate(swayAngle);
+            ctx.translate(-canvas.width/2, -pivotY);
+
+            // Draw stable stack
+            for (let s of stones) {
+                if (!s.isDropping && !s.isFalling) drawStone(ctx, s);
+            }
+            ctx.restore(); // End Wobble
+
+            // 4. Draw Falling / Dropping stones (Unaffected by wobble)
+            for (let s of stones) {
+                if (s.isFalling || s.isDropping) drawStone(ctx, s);
+            }
+
+            // 5. Draw Crane & Swinging Stone
+            if (currentStone && state === 'PLAYING') {
+                // String from above
+                ctx.beginPath();
+                ctx.moveTo(canvas.width/2, cameraY - 100); 
+                ctx.lineTo(currentStone.x, currentStone.y);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                drawStone(ctx, currentStone);
+            }
+
+            // 6. Effects
+            particles.forEach(p => p.draw(ctx));
+            floatingTexts.forEach(ft => ft.draw(ctx));
+
+            ctx.restore(); // End Camera
+        }
+
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Cap dt to prevent massive jumps on lag
+            if (dt > 100) dt = 16;
+
+            update(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize setup
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        requestAnimationFrame(gameLoop);
+
+    </script>
+</body>
+</html>

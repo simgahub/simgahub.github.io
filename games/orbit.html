@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Orbit Dodge</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --primary: #00e5ff;
+            --secondary: #ff0055;
+            --dark: #0b0f19;
+            --panel: rgba(15, 25, 45, 0.85);
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #000;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass to canvas when playing */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 2.5rem;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.1), inset 0 0 20px rgba(0, 229, 255, 0.05);
+            pointer-events: auto;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        .screen::-webkit-scrollbar { width: 8px; }
+        .screen::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
+        .screen::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .active {
+            display: flex;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 3.5rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+            text-align: center;
+        }
+
+        h2 { font-size: 2rem; margin-bottom: 1.5rem; color: var(--primary); text-shadow: 0 0 10px rgba(0,229,255,0.5); }
+        
+        .stats {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-bottom: 2rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .stats span { color: var(--primary); font-weight: bold; }
+
+        button {
+            background: linear-gradient(45deg, rgba(0,229,255,0.1), rgba(0,229,255,0.2));
+            border: 2px solid var(--primary);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            padding: 12px 30px;
+            margin: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(0,229,255,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: var(--dark);
+            box-shadow: 0 0 25px var(--primary);
+            transform: translateY(-2px);
+        }
+
+        button:hover::before { left: 100%; }
+        button:active { transform: translateY(1px); }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .shop-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0,229,255,0.2);
+            transform: translateY(-3px);
+        }
+
+        .shop-item-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 10px;
+            border-radius: 50%;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        .shop-item-title { font-weight: bold; margin-bottom: 5px; font-size: 1.1rem; }
+        .shop-item-desc { font-size: 0.8rem; color: #888; margin-bottom: 15px; flex-grow: 1; }
+        
+        .btn-buy {
+            background: transparent;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        .btn-buy:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+        
+        .btn-equip { border-color: var(--primary); color: var(--primary); }
+        .btn-equip:hover { background: var(--primary); color: var(--dark); }
+        
+        .btn-equipped { border-color: #555; color: #888; cursor: default; }
+        .btn-equipped:hover { background: transparent; color: #888; transform: none; box-shadow: none; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .hud-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        #hud-currency { color: #0f0; text-shadow: 0 0 10px #0f0; }
+        
+        .message-toast {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: #fff;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(0,229,255,0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .toast-show { opacity: 1; animation: floatUp 2s ease-out forwards; }
+
+        @keyframes floatUp {
+            0% { transform: translate(-50%, 0) scale(0.9); opacity: 0; }
+            10% { transform: translate(-50%, -10px) scale(1); opacity: 1; }
+            80% { transform: translate(-50%, -30px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -40px) scale(0.9); opacity: 0; }
+        }
+
+        /* Loading Overlay */
+        #loader {
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: var(--primary);
+            font-size: 2rem;
+            transition: opacity 0.5s;
+        }
+
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid rgba(0,229,255,0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.2rem; }
+            .screen { padding: 1.5rem; width: 95%; }
+            .shop-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="loader">
+        <div class="spinner"></div> Loading Uplink...
+    </div>
+
+    <div id="ui-layer">
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <h1>Orbit Dodge</h1>
+            <div class="stats">
+                High Score: <span id="menu-highscore">0</span><br>
+                <small>Tap or Spacebar to switch orbits.</small>
+            </div>
+            <button id="btn-play">Engage Thrusters</button>
+            <button id="btn-shop">Armory & Upgrades</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen">
+            <h2>Armory</h2>
+            <div style="width:100%; overflow-y:auto; max-height: 60vh; padding: 10px;">
+                <h3 style="margin-bottom:10px; border-bottom:1px solid #444; padding-bottom:5px;">Ship Skins</h3>
+                <div class="shop-grid" id="shop-skins"></div>
+                
+                <h3 style="margin-top:20px; margin-bottom:10px; border-bottom:1px solid #444; padding-bottom:5px;">Engine Trails</h3>
+                <div class="shop-grid" id="shop-trails"></div>
+
+                <h3 style="margin-top:20px; margin-bottom:10px; border-bottom:1px solid #444; padding-bottom:5px;">Systems</h3>
+                <div class="shop-grid" id="shop-upgrades"></div>
+            </div>
+            <button id="btn-shop-back" style="margin-top: 20px;">Return to Base</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="screen-gameover" class="screen">
+            <h1 style="color: var(--secondary); text-shadow: 0 0 20px rgba(255,0,85,0.5);">Hull Breach</h1>
+            <div class="stats">
+                Score: <span id="go-score">0</span><br>
+                Best: <span id="go-highscore">0</span>
+            </div>
+            <button id="btn-play-again">Deploy Again</button>
+            <button id="btn-menu">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-text" id="hud-score">0</div>
+        <div class="hud-text" id="hud-currency">SB: 0</div>
+    </div>
+
+    <div id="toast" class="message-toast"></div>
+
+    <script>
+        /**
+         * ORBIT DODGE
+         * A lightweight, visually polished HTML5 Canvas game.
+         */
+
+        // ==========================================
+        // 1. PLATFORM INTEGRATION & CONSTANTS
+        // ==========================================
+        const GAME_ID = "orbit";
+        
+        // Default Save State
+        let saveData = {
+            upgrades: { slow_field: false, shield: false },
+            purchased: ["skin_default", "trail_default"],
+            equippedSkin: "skin_default",
+            equippedTrail: "trail_default",
+            highScore: 0
+        };
+
+        // Session Variables
+        let sessionSimgaBucks = 0; // Tracked just for display in session
+        let pendingPurchases = {}; // { msgId: itemObject }
+        let isLoaded = false;
+
+        // Platform Communication
+        function saveGame() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function loadGame() {
+            const loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+            
+            // Fallback timeout in case platform doesn't respond
+            setTimeout(() => {
+                if(!isLoaded) initGame(); 
+            }, 1500);
+        }
+
+        function awardSimgaBucks(amount, reason = "") {
+            sessionSimgaBucks += amount;
+            updateHUD();
+            showToast(`+${amount} SB ${reason}`);
+            
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+        }
+
+        function buyItem(item) {
+            if (saveData.purchased.includes(item.id) || saveData.upgrades[item.id]) return;
+            
+            const msgId = "buy_" + Math.random().toString(36).substr(2, 9);
+            pendingPurchases[msgId] = item;
+            
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: item.price,
+                msgId: msgId
+            }, "*");
+        }
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            
+            // Handle Load
+            if (data.type === "loadResponse" && !isLoaded) {
+                if (data.data) {
+                    // Merge saved data with defaults to ensure all keys exist
+                    saveData = { ...saveData, ...data.data };
+                    saveData.upgrades = { ...{slow_field: false, shield: false}, ...(data.data.upgrades || {}) };
+                    saveData.purchased = data.data.purchased || ["skin_default", "trail_default"];
+                }
+                initGame();
+            }
+            
+            // Handle Purchase
+            if (data.type === "spendResponse") {
+                const item = pendingPurchases[data.msgId];
+                if (item) {
+                    if (data.success) {
+                        if (item.type === 'upgrade') {
+                            saveData.upgrades[item.id] = true;
+                        } else {
+                            saveData.purchased.push(item.id);
+                            // Auto equip
+                            if (item.type === 'skin') saveData.equippedSkin = item.id;
+                            if (item.type === 'trail') saveData.equippedTrail = item.id;
+                        }
+                        saveGame();
+                        renderShop();
+                        showToast("Purchase Successful!");
+                    } else {
+                        showToast("Not enough SimgaBucks!");
+                    }
+                    delete pendingPurchases[data.msgId];
+                }
+            }
+        });
+
+        // ==========================================
+        // 2. SHOP DATA
+        // ==========================================
+        const SHOP_ITEMS = [
+            { id: "skin_default", name: "Wraith (Blue)", type: "skin", price: 0, color: "#00e5ff", desc: "Standard issue light fighter." },
+            { id: "skin_red", name: "Phoenix (Red)", type: "skin", price: 20, color: "#ff0055", desc: "Aggressive aerodynamic plating." },
+            { id: "skin_gold", name: "Aegis (Gold)", type: "skin", price: 50, color: "#ffcc00", desc: "Experimental alloy chassis." },
+            { id: "skin_neon", name: "Specter (Neon)", type: "skin", price: 100, color: "#cc00ff", desc: "Stealth energy signature." },
+            
+            { id: "trail_default", name: "Ion Thruster", type: "trail", price: 0, color: "#00e5ff", desc: "Standard blue ion exhaust." },
+            { id: "trail_fire", name: "Plasma Wake", type: "trail", price: 25, color: "#ff5500", desc: "High-heat plasma trail." },
+            { id: "trail_void", name: "Dark Matter", type: "trail", price: 60, color: "#aa00ff", desc: "Distorts space-time behind you." },
+            
+            { id: "slow_field", name: "Gravity Dampener", type: "upgrade", price: 150, color: "#0f0", desc: "Passive: Reduces meteor speed by 15% permanently." },
+            { id: "shield", name: "Kinetic Shield", type: "upgrade", price: 250, color: "#00e5ff", desc: "Passive: Start every run with a shield that blocks 1 hit." }
+        ];
+
+        // ==========================================
+        // 3. ENGINE & GRAPHICS SETUP
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency on base canvas
+        
+        let width, height, cx, cy;
+        let scale = 1;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            cx = width / 2;
+            cy = height / 2;
+            scale = Math.min(width, height) / 800; // Base resolution scale
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Game State Variables
+        const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2, SHOP: 3 };
+        let currentState = STATE.MENU;
+        
+        let lastTime = 0;
+        let shakeTime = 0;
+        let shakeIntensity = 0;
+        
+        // Input
+        let inputTriggered = false;
+
+        function handleInput(e) {
+            if (e.type === 'keydown' && e.code !== 'Space') return;
+            if (e.type !== 'keydown') e.preventDefault(); // Prevent double tap zoom
+            
+            if (currentState === STATE.PLAYING && !inputTriggered) {
+                ship.toggleOrbit();
+                inputTriggered = true;
+            }
+        }
+        
+        function releaseInput() { inputTriggered = false; }
+
+        window.addEventListener('keydown', handleInput);
+        window.addEventListener('keyup', releaseInput);
+        window.addEventListener('touchstart', handleInput, {passive: false});
+        window.addEventListener('touchend', releaseInput);
+        window.addEventListener('mousedown', handleInput);
+        window.addEventListener('mouseup', releaseInput);
+
+        // ==========================================
+        // 4. GAME ENTITIES
+        // ==========================================
+        
+        // Config
+        const GAME_CONFIG = {
+            baseOrbitSpeed: 0.02,
+            innerRadiusRatio: 0.15,
+            outerRadiusRatio: 0.28,
+            meteorSpawnBase: 1200, // ms
+            meteorSpeedBase: 2.5
+        };
+
+        let entities = {
+            stars: [],
+            meteors: [],
+            particles: [],
+            trails: []
+        };
+        
+        let gameData = {
+            score: 0,
+            timeElapsed: 0,
+            nextMilestone: 30, // seconds for SB reward
+            difficultyMult: 1,
+            lastMeteorTime: 0,
+            activeShield: false
+        };
+
+        // --- Visual FX ---
+        function addShake(intensity, duration) {
+            shakeIntensity = intensity;
+            shakeTime = duration;
+        }
+
+        function createExplosion(x, y, color, count, speedMult = 1) {
+            for (let i = 0; i < count; i++) {
+                entities.particles.push(new Particle(x, y, color, speedMult));
+            }
+        }
+
+        function createFloatingText(x, y, text, color) {
+            entities.particles.push(new FloatingText(x, y, text, color));
+        }
+
+        // --- Classes ---
+        class Star {
+            constructor() {
+                this.reset(true);
+            }
+            reset(randomize = false) {
+                this.x = Math.random() * width;
+                this.y = randomize ? Math.random() * height : -10;
+                this.z = Math.random() * 3 + 0.1; // Parallax depth
+                this.size = (Math.random() * 1.5 + 0.5) / this.z;
+                this.alpha = Math.random() * 0.5 + 0.3;
+            }
+            update(dt) {
+                this.y += (20 / this.z) * (dt/1000);
+                // Twinkle
+                if (Math.random() < 0.01) this.alpha = Math.random() * 0.5 + 0.3;
+                if (this.y > height + 10) this.reset();
+            }
+            draw(ctx) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speedMult = 1) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 3 + 1) * speedMult * scale;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.size = (Math.random() * 3 + 1) * scale;
+            }
+            update(dt) {
+                this.x += this.vx * (dt/16);
+                this.y += this.vy * (dt/16);
+                this.life -= this.decay * (dt/16);
+            }
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class FloatingText {
+            constructor(x, y, text, color) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.life = 1.0;
+                this.vy = -1 * scale;
+            }
+            update(dt) {
+                this.y += this.vy * (dt/16);
+                this.life -= 0.015 * (dt/16);
+            }
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.font = `bold ${16 * scale}px Orbitron`;
+                ctx.textAlign = 'center';
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class TrailSegment {
+            constructor(x, y, width, lifeTime) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.maxLife = lifeTime;
+                this.life = lifeTime;
+            }
+        }
+
+        class Ship {
+            constructor() {
+                this.angle = 0;
+                this.isOuterOrbit = false;
+                this.radius = 0; // Current rendered radius
+                this.targetRadius = 0;
+                this.size = 12;
+                this.skin = this.getSkinColor();
+                this.trailColor = this.getTrailColor();
+                this.trail = [];
+                this.shieldEffect = 0;
+            }
+
+            getSkinColor() {
+                const item = SHOP_ITEMS.find(i => i.id === saveData.equippedSkin);
+                return item ? item.color : "#00e5ff";
+            }
+            
+            getTrailColor() {
+                const item = SHOP_ITEMS.find(i => i.id === saveData.equippedTrail);
+                return item ? item.color : "#00e5ff";
+            }
+
+            reset() {
+                this.angle = -Math.PI / 2;
+                this.isOuterOrbit = false;
+                this.targetRadius = Math.min(width, height) * GAME_CONFIG.innerRadiusRatio;
+                this.radius = this.targetRadius;
+                this.skin = this.getSkinColor();
+                this.trailColor = this.getTrailColor();
+                this.trail = [];
+                gameData.activeShield = saveData.upgrades.shield;
+            }
+
+            toggleOrbit() {
+                this.isOuterOrbit = !this.isOuterOrbit;
+                // Add a little visual flair on switch
+                addShake(2, 100);
+                createExplosion(this.x, this.y, this.trailColor, 5, 0.5);
+            }
+
+            update(dt) {
+                // Update Radius
+                const inner = Math.min(width, height) * GAME_CONFIG.innerRadiusRatio;
+                const outer = Math.min(width, height) * GAME_CONFIG.outerRadiusRatio;
+                this.targetRadius = this.isOuterOrbit ? outer : inner;
+                
+                // Smooth Lerp
+                this.radius += (this.targetRadius - this.radius) * 0.2 * (dt/16);
+
+                // Update Angle
+                const speed = GAME_CONFIG.baseOrbitSpeed * gameData.difficultyMult * (dt/16);
+                this.angle += speed;
+
+                // Calculate Position
+                this.x = cx + Math.cos(this.angle) * this.radius;
+                this.y = cy + Math.sin(this.angle) * this.radius;
+
+                // Trail logic
+                if (Math.random() < 0.5) {
+                    entities.particles.push(new Particle(this.x, this.y, this.trailColor, 0.2));
+                }
+                this.trail.push(new TrailSegment(this.x, this.y, this.size * scale, 20));
+                for (let i = this.trail.length - 1; i >= 0; i--) {
+                    this.trail[i].life -= (dt/16);
+                    if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+                }
+                
+                if(gameData.activeShield) {
+                    this.shieldEffect = (this.shieldEffect + 0.1) % (Math.PI * 2);
+                }
+            }
+
+            draw(ctx) {
+                // Draw Trail Ribbon
+                if (this.trail.length > 1) {
+                    ctx.beginPath();
+                    for (let i = 0; i < this.trail.length; i++) {
+                        const t = this.trail[i];
+                        const ratio = Math.max(0, t.life / t.maxLife);
+                        ctx.lineWidth = t.width * ratio;
+                        ctx.strokeStyle = this.trailColor;
+                        ctx.globalAlpha = ratio * 0.5;
+                        if (i === 0) ctx.moveTo(t.x, t.y);
+                        else ctx.lineTo(t.x, t.y);
+                    }
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+
+                // Draw Ship (Dart Shape)
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle + Math.PI / 2); // Face forward tangentially
+                
+                const s = this.size * scale;
+                
+                // Engine Glow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.trailColor;
+                ctx.fillStyle = "#fff";
+                ctx.beginPath();
+                ctx.arc(0, s*0.8, s*0.4, 0, Math.PI*2);
+                ctx.fill();
+
+                // Hull
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.skin;
+                ctx.fillStyle = this.skin;
+                ctx.beginPath();
+                ctx.moveTo(0, -s);
+                ctx.lineTo(s * 0.8, s);
+                ctx.lineTo(0, s * 0.4);
+                ctx.lineTo(-s * 0.8, s);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Cockpit
+                ctx.fillStyle = "#fff";
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.moveTo(0, -s*0.3);
+                ctx.lineTo(s*0.2, s*0.2);
+                ctx.lineTo(-s*0.2, s*0.2);
+                ctx.fill();
+                
+                // Shield
+                if(gameData.activeShield) {
+                    ctx.strokeStyle = `rgba(0, 229, 255, ${0.5 + Math.sin(this.shieldEffect)*0.3})`;
+                    ctx.lineWidth = 2 * scale;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, s * 1.8, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        class Meteor {
+            constructor() {
+                // Spawn far outside screen
+                const spawnAngle = Math.random() * Math.PI * 2;
+                const spawnDist = Math.max(width, height) * 0.8;
+                this.x = cx + Math.cos(spawnAngle) * spawnDist;
+                this.y = cy + Math.sin(spawnAngle) * spawnDist;
+
+                // Target a random point inside the outer orbit
+                const targetAngle = Math.random() * Math.PI * 2;
+                const targetDist = Math.random() * (Math.min(width, height) * GAME_CONFIG.outerRadiusRatio);
+                const targetX = cx + Math.cos(targetAngle) * targetDist;
+                const targetY = cy + Math.sin(targetAngle) * targetDist;
+
+                const angleToTarget = Math.atan2(targetY - this.y, targetX - this.x);
+                
+                // Apply difficulty and upgrade modifiers
+                let speedMult = gameData.difficultyMult;
+                if (saveData.upgrades.slow_field) speedMult *= 0.85; // 15% slower
+                
+                const speed = GAME_CONFIG.meteorSpeedBase * speedMult * scale * (Math.random() * 0.4 + 0.8);
+                
+                this.vx = Math.cos(angleToTarget) * speed;
+                this.vy = Math.sin(angleToTarget) * speed;
+                
+                this.size = (Math.random() * 10 + 10) * scale;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.1;
+                
+                // Generate rocky shape
+                this.verts = [];
+                const numVerts = 7 + Math.floor(Math.random() * 5);
+                for(let i=0; i<numVerts; i++) {
+                    const a = (Math.PI*2/numVerts)*i;
+                    const r = this.size * (0.7 + Math.random()*0.3);
+                    this.verts.push({a, r});
+                }
+                
+                this.nearMissed = false; // Track for SB bonus
+            }
+
+            update(dt) {
+                this.x += this.vx * (dt/16);
+                this.y += this.vy * (dt/16);
+                this.rotation += this.rotSpeed * (dt/16);
+                
+                // Fire trail
+                if(Math.random() < 0.4) {
+                    entities.particles.push(new Particle(
+                        this.x - this.vx, this.y - this.vy, 
+                        Math.random() > 0.5 ? '#ff5500' : '#ff0000', 
+                        0.5
+                    ));
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                // Glow
+                ctx.shadowBlur = 15 * scale;
+                ctx.shadowColor = "#ff2200";
+                
+                // Rock Fill
+                ctx.fillStyle = "#2a1510";
+                ctx.strokeStyle = "#ff4400";
+                ctx.lineWidth = 2 * scale;
+                
+                ctx.beginPath();
+                for(let i=0; i<this.verts.length; i++) {
+                    const v = this.verts[i];
+                    const px = Math.cos(v.a) * v.r;
+                    const py = Math.sin(v.a) * v.r;
+                    if(i===0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.shadowBlur = 0; // Turn off for stroke
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        const ship = new Ship();
+
+        // ==========================================
+        // 5. GAME LOGIC & RENDERING
+        // ==========================================
+
+        function initBackground() {
+            entities.stars = [];
+            for (let i = 0; i < 150; i++) {
+                entities.stars.push(new Star());
+            }
+        }
+
+        function spawnMeteor() {
+            entities.meteors.push(new Meteor());
+            // Flash edges subtly
+        }
+
+        function checkCollisions() {
+            const hitDist = (ship.size + 10) * scale;
+            const nearMissDist = hitDist * 3.5;
+
+            for (let i = entities.meteors.length - 1; i >= 0; i--) {
+                const m = entities.meteors[i];
+                const dx = ship.x - m.x;
+                const dy = ship.y - m.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                // Near Miss Logic (Economy)
+                if (dist < nearMissDist && !m.nearMissed) {
+                    m.nearMissed = true;
+                    awardSimgaBucks(1, "(Near Miss!)");
+                    createFloatingText(ship.x, ship.y - 20, "+1 SB", "#0f0");
+                }
+
+                // Collision Logic
+                if (dist < hitDist) {
+                    if (gameData.activeShield) {
+                        // Pop shield
+                        gameData.activeShield = false;
+                        entities.meteors.splice(i, 1);
+                        createExplosion(m.x, m.y, "#00e5ff", 20, 2);
+                        addShake(10, 300);
+                        createFloatingText(ship.x, ship.y - 20, "SHIELD BROKEN", "#00e5ff");
+                    } else {
+                        // Death
+                        gameOver();
+                        return; // Stop checking
+                    }
+                }
+                
+                // Cleanup offscreen meteors
+                const outDist = Math.max(width, height);
+                if (Math.abs(m.x - cx) > outDist || Math.abs(m.y - cy) > outDist) {
+                    entities.meteors.splice(i, 1);
+                }
+            }
+        }
+
+        function updateGame(dt) {
+            gameData.timeElapsed += dt;
+            gameData.score = Math.floor(gameData.timeElapsed / 100);
+            
+            // Difficulty Scaling
+            gameData.difficultyMult = 1 + (gameData.timeElapsed / 30000); // Increases by 1.0 every 30s
+            
+            // Economy: Time-based rewards
+            if (gameData.timeElapsed / 1000 > gameData.nextMilestone) {
+                const reward = gameData.nextMilestone <= 60 ? 2 : (gameData.nextMilestone <= 120 ? 3 : 5);
+                awardSimgaBucks(reward, `(Survived ${gameData.nextMilestone}s!)`);
+                gameData.nextMilestone += 30; // Next reward in 30s
+            }
+
+            // Spawn Meteors
+            const spawnInterval = Math.max(300, GAME_CONFIG.meteorSpawnBase / Math.sqrt(gameData.difficultyMult));
+            if (Date.now() - gameData.lastMeteorTime > spawnInterval) {
+                spawnMeteor();
+                gameData.lastMeteorTime = Date.now();
+            }
+
+            ship.update(dt);
+            
+            entities.meteors.forEach(m => m.update(dt));
+            checkCollisions();
+            
+            document.getElementById('hud-score').innerText = gameData.score;
+        }
+
+        function drawPlanet() {
+            const r = Math.min(width, height) * 0.08;
+            
+            // Atmosphere Glow
+            const glow = ctx.createRadialGradient(cx, cy, r*0.8, cx, cy, r*1.5);
+            glow.addColorStop(0, 'rgba(0, 150, 255, 0.8)');
+            glow.addColorStop(0.5, 'rgba(0, 100, 255, 0.2)');
+            glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r*1.5, 0, Math.PI*2);
+            ctx.fill();
+
+            // Planet Body
+            const body = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+            body.addColorStop(0, '#002244');
+            body.addColorStop(1, '#000811');
+            
+            ctx.fillStyle = body;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Core grid/texture stylized
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for(let i=1; i<4; i++) {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, r, r*(i/4), 0, 0, Math.PI*2);
+                ctx.stroke();
+            }
+        }
+
+        function drawOrbits() {
+            const inner = Math.min(width, height) * GAME_CONFIG.innerRadiusRatio;
+            const outer = Math.min(width, height) * GAME_CONFIG.outerRadiusRatio;
+            
+            ctx.lineWidth = 1;
+            
+            // Inner
+            ctx.strokeStyle = ship.targetRadius === inner ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath(); ctx.arc(cx, cy, inner, 0, Math.PI*2); ctx.stroke();
+            
+            // Outer
+            ctx.strokeStyle = ship.targetRadius === outer ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath(); ctx.arc(cx, cy, outer, 0, Math.PI*2); ctx.stroke();
+        }
+
+        function draw(dt) {
+            // Dark Space Background with trail effect
+            ctx.fillStyle = 'rgba(5, 8, 15, 0.8)';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.save();
+            
+            // Screen Shake
+            if (shakeTime > 0) {
+                const sx = (Math.random() - 0.5) * shakeIntensity;
+                const sy = (Math.random() - 0.5) * shakeIntensity;
+                ctx.translate(sx, sy);
+                shakeTime -= dt;
+            }
+
+            // Background layer
+            entities.stars.forEach(s => { s.update(dt); s.draw(ctx); });
+            
+            drawPlanet();
+            drawOrbits();
+
+            if (currentState === STATE.PLAYING) {
+                ship.draw(ctx);
+            }
+
+            entities.meteors.forEach(m => m.draw(ctx));
+            
+            // Particles
+            for (let i = entities.particles.length - 1; i >= 0; i--) {
+                const p = entities.particles[i];
+                p.update(dt);
+                p.draw(ctx);
+                if (p.life <= 0) entities.particles.splice(i, 1);
+            }
+
+            ctx.restore();
+        }
+
+        function loop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = Math.min(timestamp - lastTime, 32); // cap dt
+            lastTime = timestamp;
+
+            if (currentState === STATE.PLAYING) {
+                updateGame(dt);
+            } else if (currentState === STATE.MENU || currentState === STATE.SHOP || currentState === STATE.GAMEOVER) {
+                // Keep background alive
+                entities.stars.forEach(s => s.update(dt));
+                // Idle ship spin on menu
+                if(currentState === STATE.MENU) {
+                    ship.angle += GAME_CONFIG.baseOrbitSpeed * (dt/16);
+                    ship.x = cx + Math.cos(ship.angle) * ship.radius;
+                    ship.y = cy + Math.sin(ship.angle) * ship.radius;
+                }
+            }
+
+            draw(dt);
+            requestAnimationFrame(loop);
+        }
+
+        // ==========================================
+        // 6. STATE MANAGEMENT & UI
+        // ==========================================
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if(id) document.getElementById(id).classList.add('active');
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-currency').innerText = `SB: ${sessionSimgaBucks}`;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('toast-show');
+            void toast.offsetWidth; // trigger reflow
+            toast.classList.add('toast-show');
+        }
+
+        function startGame() {
+            // First very quick reward to hook player (first 20s)
+            gameData = {
+                score: 0,
+                timeElapsed: 0,
+                nextMilestone: 20, 
+                difficultyMult: 1,
+                lastMeteorTime: Date.now(),
+                activeShield: saveData.upgrades.shield
+            };
+            
+            entities.meteors = [];
+            entities.particles = [];
+            ship.reset();
+            
+            document.getElementById('hud').style.opacity = 1;
+            showScreen(null); // Hide all
+            currentState = STATE.PLAYING;
+        }
+
+        function gameOver() {
+            currentState = STATE.GAMEOVER;
+            createExplosion(ship.x, ship.y, ship.skin, 50, 3);
+            addShake(20, 500);
+            
+            if (gameData.score > saveData.highScore) {
+                saveData.highScore = gameData.score;
+                saveGame();
+            }
+
+            document.getElementById('hud').style.opacity = 0;
+            document.getElementById('go-score').innerText = gameData.score;
+            document.getElementById('go-highscore').innerText = saveData.highScore;
+            
+            setTimeout(() => { showScreen('screen-gameover'); }, 1000);
+        }
+
+        function openMenu() {
+            currentState = STATE.MENU;
+            document.getElementById('menu-highscore').innerText = saveData.highScore;
+            ship.reset();
+            entities.meteors = [];
+            showScreen('screen-menu');
+        }
+
+        // --- Shop Logic ---
+        function renderShop() {
+            const sGrid = document.getElementById('shop-skins');
+            const tGrid = document.getElementById('shop-trails');
+            const uGrid = document.getElementById('shop-upgrades');
+            
+            sGrid.innerHTML = ''; tGrid.innerHTML = ''; uGrid.innerHTML = '';
+
+            SHOP_ITEMS.forEach(item => {
+                const isPurchased = saveData.purchased.includes(item.id) || saveData.upgrades[item.id];
+                const isEquipped = saveData.equippedSkin === item.id || saveData.equippedTrail === item.id;
+                
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                
+                let btnHtml = '';
+                if (item.type === 'upgrade') {
+                    if (isPurchased) {
+                        btnHtml = `<button class="btn-buy btn-equipped">INSTALLED</button>`;
+                    } else {
+                        btnHtml = `<button class="btn-buy" onclick="buyItemById('${item.id}')">${item.price} SB</button>`;
+                    }
+                } else {
+                    if (isEquipped) {
+                        btnHtml = `<button class="btn-buy btn-equipped">EQUIPPED</button>`;
+                    } else if (isPurchased) {
+                        btnHtml = `<button class="btn-buy btn-equip" onclick="equipItem('${item.id}', '${item.type}')">EQUIP</button>`;
+                    } else {
+                        btnHtml = `<button class="btn-buy" onclick="buyItemById('${item.id}')">${item.price} SB</button>`;
+                    }
+                }
+
+                div.innerHTML = `
+                    <div class="shop-item-icon" style="color: ${item.color}; border: 2px solid ${item.color}; box-shadow: 0 0 10px ${item.color} inset;">
+                        ${item.type === 'skin' ? '▲' : (item.type==='trail' ? '≈' : '⚙')}
+                    </div>
+                    <div class="shop-item-title" style="color: ${item.color}">${item.name}</div>
+                    <div class="shop-item-desc">${item.desc}</div>
+                    ${btnHtml}
+                `;
+
+                if(item.type === 'skin') sGrid.appendChild(div);
+                else if(item.type === 'trail') tGrid.appendChild(div);
+                else uGrid.appendChild(div);
+            });
+        }
+
+        // Expose to global for inline handlers
+        window.buyItemById = function(id) {
+            const item = SHOP_ITEMS.find(i => i.id === id);
+            if(item) buyItem(item);
+        }
+
+        window.equipItem = function(id, type) {
+            if (type === 'skin') saveData.equippedSkin = id;
+            if (type === 'trail') saveData.equippedTrail = id;
+            saveGame();
+            renderShop();
+            ship.reset(); // Apply visuals instantly in background
+        }
+
+        function openShop() {
+            currentState = STATE.SHOP;
+            renderShop();
+            showScreen('screen-shop');
+        }
+
+        // ==========================================
+        // 7. INITIALIZATION
+        // ==========================================
+        
+        // UI Bindings
+        document.getElementById('btn-play').addEventListener('click', startGame);
+        document.getElementById('btn-play-again').addEventListener('click', startGame);
+        document.getElementById('btn-shop').addEventListener('click', openShop);
+        document.getElementById('btn-shop-back').addEventListener('click', openMenu);
+        document.getElementById('btn-menu').addEventListener('click', openMenu);
+
+        function initGame() {
+            isLoaded = true;
+            document.getElementById('loader').style.opacity = 0;
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+            
+            initBackground();
+            ship.reset();
+            openMenu();
+            requestAnimationFrame(loop);
+        }
+
+        // Boot
+        window.onload = () => {
+            loadGame(); // Request data from parent
+        };
+
+    </script>
+</body>
+</html>

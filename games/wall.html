@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wall Jumper</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg-color: #050510;
+            --primary: #00f3ff;
+            --secondary: #ff00ea;
+            --text-light: #e0e0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas when playing */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(5px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            pointer-events: auto;
+            transition: opacity 0.3s, transform 0.3s;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.9);
+            position: absolute;
+        }
+
+        h1 {
+            font-size: 3rem;
+            text-transform: uppercase;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary), 0 0 40px var(--primary);
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--secondary);
+            text-shadow: 0 0 10px var(--secondary);
+        }
+
+        p.subtitle {
+            margin-bottom: 40px;
+            color: #aaa;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        button {
+            background: transparent;
+            color: var(--primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            padding: 15px 40px;
+            margin: 10px;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2) inset;
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: var(--bg-color);
+            box-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        /* Shop Styles */
+        #shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .shop-item.owned { border-color: #0f0; }
+        .shop-item.equipped { border-color: var(--primary); box-shadow: 0 0 15px var(--primary) inset; }
+
+        .item-name { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+        .item-desc { font-size: 0.8rem; color: #aaa; margin-bottom: 15px; height: 30px; }
+        
+        .buy-btn {
+            padding: 8px 20px;
+            font-size: 1rem;
+            margin: 0;
+            width: 100%;
+        }
+        
+        .buy-btn.buy { border-color: var(--secondary); color: var(--secondary); }
+        .buy-btn.buy:hover { background: var(--secondary); color: #fff; box-shadow: 0 0 15px var(--secondary); }
+        
+        .buy-btn.equip { border-color: #0f0; color: #0f0; }
+        .buy-btn.equip:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+
+        .buy-btn.equipped { background: var(--primary); color: #000; cursor: default; transform: none; box-shadow: none; }
+
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .floating-text-layer {
+            position: absolute;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            top:0; left:0;
+            z-index: 20;
+        }
+
+        .float-anim {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            animation: floatUp 1.5s ease-out forwards;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+
+        /* Loading Spinner */
+        #loader {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="score-display" style="display:none;">0</div>
+    <div id="loader"></div>
+    <div id="floating-texts" class="floating-text-layer"></div>
+
+    <div id="ui-layer">
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen">
+            <h1>Wall Jumper</h1>
+            <p class="subtitle">Jump the walls. Dodge the lasers.</p>
+            <button id="btn-play">Engage</button>
+            <button id="btn-shop">Upgrades & Skins</button>
+            <p style="margin-top: 20px; font-size: 0.9rem; color:#777;">High Score: <span id="menu-highscore">0</span></p>
+        </div>
+
+        <!-- Shop -->
+        <div id="screen-shop" class="screen hidden">
+            <h2>Market</h2>
+            <div id="shop-grid">
+                <!-- Injected via JS -->
+            </div>
+            <button id="btn-shop-back">Return to Base</button>
+        </div>
+
+        <!-- Game Over -->
+        <div id="screen-gameover" class="screen hidden">
+            <h2 style="color: #ff0055; text-shadow: 0 0 10px #ff0055;">SYSTEM FAILURE</h2>
+            <p style="font-size: 1.5rem; margin-bottom: 10px;">Score: <span id="go-score" style="color:var(--primary); font-weight:bold;">0</span></p>
+            <p style="font-size: 1.1rem; margin-bottom: 30px; color:#aaa;">Best: <span id="go-highscore">0</span></p>
+            <button id="btn-restart">Retry</button>
+            <button id="btn-menu">Main Menu</button>
+        </div>
+    </div>
+
+<script>
+/** ----------------------------------------------------
+ * CORE SETUP & PLATFORM INTEGRATION
+ * ---------------------------------------------------- */
+const GAME_ID = "wall";
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Game State
+let gameState = "menu"; // menu, playing, gameover, shop
+let lastTime = 0;
+let score = 0;
+let nextRewardThreshold = 10;
+let simgaBucksEarnedThisSession = 0;
+
+// Save Data structure
+let saveData = {
+    highScore: 0,
+    skins: ["cyan"], // owned skins
+    activeSkin: "cyan",
+    hasDoubleJump: false,
+    hasGoldSparks: false,
+    hasSlowTime: false
+};
+
+// Platform communication logic
+const loadMsgId = "load_" + Date.now();
+let pendingPurchases = {}; // Track purchase requests by msgId
+
+// Request Initial Data
+window.parent.postMessage({
+    type: "loadData",
+    gameId: GAME_ID,
+    msgId: loadMsgId
+}, "*");
+
+document.getElementById('loader').style.display = 'block';
+
+// Listen to Platform responses
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    // Load Response
+    if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+        document.getElementById('loader').style.display = 'none';
+        if (data.data) {
+            // Merge loaded data with defaults
+            saveData = { ...saveData, ...data.data };
+            // Ensure skins array exists
+            if (!saveData.skins) saveData.skins = ["cyan"];
+            updateMenuUI();
+            renderShop();
+        }
+    }
+
+    // Purchase Response
+    if (data.type === "spendResponse") {
+        document.getElementById('loader').style.display = 'none';
+        const purchaseReq = pendingPurchases[data.msgId];
+        
+        if (purchaseReq) {
+            if (data.success) {
+                applyPurchase(purchaseReq.item);
+                triggerConfetti();
+            } else {
+                alert("Transaction failed. Not enough SimgaBucks.");
+            }
+            delete pendingPurchases[data.msgId];
+            renderShop();
+        }
+    }
+});
+
+function saveGameProgress() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function rewardSimgaBucks(amount) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    createFloatingText(`+${amount} SimgaBucks!`, "#0f0");
+}
+
+function requestPurchase(item) {
+    const msgId = Math.random().toString(36).substring(2);
+    pendingPurchases[msgId] = { item: item };
+    document.getElementById('loader').style.display = 'block';
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: item.cost,
+        msgId: msgId
+    }, "*");
+}
+
+/** ----------------------------------------------------
+ * SHOP ITEMS & LOGIC
+ * ---------------------------------------------------- */
+const SHOP_ITEMS = [
+    { id: "skin_pink", type: "skin", val: "magenta", name: "Magenta Overdrive", desc: "A striking neon pink core.", cost: 10 },
+    { id: "skin_gold", type: "skin", val: "gold", name: "Solar Flare", desc: "Blazing golden energy.", cost: 25 },
+    { id: "upg_sparks", type: "upgrade", key: "hasGoldSparks", name: "Plasma Sparks", desc: "Golden wall friction sparks.", cost: 15 },
+    { id: "upg_djump", type: "upgrade", key: "hasDoubleJump", name: "Air Dash", desc: "Double jump mid-air.", cost: 30 },
+    { id: "upg_slow", type: "upgrade", key: "hasSlowTime", name: "Chrono-Field", desc: "Obstacles spawn 10% slower.", cost: 40 }
+];
+
+function renderShop() {
+    const grid = document.getElementById("shop-grid");
+    grid.innerHTML = "";
+
+    SHOP_ITEMS.forEach(item => {
+        let isOwned = false;
+        let isEquipped = false;
+
+        if (item.type === "skin") {
+            isOwned = saveData.skins.includes(item.val);
+            isEquipped = saveData.activeSkin === item.val;
+        } else if (item.type === "upgrade") {
+            isOwned = saveData[item.key] === true;
+            isEquipped = isOwned; // Upgrades are passive/always on
+        }
+
+        const div = document.createElement("div");
+        div.className = `shop-item ${isOwned ? 'owned' : ''} ${isEquipped ? 'equipped' : ''}`;
+        
+        let btnHtml = "";
+        if (isEquipped) {
+            btnHtml = `<button class="buy-btn equipped">Active</button>`;
+        } else if (isOwned && item.type === "skin") {
+            btnHtml = `<button class="buy-btn equip" onclick="equipSkin('${item.val}')">Equip</button>`;
+        } else if (isOwned && item.type === "upgrade") {
+            btnHtml = `<button class="buy-btn equipped">Unlocked</button>`;
+        } else {
+            btnHtml = `<button class="buy-btn buy" onclick="buyItem('${item.id}')">Buy (${item.cost} SB)</button>`;
+        }
+
+        div.innerHTML = `
+            <div class="item-name" style="color: ${item.type === 'skin' ? item.val : '#fff'}">${item.name}</div>
+            <div class="item-desc">${item.desc}</div>
+            ${btnHtml}
+        `;
+        grid.appendChild(div);
+    });
+}
+
+window.buyItem = function(itemId) {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if(item) requestPurchase(item);
+};
+
+window.equipSkin = function(val) {
+    saveData.activeSkin = val;
+    saveGameProgress();
+    renderShop();
+};
+
+function applyPurchase(item) {
+    if (item.type === "skin") {
+        if (!saveData.skins.includes(item.val)) saveData.skins.push(item.val);
+        saveData.activeSkin = item.val;
+    } else if (item.type === "upgrade") {
+        saveData[item.key] = true;
+    }
+    saveGameProgress();
+}
+
+/** ----------------------------------------------------
+ * ENGINE & RENDERING SETUP
+ * ---------------------------------------------------- */
+let width, height, cx, cy;
+let wallGap = 350;
+let leftWallX = 0;
+let rightWallX = 0;
+let screenShake = 0;
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    cx = width / 2;
+    cy = height / 2;
+    
+    // Responsive wall gap
+    wallGap = Math.min(width * 0.75, 450);
+    leftWallX = cx - wallGap / 2;
+    rightWallX = cx + wallGap / 2;
+
+    if (player && player.side === -1) player.x = leftWallX;
+    if (player && player.side === 1) player.x = rightWallX;
+}
+window.addEventListener('resize', resize);
+
+/** ----------------------------------------------------
+ * GAME ENTITIES
+ * ---------------------------------------------------- */
+let player;
+let obstacles = [];
+let particles = [];
+let bgElements = [];
+let trail = [];
+
+let gameSpeed = 1;
+let spawnTimer = 0;
+let difficultyFactor = 0;
+
+function initGame() {
+    score = 0;
+    nextRewardThreshold = 10;
+    simgaBucksEarnedThisSession = 0;
+    gameSpeed = 1;
+    difficultyFactor = 0;
+    obstacles = [];
+    particles = [];
+    trail = [];
+    screenShake = 0;
+    
+    document.getElementById("score-display").style.display = "block";
+    document.getElementById("score-display").innerText = "0";
+
+    player = {
+        x: leftWallX,
+        y: height * 0.75, // Lower part of the screen
+        size: 24,
+        side: -1, // -1 left, 1 right, 0 mid-air
+        vx: 0,
+        jumpSpeed: wallGap * 3.5, // Pixels per second
+        hasDoubleJumped: false,
+        color: getSkinColor(),
+        rotation: 0
+    };
+
+    // Pre-populate background
+    bgElements = [];
+    for(let i=0; i<50; i++) {
+        bgElements.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 100 + 50
+        });
+    }
+
+    gameState = "playing";
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+}
+
+function getSkinColor() {
+    if(saveData.activeSkin === 'magenta') return '#ff00ea';
+    if(saveData.activeSkin === 'gold') return '#ffea00';
+    return '#00f3ff'; // cyan
+}
+
+function handleInput(e) {
+    if (gameState !== "playing") return;
+    if (e.type === "keydown" && e.code !== "Space") return;
+    
+    // Start jump
+    if (player.side !== 0) {
+        // We are on a wall
+        player.vx = player.jumpSpeed * (player.side === -1 ? 1 : -1);
+        player.side = 0;
+        player.hasDoubleJumped = false;
+        createJumpRing(player.x, player.y, player.color);
+    } 
+    // Double jump logic
+    else if (saveData.hasDoubleJump && !player.hasDoubleJumped) {
+        player.vx *= -1; // Reverse direction
+        player.hasDoubleJumped = true;
+        createJumpRing(player.x, player.y, "#fff");
+        // Burst of particles
+        createExplosion(player.x, player.y, player.color, 15, 300);
+    }
+}
+
+window.addEventListener('mousedown', handleInput);
+window.addEventListener('touchstart', handleInput, {passive: false});
+window.addEventListener('keydown', handleInput);
+
+
+/** ----------------------------------------------------
+ * GAME LOOP & LOGIC
+ * ---------------------------------------------------- */
+function gameLoop(timestamp) {
+    if (gameState !== "playing") return;
+
+    let dt = (timestamp - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; // Cap dt for lag spikes
+    lastTime = timestamp;
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+    // Difficulty Progression
+    difficultyFactor = score / 50; 
+    let scrollSpeed = 300 + (difficultyFactor * 150);
+
+    // Update Background
+    bgElements.forEach(bg => {
+        bg.y += bg.speed * dt + (scrollSpeed * dt * 0.2);
+        if (bg.y > height) {
+            bg.y = 0;
+            bg.x = Math.random() * width;
+        }
+    });
+
+    // Update Player
+    if (player.side === 0) {
+        // In air
+        player.x += player.vx * dt;
+        player.rotation += player.vx * dt * 0.02;
+
+        // Check wall collision
+        if (player.vx > 0 && player.x >= rightWallX) {
+            player.x = rightWallX;
+            player.side = 1;
+            player.vx = 0;
+            player.rotation = 0;
+            screenShake = 2;
+            createWallImpact(player.x, player.y, -1);
+        } else if (player.vx < 0 && player.x <= leftWallX) {
+            player.x = leftWallX;
+            player.side = -1;
+            player.vx = 0;
+            player.rotation = 0;
+            screenShake = 2;
+            createWallImpact(player.x, player.y, 1);
+        }
+    } else {
+        // On wall - slide sparks
+        if (Math.random() < 0.3) {
+            let sparkColor = saveData.hasGoldSparks ? "#ffea00" : player.color;
+            particles.push(new Particle(
+                player.x + (player.side * 5),
+                player.y + player.size/2,
+                (Math.random() - 0.5) * 50,
+                scrollSpeed * 0.8 + Math.random() * 100, // Move down relatively
+                Math.random() * 0.4 + 0.2,
+                sparkColor
+            ));
+        }
+    }
+
+    // Trail
+    trail.unshift({x: player.x, y: player.y});
+    if (trail.length > 15) trail.pop();
+
+    // Spawn Obstacles
+    spawnTimer -= dt;
+    let spawnRate = Math.max(0.6, 1.5 - (difficultyFactor * 0.3));
+    if (saveData.hasSlowTime) spawnRate *= 1.1; // 10% slower spawning
+
+    if (spawnTimer <= 0) {
+        spawnTimer = spawnRate;
+        let side = Math.random() > 0.5 ? 1 : -1;
+        obstacles.push({
+            x: side === 1 ? rightWallX : leftWallX,
+            y: -100,
+            side: side,
+            width: 35,
+            height: 90,
+            passed: false
+        });
+    }
+
+    // Update Obstacles
+    let obsSpeed = scrollSpeed * (saveData.hasSlowTime ? 0.9 : 1.0);
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        obs.y += obsSpeed * dt;
+
+        // Collision Check
+        if (checkCollision(player, obs)) {
+            gameOver();
+            return;
+        }
+
+        // Scoring
+        if (!obs.passed && obs.y > player.y + player.size) {
+            obs.passed = true;
+            score++;
+            document.getElementById("score-display").innerText = score;
+            checkEconomyRewards();
+        }
+
+        // Remove offscreen
+        if (obs.y > height + 200) {
+            obstacles.splice(i, 1);
+        }
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt);
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+}
+
+function checkCollision(p, o) {
+    // AABB Collision with a slightly forgiving hitbox
+    let hitBoxSize = p.size * 0.6; 
+    let px = p.x - hitBoxSize;
+    let py = p.y - hitBoxSize;
+    let pw = hitBoxSize * 2;
+    let ph = hitBoxSize * 2;
+
+    let ox = o.side === 1 ? o.x - o.width : o.x;
+    let oy = o.y - o.height/2;
+    let ow = o.width;
+    let oh = o.height;
+
+    return px < ox + ow && px + pw > ox && py < oy + oh && py + ph > oy;
+}
+
+/** ----------------------------------------------------
+ * ECONOMY PACING
+ * ---------------------------------------------------- */
+function checkEconomyRewards() {
+    // Reward curve: Quick early rewards, then spaced out.
+    // Score targets: 10, 25, 50, 80, 120...
+    if (score >= nextRewardThreshold) {
+        let rewardAmt = 0;
+        
+        if (score === 10) { rewardAmt = 1; nextRewardThreshold = 25; }
+        else if (score === 25) { rewardAmt = 2; nextRewardThreshold = 50; }
+        else if (score === 50) { rewardAmt = 3; nextRewardThreshold = 80; }
+        else if (score === 80) { rewardAmt = 4; nextRewardThreshold = 120; }
+        else { 
+            rewardAmt = 5; 
+            nextRewardThreshold += 50; 
+        }
+
+        simgaBucksEarnedThisSession += rewardAmt;
+        rewardSimgaBucks(rewardAmt);
+    }
+}
+
+/** ----------------------------------------------------
+ * VISUAL FX (PARTICLES)
+ * ---------------------------------------------------- */
+class Particle {
+    constructor(x, y, vx, vy, life, color, type="normal") {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.life = life;
+        this.maxLife = life;
+        this.color = color;
+        this.type = type;
+        this.size = Math.random() * 4 + 2;
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+        if(this.type === "ring") {
+            this.size += 500 * dt; // expand
+        }
+    }
+    draw(ctx) {
+        let alpha = Math.max(0, this.life / this.maxLife);
+        ctx.globalAlpha = alpha;
+        
+        if (this.type === "ring") {
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+            ctx.shadowBlur = 0;
+        }
+        ctx.globalAlpha = 1;
+    }
+}
+
+function createExplosion(x, y, color, count, speedMax) {
+    for (let i = 0; i < count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * speedMax;
+        particles.push(new Particle(
+            x, y, 
+            Math.cos(angle) * speed, 
+            Math.sin(angle) * speed, 
+            Math.random() * 0.5 + 0.2, 
+            color
+        ));
+    }
+}
+
+function createJumpRing(x, y, color) {
+    particles.push(new Particle(x, y, 0, 0, 0.3, color, "ring"));
+}
+
+function createWallImpact(x, y, dir) {
+    for (let i = 0; i < 8; i++) {
+        particles.push(new Particle(
+            x, y, 
+            dir * (Math.random() * 200 + 50), 
+            (Math.random() - 0.5) * 200, 
+            0.3, 
+            "#fff"
+        ));
+    }
+}
+
+function createFloatingText(text, color) {
+    const layer = document.getElementById('floating-texts');
+    const el = document.createElement('div');
+    el.className = 'float-anim';
+    el.style.color = color;
+    el.innerText = text;
+    // Randomize position near center
+    el.style.left = `calc(50% + ${(Math.random() - 0.5) * 100}px)`;
+    el.style.top = `calc(30% + ${(Math.random() - 0.5) * 100}px)`;
+    layer.appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 1500);
+}
+
+function triggerConfetti() {
+    for(let i=0; i<30; i++) {
+        particles.push(new Particle(
+            cx, height,
+            (Math.random() - 0.5) * 600,
+            -(Math.random() * 500 + 300),
+            Math.random() * 1 + 1,
+            Math.random() > 0.5 ? varPrimary : varSecondary
+        ));
+    }
+}
+
+const varPrimary = "#00f3ff";
+const varSecondary = "#ff00ea";
+
+/** ----------------------------------------------------
+ * RENDERING
+ * ---------------------------------------------------- */
+function draw() {
+    // Clear screen
+    ctx.fillStyle = "rgba(5, 5, 16, 1)";
+    ctx.fillRect(0, 0, width, height);
+
+    // Screen Shake
+    ctx.save();
+    if (screenShake > 0) {
+        let sx = (Math.random() - 0.5) * screenShake * 10;
+        let sy = (Math.random() - 0.5) * screenShake * 10;
+        ctx.translate(sx, sy);
+        screenShake -= 0.1;
+    }
+
+    // Draw Background Grid/Stars
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    bgElements.forEach(bg => {
+        ctx.fillRect(bg.x, bg.y, bg.size, bg.size);
+    });
+
+    // Draw Walls
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = varPrimary;
+    ctx.strokeStyle = varPrimary;
+    ctx.lineWidth = 4;
+    
+    // Left Wall
+    ctx.beginPath();
+    ctx.moveTo(leftWallX, 0);
+    ctx.lineTo(leftWallX, height);
+    ctx.stroke();
+    
+    // Right Wall
+    ctx.beginPath();
+    ctx.moveTo(rightWallX, 0);
+    ctx.lineTo(rightWallX, height);
+    ctx.stroke();
+
+    // Inner white hot core of walls
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftWallX, 0); ctx.lineTo(leftWallX, height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rightWallX, 0); ctx.lineTo(rightWallX, height); ctx.stroke();
+
+    // Draw Obstacles
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "#ff0055";
+    ctx.fillStyle = "#ff0055";
+    obstacles.forEach(obs => {
+        // Draw spiked laser hazard
+        ctx.beginPath();
+        if (obs.side === -1) {
+            ctx.moveTo(obs.x, obs.y - obs.height/2);
+            ctx.lineTo(obs.x + obs.width, obs.y);
+            ctx.lineTo(obs.x, obs.y + obs.height/2);
+        } else {
+            ctx.moveTo(obs.x, obs.y - obs.height/2);
+            ctx.lineTo(obs.x - obs.width, obs.y);
+            ctx.lineTo(obs.x, obs.y + obs.height/2);
+        }
+        ctx.fill();
+        
+        // Inner core
+        ctx.fillStyle = "#fff";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        if (obs.side === -1) {
+            ctx.moveTo(obs.x, obs.y - obs.height/4);
+            ctx.lineTo(obs.x + obs.width*0.6, obs.y);
+            ctx.lineTo(obs.x, obs.y + obs.height/4);
+        } else {
+            ctx.moveTo(obs.x, obs.y - obs.height/4);
+            ctx.lineTo(obs.x - obs.width*0.6, obs.y);
+            ctx.lineTo(obs.x, obs.y + obs.height/4);
+        }
+        ctx.fill();
+        ctx.fillStyle = "#ff0055";
+        ctx.shadowBlur = 15;
+    });
+
+    // Draw Trail
+    if (trail.length > 1 && player) {
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        for(let i=1; i<trail.length; i++) {
+            ctx.lineTo(trail[i].x, trail[i].y);
+        }
+        ctx.strokeStyle = player.color;
+        ctx.lineWidth = player.size * 0.8;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = player.color;
+        // Gradient for fading tail
+        let grad = ctx.createLinearGradient(trail[0].x, trail[0].y, trail[trail.length-1].x, trail[trail.length-1].y);
+        grad.addColorStop(0, `rgba(${hexToRgb(player.color)}, 0.5)`);
+        grad.addColorStop(1, `rgba(${hexToRgb(player.color)}, 0)`);
+        ctx.strokeStyle = grad;
+        ctx.stroke();
+    }
+
+    // Draw Particles
+    particles.forEach(p => p.draw(ctx));
+
+    // Draw Player
+    if (player) {
+        ctx.save();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = player.color;
+        ctx.fillStyle = player.color;
+        
+        ctx.translate(player.x, player.y);
+        
+        // Logic for visual squishing against wall
+        if (player.side !== 0) {
+            let stretch = 1.2;
+            let squish = 0.8;
+            if (player.side === -1) {
+                ctx.scale(squish, stretch);
+                ctx.translate(player.size/2 * (1-squish), 0);
+            } else {
+                ctx.scale(squish, stretch);
+                ctx.translate(-player.size/2 * (1-squish), 0);
+            }
+        } else {
+            ctx.rotate(player.rotation);
+        }
+
+        // Draw glowing diamond/arrow shape
+        ctx.beginPath();
+        ctx.moveTo(0, -player.size);
+        ctx.lineTo(player.size*0.8, 0);
+        ctx.lineTo(0, player.size);
+        ctx.lineTo(-player.size*0.8, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Core
+        ctx.fillStyle = "#fff";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(0, -player.size*0.5);
+        ctx.lineTo(player.size*0.4, 0);
+        ctx.lineTo(0, player.size*0.5);
+        ctx.lineTo(-player.size*0.4, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore(); // Undo all translates/rotates/scales for player
+    }
+
+    // Restore screen shake
+    ctx.restore(); 
+}
+
+function hexToRgb(hex) {
+    let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255,255,255';
+}
+
+/** ----------------------------------------------------
+ * GAME OVER & UI MANAGEMENT
+ * ---------------------------------------------------- */
+function gameOver() {
+    gameState = "gameover";
+    screenShake = 10;
+    createExplosion(player.x, player.y, player.color, 50, 600);
+    
+    // Force one last draw to show explosion
+    draw(); 
+
+    document.getElementById("score-display").style.display = "none";
+    
+    if (score > saveData.highScore) {
+        saveData.highScore = score;
+        saveGameProgress();
+    }
+
+    document.getElementById("go-score").innerText = score;
+    document.getElementById("go-highscore").innerText = saveData.highScore;
+    
+    setTimeout(() => {
+        showScreen("screen-gameover");
+    }, 1000);
+}
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    if (id) {
+        document.getElementById(id).classList.remove('hidden');
+    }
+    document.getElementById('ui-layer').style.pointerEvents = id ? 'auto' : 'none';
+}
+
+function updateMenuUI() {
+    document.getElementById("menu-highscore").innerText = saveData.highScore || 0;
+}
+
+/** ----------------------------------------------------
+ * BUTTON LISTENERS
+ * ---------------------------------------------------- */
+document.getElementById("btn-play").addEventListener("click", () => {
+    showScreen(null); // Hide all UI
+    initGame();
+});
+
+document.getElementById("btn-restart").addEventListener("click", () => {
+    showScreen(null);
+    initGame();
+});
+
+document.getElementById("btn-menu").addEventListener("click", () => {
+    updateMenuUI();
+    showScreen("screen-menu");
+});
+
+document.getElementById("btn-shop").addEventListener("click", () => {
+    renderShop();
+    showScreen("screen-shop");
+});
+
+document.getElementById("btn-shop-back").addEventListener("click", () => {
+    updateMenuUI();
+    showScreen("screen-menu");
+});
+
+// Init layout
+resize();
+
+// Let initial render happen for background behind menu
+draw(); 
+
+</script>
+</body>
+</html>

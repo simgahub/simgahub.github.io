@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spin Arena</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ea;
+            --neon-green: #00ff66;
+            --neon-yellow: #ffea00;
+            --dark-bg: #05050a;
+            --panel-bg: rgba(10, 10, 20, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--dark-bg);
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass to canvas unless over UI */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+            pointer-events: auto;
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none !important;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue);
+            animation: pulse-glow 2s infinite alternate;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 10px 0;
+            color: var(--neon-pink);
+            text-shadow: 0 0 10px var(--neon-pink);
+        }
+
+        @keyframes pulse-glow {
+            from { text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue); }
+            to { text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue), 0 0 60px var(--neon-blue); }
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 15px 40px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px inset rgba(0, 243, 255, 0.2), 0 0 10px rgba(0, 243, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Loading Screen */
+        .loader {
+            border: 4px solid rgba(0, 243, 255, 0.1);
+            border-top: 4px solid var(--neon-blue);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: transparent;
+        }
+
+        .hud-top {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        .hud-score { color: #fff; }
+        .hud-currency { color: var(--neon-yellow); text-shadow: 0 0 10px var(--neon-yellow); }
+
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            padding: 0 20px;
+            justify-content: space-between;
+            pointer-events: auto;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(0, 243, 255, 0.1);
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            color: rgba(0, 243, 255, 0.7);
+            font-size: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #pulse-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 0, 234, 0.1);
+            border: 2px solid rgba(255, 0, 234, 0.5);
+            color: var(--neon-pink);
+            font-size: 1rem;
+            font-weight: bold;
+            display: none; /* Shown if unlocked */
+            pointer-events: auto;
+            text-align: center;
+            line-height: 1.2;
+            box-shadow: 0 0 15px rgba(255, 0, 234, 0.3);
+        }
+        #pulse-btn.ready {
+            background: rgba(255, 0, 234, 0.4);
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 25px var(--neon-pink);
+            animation: pulse-ready 1s infinite alternate;
+        }
+        @keyframes pulse-ready { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.1); } }
+
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex; }
+        }
+
+        /* Shop UI */
+        .shop-container {
+            background: var(--panel-bg);
+            border: 2px solid var(--neon-blue);
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Custom Scrollbar for Shop */
+        .shop-container::-webkit-scrollbar { width: 8px; }
+        .shop-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); border-radius: 4px; }
+        .shop-container::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 4px; }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(0, 243, 255, 0.3);
+        }
+
+        .item-info h3 { margin: 0 0 5px 0; color: #fff; font-size: 1.2rem; }
+        .item-info p { margin: 0; color: #aaa; font-size: 0.9rem; }
+        
+        .buy-btn {
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin: 0;
+            min-width: 120px;
+        }
+
+        .buy-btn.owned {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: 0 0 10px inset rgba(0, 255, 102, 0.2);
+        }
+        .buy-btn.equipped {
+            background: var(--neon-green);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+
+        .close-btn { margin-top: 20px; width: 100%; }
+
+        .stats-panel {
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        .stats-panel span { color: #fff; }
+
+        /* Notification Toast */
+        #toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 102, 0.2);
+            border: 1px solid var(--neon-green);
+            color: #fff;
+            padding: 10px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, top 0.3s;
+            z-index: 100;
+        }
+        #toast.show { opacity: 1; top: 40px; }
+
+        #blocking-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 999;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--neon-yellow); font-size: 1.5rem; text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="screen-loading" class="screen">
+            <div class="loader"></div>
+            <h2>CONNECTING</h2>
+            <p>Syncing Data...</p>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen hidden">
+            <h1>SPIN ARENA</h1>
+            <div class="stats-panel">HIGH SCORE: <span id="menu-highscore">0</span></div>
+            <br>
+            <button onclick="Game.start()">INITIALIZE</button>
+            <button onclick="Shop.open()">UPGRADES</button>
+        </div>
+
+        <!-- HUD -->
+        <div id="screen-hud" class="screen hidden" style="pointer-events: none; background: none;">
+            <div class="hud-top">
+                <div class="hud-score">SCORE: <span id="hud-score-val">0</span></div>
+                <div class="hud-currency">SB: <span id="hud-sb-val">0</span></div>
+            </div>
+            
+            <button id="pulse-btn" onclick="Game.usePulse()">PULSE<br><span id="pulse-cd-text">READY</span></button>
+
+            <div id="mobile-controls">
+                <div class="control-btn" id="btn-left">◄</div>
+                <div class="control-btn" id="btn-right">►</div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="screen-gameover" class="screen hidden">
+            <h1 style="color: var(--neon-pink); text-shadow: 0 0 20px var(--neon-pink);">SYSTEM FAILURE</h1>
+            <h2>SCORE: <span id="go-score">0</span></h2>
+            <p style="margin-bottom: 30px;">Earned this run: <span id="go-earned" style="color:var(--neon-yellow);">0 SB</span></p>
+            <button onclick="Game.start()">REBOOT</button>
+            <button onclick="Shop.open()">UPGRADES</button>
+            <button onclick="Game.showMenu()">MAIN MENU</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="screen-shop" class="screen hidden">
+            <div class="shop-container">
+                <div class="shop-header">
+                    <h2 style="margin: 0; text-shadow: 0 0 10px var(--neon-blue); color: var(--neon-blue);">ARMORY</h2>
+                </div>
+                <div id="shop-items">
+                    <!-- Injected via JS -->
+                </div>
+                <button class="close-btn" onclick="Shop.close()">CLOSE</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Processing Overlay for Purchases -->
+    <div id="blocking-overlay" class="hidden">
+        PROCESSING TRANSACTION...
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">+1 SimgaBuck!</div>
+
+    <script>
+        /*******************************************************
+         * PLATFORM INTEGRATION
+         *******************************************************/
+        const GAME_ID = "spin";
+        
+        let localSaveData = {
+            highScore: 0,
+            upgrades: {
+                speedLevel: 0,
+                pulseUnlocked: false,
+                skins: ["default"],
+                themes: ["neon"],
+                activeSkin: "default",
+                activeTheme: "neon"
+            }
+        };
+
+        // Temporary local session tracking
+        let sessionEarnedSB = 0; 
+
+        const Platform = {
+            save() {
+                window.parent.postMessage({
+                    type: "saveData",
+                    gameId: GAME_ID,
+                    data: localSaveData
+                }, "*");
+            },
+
+            load(callback) {
+                const loadMsgId = "load_" + Date.now();
+                let responded = false;
+
+                const listener = (event) => {
+                    const data = event.data;
+                    if (data && data.type === "loadResponse" && data.msgId === loadMsgId) {
+                        responded = true;
+                        window.removeEventListener("message", listener);
+                        if (data.data) {
+                            // Merge saved data with default structure
+                            localSaveData = { ...localSaveData, ...data.data };
+                            // Ensure nested objects exist
+                            localSaveData.upgrades = { 
+                                ...{speedLevel:0, pulseUnlocked:false, skins:["default"], themes:["neon"], activeSkin:"default", activeTheme:"neon"}, 
+                                ...(data.data.upgrades || {}) 
+                            };
+                        }
+                        callback();
+                    }
+                };
+
+                window.addEventListener("message", listener);
+                window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+
+                // Fallback timeout in case platform doesn't respond
+                setTimeout(() => {
+                    if (!responded) {
+                        window.removeEventListener("message", listener);
+                        console.warn("Load response timeout, using default local save.");
+                        callback();
+                    }
+                }, 2000);
+            },
+
+            earnSimgaBucks(amount, reason) {
+                window.parent.postMessage({
+                    type: "addSimgaBucks",
+                    amount: amount
+                }, "*");
+                sessionEarnedSB += amount;
+                UI.showToast(`+${amount} SimgaBucks!`);
+            },
+
+            pendingPurchase: null,
+
+            buyUpgrade(item, callback) {
+                UI.showBlocking(true);
+                const msgId = Math.random().toString(36);
+                this.pendingPurchase = { item, msgId, callback };
+
+                window.parent.postMessage({
+                    type: "spendSimgaBucks",
+                    amount: item.cost,
+                    msgId: msgId
+                }, "*");
+                
+                // Safety timeout
+                setTimeout(() => {
+                    if(this.pendingPurchase && this.pendingPurchase.msgId === msgId) {
+                        UI.showBlocking(false);
+                        alert("Transaction timeout.");
+                        this.pendingPurchase = null;
+                    }
+                }, 5000);
+            },
+
+            handleMessage(event) {
+                const data = event.data;
+                if (!data) return;
+
+                if (data.type === "spendResponse" && this.pendingPurchase) {
+                    if (data.msgId === this.pendingPurchase.msgId) {
+                        UI.showBlocking(false);
+                        if (data.success) {
+                            this.pendingPurchase.callback(true);
+                        } else {
+                            alert("Not enough SimgaBucks!");
+                            this.pendingPurchase.callback(false);
+                        }
+                        this.pendingPurchase = null;
+                    }
+                }
+            }
+        };
+
+        window.addEventListener("message", e => Platform.handleMessage(e));
+
+
+        /*******************************************************
+         * ENGINE & CANVAS SETUP
+         *******************************************************/
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        let width, height, cx, cy;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            cx = width / 2;
+            cy = height / 2;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        // Input State
+        const Keys = { left: false, right: false, space: false };
+        let touchDir = 0; // -1 left, 1 right
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') Keys.left = true;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') Keys.right = true;
+            if (e.code === 'Space') { 
+                Keys.space = true; 
+                if(Game.state === 'playing') Game.usePulse(); 
+            }
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') Keys.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') Keys.right = false;
+            if (e.code === 'Space') Keys.space = false;
+        });
+
+        // Touch Controls
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        
+        const handleTouchStart = (dir, e) => { e.preventDefault(); touchDir = dir; };
+        const handleTouchEnd = (e) => { e.preventDefault(); touchDir = 0; };
+        
+        btnLeft.addEventListener('touchstart', e => handleTouchStart(-1, e));
+        btnLeft.addEventListener('touchend', handleTouchEnd);
+        btnLeft.addEventListener('mousedown', e => handleTouchStart(-1, e));
+        btnLeft.addEventListener('mouseup', handleTouchEnd);
+        btnLeft.addEventListener('mouseleave', handleTouchEnd);
+        
+        btnRight.addEventListener('touchstart', e => handleTouchStart(1, e));
+        btnRight.addEventListener('touchend', handleTouchEnd);
+        btnRight.addEventListener('mousedown', e => handleTouchStart(1, e));
+        btnRight.addEventListener('mouseup', handleTouchEnd);
+        btnRight.addEventListener('mouseleave', handleTouchEnd);
+
+        // Utility Math
+        const MathUtil = {
+            rand: (min, max) => Math.random() * (max - min) + min,
+            dist: (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1),
+            lerp: (a, b, t) => a + (b - a) * t
+        };
+
+        /*******************************************************
+         * GAME ENTITIES
+         *******************************************************/
+
+        class Starfield {
+            constructor() {
+                this.stars = [];
+                for(let i=0; i<100; i++) {
+                    this.stars.push({
+                        angle: Math.random() * Math.PI * 2,
+                        dist: Math.random() * Math.max(width, height),
+                        speed: MathUtil.rand(0.2, 1.5),
+                        size: MathUtil.rand(0.5, 2)
+                    });
+                }
+            }
+            update(speedMult) {
+                for(let s of this.stars) {
+                    s.dist += s.speed * speedMult;
+                    if(s.dist > Math.max(width, height)) {
+                        s.dist = 10;
+                        s.angle = Math.random() * Math.PI * 2;
+                    }
+                }
+            }
+            draw(ctx, color) {
+                ctx.fillStyle = color;
+                for(let s of this.stars) {
+                    const x = cx + Math.cos(s.angle) * s.dist;
+                    const y = cy + Math.sin(s.angle) * s.dist;
+                    ctx.globalAlpha = Math.min(1, s.dist / 100);
+                    ctx.fillRect(x, y, s.size, s.size);
+                }
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speed, size, lifeSpan) {
+                this.x = x; this.y = y;
+                const a = Math.random() * Math.PI * 2;
+                const s = Math.random() * speed;
+                this.vx = Math.cos(a) * s;
+                this.vy = Math.sin(a) * s;
+                this.color = color;
+                this.size = size;
+                this.life = lifeSpan;
+                this.maxLife = lifeSpan;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                this.size *= 0.95;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class Player {
+            constructor() {
+                this.angle = -Math.PI / 2;
+                this.radius = 120; // Orbit distance
+                // Base speed + upgrade bonus
+                this.baseSpeed = 0.04 + (localSaveData.upgrades.speedLevel * 0.005);
+                this.color = localSaveData.upgrades.activeSkin === 'crimson' ? '#ff003c' :
+                             localSaveData.upgrades.activeSkin === 'phantom' ? '#ffffff' : '#00f3ff';
+                this.trail = [];
+                this.size = 15;
+                this.alive = true;
+            }
+            update() {
+                if(!this.alive) return;
+
+                // Input
+                let moveDir = 0;
+                if(Keys.left || touchDir === -1) moveDir = -1;
+                if(Keys.right || touchDir === 1) moveDir = 1;
+                
+                this.angle += moveDir * this.baseSpeed;
+
+                // Trail logic
+                this.trail.push({a: this.angle, life: 1.0});
+                if(this.trail.length > 15) this.trail.shift();
+                for(let t of this.trail) t.life -= 0.08;
+
+                // Add small engine particles
+                if (moveDir !== 0 && Math.random() > 0.5) {
+                    const px = cx + Math.cos(this.angle) * this.radius;
+                    const py = cy + Math.sin(this.angle) * this.radius;
+                    Game.particles.push(new Particle(px, py, this.color, 1, 3, 20));
+                }
+            }
+            draw(ctx) {
+                if(!this.alive) return;
+
+                // Draw Trail
+                if(this.trail.length > 0) {
+                    ctx.beginPath();
+                    for(let i=0; i<this.trail.length; i++) {
+                        const t = this.trail[i];
+                        if(t.life <= 0) continue;
+                        const tx = cx + Math.cos(t.a) * this.radius;
+                        const ty = cy + Math.sin(t.a) * this.radius;
+                        if(i===0) ctx.moveTo(tx, ty);
+                        else ctx.lineTo(tx, ty);
+                    }
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 4;
+                    ctx.globalAlpha = 0.5;
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.stroke();
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Draw Ship
+                const x = cx + Math.cos(this.angle) * this.radius;
+                const y = cy + Math.sin(this.angle) * this.radius;
+
+                ctx.save();
+                ctx.translate(x, y);
+                // Orient along the tangent
+                let moveDir = (Keys.left || touchDir === -1) ? -1 : (Keys.right || touchDir === 1) ? 1 : 1;
+                ctx.rotate(this.angle + (moveDir > 0 ? Math.PI/2 : -Math.PI/2));
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+
+                if(localSaveData.upgrades.activeSkin === 'phantom') {
+                    // Diamond shape
+                    ctx.beginPath(); ctx.moveTo(0, -this.size); ctx.lineTo(this.size, 0); ctx.lineTo(0, this.size); ctx.lineTo(-this.size, 0); ctx.fill();
+                } else {
+                    // Standard / Crimson Triangle
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size);
+                    ctx.lineTo(this.size*0.8, this.size);
+                    ctx.lineTo(0, this.size*0.5);
+                    ctx.lineTo(-this.size*0.8, this.size);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+            getPos() {
+                return { x: cx + Math.cos(this.angle) * this.radius, y: cy + Math.sin(this.angle) * this.radius };
+            }
+        }
+
+        class Enemy {
+            constructor(speedMult) {
+                const angle = Math.random() * Math.PI * 2;
+                const spawnDist = Math.max(width, height) * 0.6;
+                this.x = cx + Math.cos(angle) * spawnDist;
+                this.y = cy + Math.sin(angle) * spawnDist;
+                this.speed = MathUtil.rand(1.5, 3.0) * speedMult;
+                this.angle = angle + Math.PI; // Point to center
+                this.size = 10;
+                
+                // Spiral modifier
+                this.wobble = Math.random() > 0.7 ? MathUtil.rand(-0.02, 0.02) : 0;
+                this.color = localSaveData.upgrades.activeTheme === 'inferno' ? '#ff3300' : '#ff00ea';
+            }
+            update() {
+                this.angle += this.wobble;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                // Add trail particle sometimes
+                if(Math.random() > 0.8) {
+                    Game.particles.push(new Particle(this.x, this.y, this.color, 0.5, 2, 15));
+                }
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                
+                // Draw spike shape
+                ctx.beginPath();
+                ctx.moveTo(this.size, 0);
+                ctx.lineTo(-this.size, this.size*0.7);
+                ctx.lineTo(-this.size*0.5, 0);
+                ctx.lineTo(-this.size, -this.size*0.7);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class SimgaToken {
+            constructor() {
+                const angle = Math.random() * Math.PI * 2;
+                const spawnDist = Math.max(width, height) * 0.6;
+                this.x = cx + Math.cos(angle) * spawnDist;
+                this.y = cy + Math.sin(angle) * spawnDist;
+                this.speed = 1.0; // Slow
+                this.angle = angle + Math.PI;
+                this.size = 12;
+                this.pulseTimer = 0;
+                this.color = '#ffea00';
+            }
+            update() {
+                const distToCenter = MathUtil.dist(this.x, this.y, cx, cy);
+                // Stop at orbit ring
+                if(distToCenter > 120) {
+                    this.x += Math.cos(this.angle) * this.speed;
+                    this.y += Math.sin(this.angle) * this.speed;
+                }
+                this.pulseTimer += 0.1;
+                if(Math.random()>0.9) Game.particles.push(new Particle(this.x, this.y, this.color, 1, 2, 20));
+            }
+            draw(ctx) {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                const p = Math.sin(this.pulseTimer)*3;
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size + p, 0, Math.PI*2);
+                ctx.fill();
+
+                // Inner detail
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size/2, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        /*******************************************************
+         * GAME MANAGER
+         *******************************************************/
+        const Game = {
+            state: 'loading', // loading, menu, playing, gameover
+            score: 0,
+            timeAlive: 0,
+            lastFrameTime: 0,
+            shakeAmount: 0,
+            
+            player: null,
+            enemies: [],
+            tokens: [],
+            particles: [],
+            starfield: new Starfield(),
+            
+            pulseActive: false,
+            pulseRadius: 0,
+            pulseCooldown: 0,
+            
+            difficultyMult: 1.0,
+            spawnTimer: 0,
+            tokenSpawnTimer: 0,
+
+            // Economy pacing trackers
+            milestones: [20, 60, 120], // Seconds where passive SB is awarded
+            milestonesReached: 0,
+
+            init() {
+                requestAnimationFrame(this.loop.bind(this));
+            },
+
+            showMenu() {
+                this.state = 'menu';
+                UI.hideAllScreens();
+                document.getElementById('screen-menu').classList.remove('hidden');
+                document.getElementById('menu-highscore').innerText = localSaveData.highScore;
+            },
+
+            start() {
+                this.state = 'playing';
+                this.score = 0;
+                this.timeAlive = 0;
+                this.difficultyMult = 1.0;
+                this.spawnTimer = 0;
+                this.tokenSpawnTimer = 0;
+                this.milestonesReached = 0;
+                sessionEarnedSB = 0;
+
+                this.player = new Player();
+                this.enemies = [];
+                this.tokens = [];
+                this.particles = [];
+                
+                this.pulseCooldown = 0;
+                this.pulseActive = false;
+
+                UI.hideAllScreens();
+                document.getElementById('screen-hud').classList.remove('hidden');
+                
+                // Show/hide pulse button
+                const btn = document.getElementById('pulse-btn');
+                if(localSaveData.upgrades.pulseUnlocked) {
+                    btn.style.display = 'block';
+                    btn.classList.add('ready');
+                    document.getElementById('pulse-cd-text').innerText = "READY";
+                } else {
+                    btn.style.display = 'none';
+                }
+
+                this.updateHUD();
+                this.lastFrameTime = performance.now();
+            },
+
+            usePulse() {
+                if(!localSaveData.upgrades.pulseUnlocked) return;
+                if(this.pulseCooldown > 0) return;
+                
+                this.pulseActive = true;
+                this.pulseRadius = this.player.radius; // Start from orbit
+                this.pulseCooldown = 15; // 15 seconds cooldown
+                this.screenShake(10);
+                
+                const btn = document.getElementById('pulse-btn');
+                btn.classList.remove('ready');
+            },
+
+            gameOver() {
+                this.state = 'gameover';
+                this.player.alive = false;
+                this.screenShake(20);
+                
+                // Explode player
+                const p = this.player.getPos();
+                for(let i=0; i<40; i++) {
+                    this.particles.push(new Particle(p.x, p.y, this.player.color, 5, 4, 40));
+                }
+
+                if(this.score > localSaveData.highScore) {
+                    localSaveData.highScore = Math.floor(this.score);
+                }
+                
+                Platform.save();
+
+                setTimeout(() => {
+                    UI.hideAllScreens();
+                    document.getElementById('screen-gameover').classList.remove('hidden');
+                    document.getElementById('go-score').innerText = Math.floor(this.score);
+                    document.getElementById('go-earned').innerText = sessionEarnedSB + " SB";
+                }, 1500);
+            },
+
+            screenShake(amt) {
+                this.shakeAmount = amt;
+            },
+
+            update(dt) {
+                if(this.state !== 'playing') {
+                    this.starfield.update(0.2);
+                    this.updateParticles();
+                    return;
+                }
+
+                this.timeAlive += dt;
+                this.score += dt * 10;
+                this.difficultyMult += dt * 0.01; // Gets harder over time
+
+                // Economy Passive Milestones
+                if(this.milestonesReached < this.milestones.length) {
+                    const nextMilestone = this.milestones[this.milestonesReached];
+                    if(this.timeAlive >= nextMilestone) {
+                        const reward = this.milestonesReached + 1; // +1, +2, +3
+                        Platform.earnSimgaBucks(reward, "Survival Milestone");
+                        this.milestonesReached++;
+                    }
+                }
+
+                // Spawning Enemies
+                this.spawnTimer -= dt;
+                if(this.spawnTimer <= 0) {
+                    this.enemies.push(new Enemy(this.difficultyMult));
+                    this.spawnTimer = Math.max(0.3, 1.5 - (this.difficultyMult * 0.2));
+                }
+
+                // Spawning Tokens
+                this.tokenSpawnTimer -= dt;
+                if(this.tokenSpawnTimer <= 0) {
+                    if(this.tokens.length < 1 && Math.random() > 0.5) { // Max 1 token at a time
+                        this.tokens.push(new SimgaToken());
+                    }
+                    this.tokenSpawnTimer = MathUtil.rand(25, 40); // Check every 25-40s
+                }
+
+                // Update Pulse Cooldown
+                if(this.pulseCooldown > 0) {
+                    this.pulseCooldown -= dt;
+                    const btn = document.getElementById('pulse-btn');
+                    document.getElementById('pulse-cd-text').innerText = Math.ceil(this.pulseCooldown) + "s";
+                    if(this.pulseCooldown <= 0) {
+                        btn.classList.add('ready');
+                        document.getElementById('pulse-cd-text').innerText = "READY";
+                    }
+                }
+
+                this.player.update();
+                const pPos = this.player.getPos();
+
+                // Pulse Expansion & Collision
+                if(this.pulseActive) {
+                    this.pulseRadius += 800 * dt; // Expansion speed
+                    if(this.pulseRadius > Math.max(width, height)) {
+                        this.pulseActive = false;
+                    }
+                }
+
+                // Update Enemies
+                for(let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    e.update();
+                    
+                    const distToCenter = MathUtil.dist(e.x, e.y, cx, cy);
+                    const distToPlayer = MathUtil.dist(e.x, e.y, pPos.x, pPos.y);
+
+                    // Pulse Destroy
+                    if(this.pulseActive) {
+                        const distFromPulseOrigin = MathUtil.dist(e.x, e.y, cx, cy); // Pulse expands from center
+                        if(Math.abs(distFromPulseOrigin - this.pulseRadius) < 30) {
+                            // Destroy enemy
+                            for(let j=0; j<10; j++) this.particles.push(new Particle(e.x, e.y, e.color, 3, 3, 20));
+                            this.enemies.splice(i, 1);
+                            this.score += 50;
+                            continue;
+                        }
+                    }
+
+                    // Player Collision
+                    if(distToPlayer < this.player.size + e.size) {
+                        this.gameOver();
+                        break;
+                    }
+
+                    // Reach Center
+                    if(distToCenter < 10) {
+                        this.enemies.splice(i, 1);
+                        this.screenShake(2);
+                    }
+                }
+
+                // Update Tokens
+                for(let i = this.tokens.length - 1; i >= 0; i--) {
+                    const t = this.tokens[i];
+                    t.update();
+                    
+                    const distToPlayer = MathUtil.dist(t.x, t.y, pPos.x, pPos.y);
+                    if(distToPlayer < this.player.size + t.size + 10) { // Slightly generous hitbox
+                        // Collected!
+                        Platform.earnSimgaBucks(1, "Collected Token");
+                        for(let j=0; j<15; j++) this.particles.push(new Particle(t.x, t.y, '#ffea00', 4, 3, 30));
+                        this.tokens.splice(i, 1);
+                    }
+                }
+
+                this.starfield.update(1.0 + (this.difficultyMult*0.5));
+                this.updateParticles();
+                this.updateHUD();
+
+                if(this.shakeAmount > 0) {
+                    this.shakeAmount *= 0.9;
+                    if(this.shakeAmount < 0.5) this.shakeAmount = 0;
+                }
+            },
+
+            updateParticles() {
+                for(let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.update();
+                    if(p.life <= 0 || p.size <= 0.1) this.particles.splice(i, 1);
+                }
+            },
+
+            draw() {
+                // Theme colors
+                const theme = localSaveData.upgrades.activeTheme;
+                const bgColor = theme === 'inferno' ? '#1a0500' : theme === 'cyberpunk' ? '#0d001a' : '#05050a';
+                const orbitColor = theme === 'inferno' ? 'rgba(255, 51, 0, 0.2)' : theme === 'cyberpunk' ? 'rgba(255, 0, 234, 0.2)' : 'rgba(0, 243, 255, 0.2)';
+                const coreColor = theme === 'inferno' ? '#ffaa00' : theme === 'cyberpunk' ? '#ff00ea' : '#00f3ff';
+                const starColor = theme === 'inferno' ? '#ff5500' : '#ffffff';
+
+                // Clear & BG
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.save();
+                if(this.shakeAmount > 0) {
+                    ctx.translate(MathUtil.rand(-this.shakeAmount, this.shakeAmount), MathUtil.rand(-this.shakeAmount, this.shakeAmount));
+                }
+
+                // Draw BG Gradient
+                const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(width, height)*0.8);
+                grad.addColorStop(0, theme === 'inferno' ? 'rgba(255,0,0,0.1)' : 'rgba(0,100,255,0.1)');
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0,0,width,height);
+
+                this.starfield.draw(ctx, starColor);
+
+                // Draw Orbit Ring
+                ctx.beginPath();
+                ctx.arc(cx, cy, 120, 0, Math.PI * 2);
+                ctx.strokeStyle = orbitColor;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 15]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw Core
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = coreColor;
+                ctx.fillStyle = coreColor;
+                const corePulse = Math.sin(performance.now() * 0.005) * 5;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 15 + corePulse, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw Pulse Wave
+                if(this.pulseActive) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, this.pulseRadius, 0, Math.PI*2);
+                    ctx.strokeStyle = `rgba(255, 0, 234, ${Math.max(0, 1 - this.pulseRadius/Math.max(width,height))})`;
+                    ctx.lineWidth = 10;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#ff00ea';
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // Draw Entities
+                for(let t of this.tokens) t.draw(ctx);
+                for(let e of this.enemies) e.draw(ctx);
+                if(this.player) this.player.draw(ctx);
+                for(let p of this.particles) p.draw(ctx);
+
+                ctx.restore();
+            },
+
+            updateHUD() {
+                document.getElementById('hud-score-val').innerText = Math.floor(this.score);
+                document.getElementById('hud-sb-val').innerText = sessionEarnedSB;
+            },
+
+            loop(timestamp) {
+                const dt = (timestamp - this.lastFrameTime) / 1000;
+                this.lastFrameTime = timestamp;
+                
+                // Cap dt to avoid massive spikes on tab switch
+                if(dt < 0.1) {
+                    this.update(dt);
+                    this.draw();
+                }
+                
+                requestAnimationFrame(this.loop.bind(this));
+            }
+        };
+
+        /*******************************************************
+         * UI & SHOP MANAGER
+         *******************************************************/
+        const UI = {
+            hideAllScreens() {
+                const screens = document.querySelectorAll('.screen');
+                screens.forEach(s => s.classList.add('hidden'));
+            },
+            showToast(msg) {
+                const t = document.getElementById('toast');
+                t.innerText = msg;
+                t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 2000);
+            },
+            showBlocking(show) {
+                const el = document.getElementById('blocking-overlay');
+                if(show) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            }
+        };
+
+        const ShopConfig = [
+            { id: 'speed_up', name: 'Engine Overclock', desc: 'Increase rotation speed.', type: 'upgrade', cost: 15, maxLvl: 3 },
+            { id: 'pulse', name: 'Pulse Emitter', desc: 'Spacebar/Button to clear nearby enemies.', type: 'ability', cost: 20 },
+            { id: 'phantom', name: 'Phantom Skin', desc: 'Sleek white diamond frame.', type: 'skin', cost: 25 },
+            { id: 'crimson', name: 'Crimson Skin', desc: 'Aggressive red chassis.', type: 'skin', cost: 25 },
+            { id: 'cyberpunk', name: 'Cyberpunk Theme', desc: 'Neon magenta and deep purple arena.', type: 'theme', cost: 30 },
+            { id: 'inferno', name: 'Inferno Theme', desc: 'Blazing orange and red arena.', type: 'theme', cost: 30 }
+        ];
+
+        const Shop = {
+            open() {
+                UI.hideAllScreens();
+                document.getElementById('screen-shop').classList.remove('hidden');
+                this.render();
+            },
+            
+            close() {
+                if(Game.state === 'gameover') {
+                    UI.hideAllScreens();
+                    document.getElementById('screen-gameover').classList.remove('hidden');
+                } else {
+                    Game.showMenu();
+                }
+            },
+
+            render() {
+                const container = document.getElementById('shop-items');
+                container.innerHTML = '';
+                
+                ShopConfig.forEach(item => {
+                    const isOwned = this.checkOwned(item);
+                    const isEquipped = this.checkEquipped(item);
+                    
+                    let btnHTML = '';
+                    if(item.type === 'upgrade') {
+                        const lvl = localSaveData.upgrades.speedLevel;
+                        if(lvl >= item.maxLvl) {
+                            btnHTML = `<button class="buy-btn owned" disabled>MAX LVL</button>`;
+                        } else {
+                            btnHTML = `<button class="buy-btn" onclick="Shop.purchase('${item.id}')">${item.cost} SB</button>`;
+                        }
+                    } else if(isEquipped) {
+                        btnHTML = `<button class="buy-btn equipped" disabled>EQUIPPED</button>`;
+                    } else if(isOwned) {
+                        btnHTML = `<button class="buy-btn owned" onclick="Shop.equip('${item.id}', '${item.type}')">EQUIP</button>`;
+                    } else {
+                        btnHTML = `<button class="buy-btn" onclick="Shop.purchase('${item.id}')">${item.cost} SB</button>`;
+                    }
+
+                    const html = `
+                        <div class="shop-item">
+                            <div class="item-info">
+                                <h3>${item.name} ${item.type==='upgrade' ? `(Lv ${localSaveData.upgrades.speedLevel})` : ''}</h3>
+                                <p>${item.desc}</p>
+                            </div>
+                            ${btnHTML}
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            },
+
+            checkOwned(item) {
+                if(item.type === 'ability' && localSaveData.upgrades.pulseUnlocked) return true;
+                if(item.type === 'skin' && localSaveData.upgrades.skins.includes(item.id)) return true;
+                if(item.type === 'theme' && localSaveData.upgrades.themes.includes(item.id)) return true;
+                return false;
+            },
+
+            checkEquipped(item) {
+                if(item.type === 'ability') return localSaveData.upgrades.pulseUnlocked;
+                if(item.type === 'skin' && localSaveData.upgrades.activeSkin === item.id) return true;
+                if(item.type === 'theme' && localSaveData.upgrades.activeTheme === item.id) return true;
+                return false;
+            },
+
+            purchase(id) {
+                const item = ShopConfig.find(i => i.id === id);
+                if(!item) return;
+
+                Platform.buyUpgrade(item, (success) => {
+                    if(success) {
+                        // Apply upgrade logic
+                        if(item.type === 'upgrade') localSaveData.upgrades.speedLevel++;
+                        if(item.type === 'ability') localSaveData.upgrades.pulseUnlocked = true;
+                        if(item.type === 'skin') {
+                            localSaveData.upgrades.skins.push(item.id);
+                            localSaveData.upgrades.activeSkin = item.id;
+                        }
+                        if(item.type === 'theme') {
+                            localSaveData.upgrades.themes.push(item.id);
+                            localSaveData.upgrades.activeTheme = item.id;
+                        }
+                        Platform.save();
+                        this.render(); // Re-render shop
+                    }
+                });
+            },
+
+            equip(id, type) {
+                if(type === 'skin') localSaveData.upgrades.activeSkin = id;
+                if(type === 'theme') localSaveData.upgrades.activeTheme = id;
+                Platform.save();
+                this.render();
+            }
+        };
+
+        // Initialize Application Flow
+        window.onload = () => {
+            Game.init();
+            // Start Load Flow
+            Platform.load(() => {
+                Game.showMenu();
+            });
+        };
+
+    </script>
+</body>
+</html>

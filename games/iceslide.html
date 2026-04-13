@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ice Slide Escape</title>
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --primary-glow: rgba(14, 165, 233, 0.6);
+            --bg-dark: #0f172a;
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --text-main: #f8fafc;
+            --danger: #e11d48;
+            --success: #10b981;
+            --gold: #fbbf24;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none; /* Prevent scroll on swipe */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, rgba(15,23,42,0.4) 0%, rgba(15,23,42,0.9) 100%);
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.05);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(to right, #7dd3fc, #e0f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(125, 211, 252, 0.3);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #bae6fd;
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-shop {
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-buy {
+            background: linear-gradient(135deg, #059669, #047857);
+            font-size: 1rem;
+            padding: 10px;
+            margin-top: 10px;
+            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.4);
+        }
+
+        .btn-equipped {
+            background: #475569;
+            box-shadow: none;
+            cursor: default;
+        }
+
+        .btn-equip {
+            background: linear-gradient(135deg, #d97706, #b45309);
+        }
+
+        .btn-back {
+            background: transparent;
+            border: 2px solid #475569;
+            box-shadow: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            background: rgba(15, 23, 42, 0.6);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: auto;
+        }
+
+        #undoBtn {
+            pointer-events: auto;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 0 10px var(--primary-glow);
+            transition: all 0.2s;
+        }
+        
+        #undoBtn:active {
+            transform: scale(0.9);
+        }
+
+        #undoBtn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            border-color: #475569;
+            box-shadow: none;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            max-height: 50vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 5px;
+        }
+        
+        /* Custom scrollbar for shop */
+        .shop-grid::-webkit-scrollbar { width: 6px; }
+        .shop-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .shop-grid::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .shop-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .shop-item-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .shop-item-cost {
+            color: var(--gold);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .shop-item-desc {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            margin-bottom: 0;
+        }
+
+        /* Notification Toast */
+        #toast {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+        }
+
+        .toast-show {
+            opacity: 1 !important;
+            top: 40px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-text">Level: <span id="levelDisplay">1</span></div>
+        <button id="undoBtn" class="hidden disabled">↺ Undo</button>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menuOverlay" class="overlay">
+        <div class="panel">
+            <h1>Ice Slide</h1>
+            <p>Swipe to slide. Hit walls to stop. Avoid traps and reach the portal!</p>
+            <button class="btn" id="playBtn">Play Game</button>
+            <button class="btn btn-shop" id="shopMenuBtn">Shop & Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="shopOverlay" class="overlay hidden">
+        <div class="panel" style="max-width: 450px;">
+            <h2>Simga Shop</h2>
+            <div class="shop-grid" id="shopItemsContainer">
+                <!-- Items injected here by JS -->
+            </div>
+            <button class="btn btn-back" id="closeShopBtn">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Level Complete -->
+    <div id="winOverlay" class="overlay hidden">
+        <div class="panel">
+            <h1 style="color: #6ee7b7; text-shadow: 0 0 20px rgba(110,231,183,0.4);">Level Cleared!</h1>
+            <p id="winStats">Moves: 0</p>
+            <p style="color: var(--gold); font-weight: bold; font-size: 1.2rem;">+<span id="rewardDisplay">2</span> SimgaBucks</p>
+            <button class="btn" id="nextLevelBtn">Next Level</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="deathOverlay" class="overlay hidden">
+        <div class="panel">
+            <h1 style="color: #f87171; text-shadow: 0 0 20px rgba(248,113,113,0.4);">Shattered!</h1>
+            <p>You hit a trap.</p>
+            <button class="btn" id="restartBtn">Try Again</button>
+            <button class="btn btn-back" id="quitBtn">Menu</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Message</div>
+
+    <script>
+        /*******************************************************
+         * GAME PLATFORM CONFIG & COMMUNICATION
+         *******************************************************/
+        const GAME_ID = "iceSlide";
+
+        // Default Save Data
+        let saveData = {
+            level: 1,
+            highScore: 1, // Max level reached
+            unlocks: {
+                undo: false,
+                hint: false,
+                neon_ice: false,
+                skin_fire: false,
+                skin_gold: false
+            },
+            equippedSkin: 'default',
+            equippedTheme: 'default'
+        };
+
+        let pendingPurchase = null;
+        let isDataLoaded = false;
+
+        // Iframe Message Listener
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            // Load Response
+            if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+                if (data.data) {
+                    // Merge saved data with defaults to ensure new keys exist
+                    saveData = { ...saveData, ...data.data, unlocks: { ...saveData.unlocks, ...(data.data.unlocks || {}) } };
+                }
+                isDataLoaded = true;
+                initGameUI();
+            }
+
+            // Spend Response
+            if (data.type === "spendResponse") {
+                if (data.success && pendingPurchase) {
+                    // Unlock item
+                    saveData.unlocks[pendingPurchase.id] = true;
+                    
+                    // Auto equip if skin or theme
+                    if (pendingPurchase.type === 'skin') saveData.equippedSkin = pendingPurchase.id;
+                    if (pendingPurchase.type === 'theme') saveData.equippedTheme = pendingPurchase.id;
+                    
+                    saveGameData();
+                    showToast(`Purchased ${pendingPurchase.name}!`);
+                    renderShop(); // Refresh UI
+                } else {
+                    showToast("Not enough SimgaBucks!", true);
+                }
+                pendingPurchase = null;
+            }
+        });
+
+        // Communication Wrappers
+        function requestLoadData() {
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: "load_" + Date.now()
+            }, "*");
+
+            // Fallback for local testing (if no response after 500ms)
+            setTimeout(() => {
+                if (!isDataLoaded) {
+                    console.log("Local mode: Using default save data.");
+                    isDataLoaded = true;
+                    initGameUI();
+                }
+            }, 500);
+        }
+
+        function saveGameData() {
+            if (saveData.level > saveData.highScore) saveData.highScore = saveData.level;
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function awardSimgaBucks(amount) {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+        }
+
+        function buyItem(item) {
+            if (pendingPurchase) return; // Wait for current transaction
+            pendingPurchase = item;
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: item.cost,
+                msgId: Math.random().toString(36)
+            }, "*");
+
+            // Local fallback test
+            if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.parent === window) {
+                setTimeout(() => {
+                    window.postMessage({ type: "spendResponse", success: true }, "*");
+                }, 200);
+            }
+        }
+
+        /*******************************************************
+         * SHOP CONFIGURATION
+         *******************************************************/
+        const SHOP_ITEMS = [
+            { id: 'undo', name: 'Time Rewind', type: 'upgrade', cost: 15, desc: 'Unlocks the Undo Move ability during gameplay.' },
+            { id: 'hint', name: 'Path Finder', type: 'upgrade', cost: 20, desc: 'Shows subtle arrows pointing to the optimal path.' },
+            { id: 'neon_ice', name: 'Neon Cyber Theme', type: 'theme', cost: 25, desc: 'Transforms the dungeon into a glowing neon grid.' },
+            { id: 'skin_fire', name: 'Inferno Core', type: 'skin', cost: 25, desc: 'A blazing skin that leaves a trail of fire.' },
+            { id: 'skin_gold', name: 'Radiant Star', type: 'skin', cost: 35, desc: 'A brilliant, glowing golden orb skin.' }
+        ];
+
+        /*******************************************************
+         * GAME ENGINE & STATE
+         *******************************************************/
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Game State Enums
+        const STATE_MENU = 0;
+        const STATE_PLAYING = 1;
+        const STATE_TRANSITION = 2;
+
+        let currentState = STATE_MENU;
+        let lastTime = 0;
+        let shakeTime = 0;
+        let shakeIntensity = 0;
+
+        // Grid constants
+        const COLS = 9;
+        const ROWS = 13;
+        let tileSize = 0;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // Entities
+        let grid = []; // 0: empty, 1: wall, 2: trap, 3: exit
+        let player = {
+            gridX: 0, gridY: 0, 
+            x: 0, y: 0, 
+            targetX: 0, targetY: 0,
+            isMoving: false,
+            speed: 15, // pixels per frame roughly
+            size: 0.6, // relative to tileSize
+            moveHistory: [] // for undo
+        };
+        let exitPos = { x: 0, y: 0 };
+        let particles = [];
+        let bgParticles = [];
+        let trails = [];
+        let optimalPath = null;
+        let movesTaken = 0;
+
+        // Input handling
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const SWIPE_THRESH = 30;
+        const keys = {};
+
+        // Visual Themes
+        const THEMES = {
+            default: {
+                bgBase: '#020617', bgGlow: '#0f172a',
+                floor: 'rgba(14, 165, 233, 0.05)', floorLine: 'rgba(14, 165, 233, 0.1)',
+                wallTop: '#38bdf8', wallSide: '#0369a1', wallGlow: 'rgba(56, 189, 248, 0.2)',
+                exitBase: '#fbbf24', exitGlow: 'rgba(251, 191, 36, 0.6)',
+                trapBase: '#1e1b4b', trapSpike: '#e11d48', trapGlow: 'rgba(225, 29, 72, 0.4)'
+            },
+            neon_ice: {
+                bgBase: '#09090b', bgGlow: '#18181b',
+                floor: 'rgba(139, 92, 246, 0.05)', floorLine: 'rgba(139, 92, 246, 0.2)',
+                wallTop: '#22d3ee', wallSide: '#0891b2', wallGlow: 'rgba(34, 211, 238, 0.4)',
+                exitBase: '#a855f7', exitGlow: 'rgba(168, 85, 247, 0.6)',
+                trapBase: '#000000', trapSpike: '#f43f5e', trapGlow: 'rgba(244, 63, 94, 0.5)'
+            }
+        };
+
+        const SKINS = {
+            default: { color: '#38bdf8', glow: 'rgba(56, 189, 248, 0.8)', trailColor: 'rgba(56, 189, 248, 0.3)' },
+            skin_fire: { color: '#fb923c', glow: 'rgba(239, 68, 68, 0.8)', trailColor: 'rgba(239, 68, 68, 0.4)' },
+            skin_gold: { color: '#fef08a', glow: 'rgba(250, 204, 21, 0.9)', trailColor: 'rgba(250, 204, 21, 0.4)' }
+        };
+
+        /*******************************************************
+         * INITIALIZATION & RESIZE
+         *******************************************************/
+        function initGameUI() {
+            document.getElementById("playBtn").addEventListener("click", startGame);
+            document.getElementById("shopMenuBtn").addEventListener("click", () => showOverlay("shopOverlay"));
+            document.getElementById("closeShopBtn").addEventListener("click", () => showOverlay("menuOverlay"));
+            document.getElementById("nextLevelBtn").addEventListener("click", nextLevel);
+            document.getElementById("restartBtn").addEventListener("click", retryLevel);
+            document.getElementById("quitBtn").addEventListener("click", () => showOverlay("menuOverlay"));
+            document.getElementById("undoBtn").addEventListener("click", performUndo);
+            
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Setup Input
+            setupInput();
+            
+            // Background particles
+            for(let i=0; i<50; i++) {
+                bgParticles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    s: Math.random() * 2 + 1,
+                    vy: Math.random() * 0.5 + 0.2,
+                    a: Math.random() * 0.5 + 0.1
+                });
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Calculate grid size to fit screen with padding
+            const padding = 40;
+            const availableWidth = canvas.width - padding;
+            const availableHeight = canvas.height - padding - 80; // Extra room for HUD
+            
+            const cellW = availableWidth / COLS;
+            const cellH = availableHeight / ROWS;
+            
+            tileSize = Math.floor(Math.min(cellW, cellH));
+            
+            // Center grid
+            offsetX = Math.floor((canvas.width - (tileSize * COLS)) / 2);
+            offsetY = Math.floor((canvas.height - (tileSize * ROWS)) / 2) + 20;
+
+            // Snap player visually if alive
+            if(currentState === STATE_PLAYING && !player.isMoving) {
+                player.x = getPixelX(player.gridX);
+                player.y = getPixelY(player.gridY);
+                player.targetX = player.x;
+                player.targetY = player.y;
+            }
+        }
+
+        function getPixelX(gx) { return offsetX + gx * tileSize + tileSize/2; }
+        function getPixelY(gy) { return offsetY + gy * tileSize + tileSize/2; }
+
+        /*******************************************************
+         * LEVEL GENERATION & LOGIC
+         *******************************************************/
+        // A* / BFS to find shortest path for sliding
+        function solveGrid(tempGrid, sx, sy, ex, ey) {
+            let queue = [{x: sx, y: sy, path: []}];
+            let visited = new Set();
+            visited.add(`${sx},${sy}`);
+            
+            const dirs = [{dx:0,dy:-1}, {dx:0,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}];
+            
+            let iterations = 0;
+            while(queue.length > 0 && iterations < 1000) {
+                iterations++;
+                let curr = queue.shift();
+                
+                if (curr.x === ex && curr.y === ey) return curr.path;
+
+                for (let d of dirs) {
+                    let sim = simulateSlide(tempGrid, curr.x, curr.y, d.dx, d.dy);
+                    // If we hit a trap or didn't move, invalid
+                    if (sim.hitTrap || (sim.x === curr.x && sim.y === curr.y)) continue;
+
+                    let key = `${sim.x},${sim.y}`;
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        let newPath = [...curr.path, {x: sim.x, y: sim.y, dx: d.dx, dy: d.dy}];
+                        queue.push({x: sim.x, y: sim.y, path: newPath});
+                    }
+                }
+            }
+            return null; // Unsolvable or too complex
+        }
+
+        function simulateSlide(gridData, startX, startY, dx, dy) {
+            let cx = startX;
+            let cy = startY;
+            let hitTrap = false;
+            let hitExit = false;
+
+            while (true) {
+                let nx = cx + dx;
+                let ny = cy + dy;
+
+                if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) break; // Bounds
+                let tile = gridData[ny][nx];
+                
+                if (tile === 1) break; // Wall
+                
+                cx = nx; cy = ny;
+                
+                if (tile === 2) { hitTrap = true; break; }
+                if (tile === 3) { hitExit = true; break; }
+            }
+            return {x: cx, y: cy, hitTrap, hitExit};
+        }
+
+        function generateLevel(levelNum) {
+            // Difficulty scaling
+            const targetMoves = Math.min(3 + Math.floor(levelNum / 2), 15);
+            const numTraps = Math.min(Math.floor(levelNum / 3), 4);
+            const obstacleDensity = Math.min(0.1 + (levelNum * 0.01), 0.3); // % of board
+            const maxObstacles = Math.floor(COLS * ROWS * obstacleDensity);
+
+            let bestGrid = null;
+            let bestPath = null;
+
+            // Generate loop until valid
+            for (let attempts = 0; attempts < 50; attempts++) {
+                // Init empty
+                let tempGrid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+                
+                // Outer boundaries implicitly handled by simulateSlide bounds check
+                // Just place S and E
+                let sx = Math.floor(COLS/2);
+                let sy = ROWS - 1;
+                let ex = Math.floor(Math.random() * (COLS-2)) + 1;
+                let ey = 0;
+
+                tempGrid[ey][ex] = 3; // Exit
+
+                // Place walls to build complexity
+                for (let i = 0; i < maxObstacles; i++) {
+                    let wx = Math.floor(Math.random() * COLS);
+                    let wy = Math.floor(Math.random() * ROWS);
+                    if (tempGrid[wy][wx] === 0 && !(wx === sx && wy === sy)) {
+                        tempGrid[wy][wx] = 1;
+                        let path = solveGrid(tempGrid, sx, sy, ex, ey);
+                        if (!path) {
+                            tempGrid[wy][wx] = 0; // Revert
+                        }
+                    }
+                }
+
+                // Try placing traps
+                let trapsPlaced = 0;
+                for (let i = 0; i < 50 && trapsPlaced < numTraps; i++) {
+                    let tx = Math.floor(Math.random() * COLS);
+                    let ty = Math.floor(Math.random() * ROWS);
+                    if (tempGrid[ty][tx] === 0 && !(tx === sx && ty === sy)) {
+                        tempGrid[ty][tx] = 2;
+                        let path = solveGrid(tempGrid, sx, sy, ex, ey);
+                        if (!path) {
+                            tempGrid[ty][tx] = 0; // Revert
+                        } else {
+                            trapsPlaced++;
+                        }
+                    }
+                }
+
+                let finalPath = solveGrid(tempGrid, sx, sy, ex, ey);
+                if (finalPath && finalPath.length >= targetMoves - 2) {
+                    bestGrid = tempGrid;
+                    bestPath = finalPath;
+                    break;
+                }
+            }
+
+            // Fallback if gen fails
+            if (!bestGrid) {
+                bestGrid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+                bestGrid[0][Math.floor(COLS/2)] = 3;
+                bestPath = solveGrid(bestGrid, Math.floor(COLS/2), ROWS-1, Math.floor(COLS/2), 0);
+            }
+
+            grid = bestGrid;
+            optimalPath = bestPath;
+            exitPos = {x: 0, y:0};
+            
+            // Find Exit pos for rendering
+            for(let r=0; r<ROWS; r++){
+                for(let c=0; c<COLS; c++){
+                    if(grid[r][c] === 3) exitPos = {x:c, y:r};
+                }
+            }
+
+            // Reset Player
+            player.gridX = Math.floor(COLS/2);
+            player.gridY = ROWS - 1;
+            player.x = getPixelX(player.gridX);
+            player.y = getPixelY(player.gridY);
+            player.targetX = player.x;
+            player.targetY = player.y;
+            player.isMoving = false;
+            player.moveHistory = [];
+            movesTaken = 0;
+            
+            particles = [];
+            trails = [];
+        }
+
+        /*******************************************************
+         * GAMEPLAY ACTIONS
+         *******************************************************/
+        function startGame() {
+            generateLevel(saveData.level);
+            document.getElementById("levelDisplay").innerText = saveData.level;
+            
+            // UI Setup
+            const undoBtn = document.getElementById("undoBtn");
+            if(saveData.unlocks.undo) {
+                undoBtn.classList.remove("hidden");
+                updateUndoButton();
+            } else {
+                undoBtn.classList.add("hidden");
+            }
+
+            showOverlay(null);
+            document.getElementById("hud").classList.remove("hidden");
+            currentState = STATE_PLAYING;
+        }
+
+        function nextLevel() {
+            saveData.level++;
+            saveGameData();
+            startGame();
+        }
+
+        function retryLevel() {
+            startGame(); // Regens same level (or new layout, same difficulty)
+        }
+
+        function attemptMove(dx, dy) {
+            if (currentState !== STATE_PLAYING || player.isMoving) return;
+            
+            let sim = simulateSlide(grid, player.gridX, player.gridY, dx, dy);
+            
+            // If didn't move
+            if (sim.x === player.gridX && sim.y === player.gridY) return;
+
+            // Record history
+            player.moveHistory.push({x: player.gridX, y: player.gridY});
+            updateUndoButton();
+            movesTaken++;
+
+            // Initiate movement
+            player.gridX = sim.x;
+            player.gridY = sim.y;
+            player.targetX = getPixelX(sim.x);
+            player.targetY = getPixelY(sim.y);
+            player.isMoving = true;
+            player.hitTrap = sim.hitTrap;
+            player.hitExit = sim.hitExit;
+            
+            // Sound/Visual feedback start
+            spawnDashParticles(player.x, player.y, dx, dy);
+            
+            // Recalculate hint
+            if(saveData.unlocks.hint) {
+                optimalPath = solveGrid(grid, player.gridX, player.gridY, exitPos.x, exitPos.y);
+            }
+        }
+
+        function performUndo() {
+            if(currentState !== STATE_PLAYING || player.isMoving || player.moveHistory.length === 0) return;
+            
+            let prev = player.moveHistory.pop();
+            updateUndoButton();
+            
+            player.gridX = prev.x;
+            player.gridY = prev.y;
+            player.targetX = getPixelX(prev.x);
+            player.targetY = getPixelY(prev.y);
+            player.isMoving = true;
+            player.hitTrap = false;
+            player.hitExit = false;
+            
+            movesTaken--;
+            
+            if(saveData.unlocks.hint) {
+                optimalPath = solveGrid(grid, player.gridX, player.gridY, exitPos.x, exitPos.y);
+            }
+        }
+
+        function updateUndoButton() {
+            const btn = document.getElementById("undoBtn");
+            if (player.moveHistory.length > 0) {
+                btn.classList.remove("disabled");
+            } else {
+                btn.classList.add("disabled");
+            }
+        }
+
+        function onArrive() {
+            player.isMoving = false;
+            screenShake(5, 10);
+            spawnImpactParticles(player.x, player.y);
+
+            if (player.hitTrap) {
+                die();
+            } else if (player.hitExit) {
+                win();
+            }
+        }
+
+        function die() {
+            currentState = STATE_TRANSITION;
+            screenShake(10, 20);
+            // Big explosion
+            for(let i=0; i<30; i++) {
+                spawnParticle(player.x, player.y, getSkin().color, Math.random()*Math.PI*2, Math.random()*8+2, 0.05);
+            }
+            setTimeout(() => {
+                showOverlay("deathOverlay");
+                document.getElementById("hud").classList.add("hidden");
+            }, 800);
+        }
+
+        function win() {
+            currentState = STATE_TRANSITION;
+            document.getElementById("winStats").innerText = `Moves taken: ${movesTaken}`;
+            
+            // Calculate SimgaBucks Reward
+            let reward = 2; // base
+            if (saveData.level % 5 === 0) reward += 3; // Boss/Milestone
+            if (movesTaken <= (optimalPath ? optimalPath.length + 1 : 99)) reward += 1; // Flawless bonus
+            
+            // Ensure first reward is fast (level 1)
+            if (saveData.level === 1) reward = 5;
+
+            document.getElementById("rewardDisplay").innerText = reward;
+            
+            // Send reward
+            awardSimgaBucks(reward);
+
+            // Confetti
+            for(let i=0; i<50; i++) {
+                spawnParticle(player.x, player.y, THEMES[saveData.equippedTheme || 'default'].exitBase, Math.random()*Math.PI*2, Math.random()*6+2, 0.02);
+            }
+
+            setTimeout(() => {
+                showOverlay("winOverlay");
+                document.getElementById("hud").classList.add("hidden");
+            }, 1000);
+        }
+
+        /*******************************************************
+         * INPUT HANDLING
+         *******************************************************/
+        function setupInput() {
+            window.addEventListener('keydown', (e) => {
+                if(currentState !== STATE_PLAYING) return;
+                keys[e.key] = true;
+                if(e.key === 'ArrowUp' || e.key === 'w') attemptMove(0, -1);
+                if(e.key === 'ArrowDown' || e.key === 's') attemptMove(0, 1);
+                if(e.key === 'ArrowLeft' || e.key === 'a') attemptMove(-1, 0);
+                if(e.key === 'ArrowRight' || e.key === 'd') attemptMove(1, 0);
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keys[e.key] = false;
+            });
+
+            canvas.addEventListener('touchstart', (e) => {
+                if(currentState !== STATE_PLAYING) return;
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            });
+
+            canvas.addEventListener('touchend', (e) => {
+                if(currentState !== STATE_PLAYING) return;
+                let touchEndX = e.changedTouches[0].screenX;
+                let touchEndY = e.changedTouches[0].screenY;
+                
+                let dx = touchEndX - touchStartX;
+                let dy = touchEndY - touchStartY;
+                
+                if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESH) {
+                    if(dx > 0) attemptMove(1, 0);
+                    else attemptMove(-1, 0);
+                } else if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > SWIPE_THRESH) {
+                    if(dy > 0) attemptMove(0, 1);
+                    else attemptMove(0, -1);
+                }
+            });
+        }
+
+        /*******************************************************
+         * RENDERING & DRAWING
+         *******************************************************/
+        function getTheme() {
+            return THEMES[saveData.equippedTheme || 'default'] || THEMES['default'];
+        }
+
+        function getSkin() {
+            return SKINS[saveData.equippedSkin || 'default'] || SKINS['default'];
+        }
+
+        function screenShake(intensity, durationFrames) {
+            shakeIntensity = intensity;
+            shakeTime = durationFrames;
+        }
+
+        function spawnParticle(x, y, color, angle, speed, decay) {
+            particles.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0, decay: decay, color: color,
+                size: Math.random() * 4 + 2
+            });
+        }
+
+        function spawnDashParticles(x, y, dx, dy) {
+            const theme = getTheme();
+            for(let i=0; i<5; i++) {
+                let angle = Math.atan2(-dy, -dx) + (Math.random()-0.5)*1.5;
+                spawnParticle(x, y, theme.wallTop, angle, Math.random()*3+1, 0.05);
+            }
+        }
+
+        function spawnImpactParticles(x, y) {
+            const theme = getTheme();
+            for(let i=0; i<10; i++) {
+                spawnParticle(x, y, theme.wallTop, Math.random()*Math.PI*2, Math.random()*4+1, 0.08);
+            }
+        }
+
+        function updateAndDrawParticles(ctx) {
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+                
+                if(p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawBackground(ctx, theme) {
+            // Gradient Base
+            let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
+            grad.addColorStop(0, theme.bgGlow);
+            grad.addColorStop(1, theme.bgBase);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Floating Background Dust/Snow
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            for(let p of bgParticles) {
+                p.y += p.vy;
+                if(p.y > canvas.height) p.y = 0;
+                ctx.globalAlpha = p.a;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.s, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawGrid(ctx, theme) {
+            ctx.lineWidth = 1;
+            
+            for(let y=0; y<ROWS; y++) {
+                for(let x=0; x<COLS; x++) {
+                    let px = offsetX + x * tileSize;
+                    let py = offsetY + y * tileSize;
+                    let tile = grid[y][x];
+                    
+                    // Floor (always draw under)
+                    ctx.fillStyle = theme.floor;
+                    ctx.fillRect(px, py, tileSize, tileSize);
+                    ctx.strokeStyle = theme.floorLine;
+                    ctx.strokeRect(px, py, tileSize, tileSize);
+
+                    // Wall block (pseudo 3D)
+                    if (tile === 1) {
+                        let h = tileSize * 0.3; // Height of block
+                        // Front face
+                        ctx.fillStyle = theme.wallSide;
+                        ctx.beginPath();
+                        ctx.moveTo(px, py + tileSize - h);
+                        ctx.lineTo(px + tileSize, py + tileSize - h);
+                        ctx.lineTo(px + tileSize, py + tileSize);
+                        ctx.lineTo(px, py + tileSize);
+                        ctx.fill();
+                        
+                        // Top face
+                        ctx.fillStyle = theme.wallTop;
+                        ctx.fillRect(px, py - h, tileSize, tileSize);
+                        
+                        // Edge highlights
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.strokeRect(px, py - h, tileSize, tileSize);
+                    }
+                    
+                    // Trap (Spikes)
+                    if (tile === 2) {
+                        ctx.fillStyle = theme.trapBase;
+                        ctx.fillRect(px + tileSize*0.2, py + tileSize*0.2, tileSize*0.6, tileSize*0.6);
+                        
+                        // Spikes
+                        ctx.fillStyle = theme.trapSpike;
+                        ctx.shadowColor = theme.trapGlow;
+                        ctx.shadowBlur = 10;
+                        ctx.beginPath();
+                        ctx.moveTo(px + tileSize*0.3, py + tileSize*0.8);
+                        ctx.lineTo(px + tileSize*0.5, py + tileSize*0.2);
+                        ctx.lineTo(px + tileSize*0.7, py + tileSize*0.8);
+                        ctx.fill();
+                        ctx.shadowBlur = 0; // reset
+                    }
+
+                    // Exit Portal
+                    if (tile === 3) {
+                        let time = Date.now() / 200;
+                        let pulse = Math.sin(time) * 0.1 + 0.9;
+                        let cx = px + tileSize/2;
+                        let cy = py + tileSize/2;
+                        
+                        ctx.shadowColor = theme.exitGlow;
+                        ctx.shadowBlur = 20 * pulse;
+                        ctx.fillStyle = theme.exitBase;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, tileSize*0.3 * pulse, 0, Math.PI*2);
+                        ctx.fill();
+                        
+                        // Inner core
+                        ctx.fillStyle = 'white';
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, tileSize*0.15, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0; // reset
+                    }
+                }
+            }
+        }
+
+        function drawPlayer(ctx) {
+            const skin = getSkin();
+            
+            // Draw Trail
+            if(trails.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(trails[0].x, trails[0].y);
+                for(let i=1; i<trails.length; i++) {
+                    ctx.lineTo(trails[i].x, trails[i].y);
+                }
+                ctx.strokeStyle = skin.trailColor;
+                ctx.lineWidth = tileSize * player.size * 0.6;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+            }
+
+            // Draw Body
+            let pulse = currentState === STATE_PLAYING ? Math.sin(Date.now() / 150) * 0.05 + 1.0 : 1.0;
+            let radius = (tileSize / 2) * player.size * pulse;
+
+            ctx.shadowColor = skin.glow;
+            ctx.shadowBlur = 15;
+            
+            // Glow Outer
+            ctx.fillStyle = skin.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, radius, 0, Math.PI*2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.beginPath();
+            ctx.arc(player.x - radius*0.2, player.y - radius*0.2, radius*0.4, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+        }
+
+        function drawHints(ctx) {
+            if(saveData.unlocks.hint && optimalPath && optimalPath.length > 0 && !player.isMoving && currentState === STATE_PLAYING) {
+                let firstStep = optimalPath[0];
+                let px = getPixelX(player.gridX);
+                let py = getPixelY(player.gridY);
+                let dx = firstStep.dx * tileSize;
+                let dy = firstStep.dy * tileSize;
+                
+                let pulse = (Math.sin(Date.now() / 200) + 1) / 2; // 0 to 1
+                
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 + pulse * 0.3})`;
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 10]);
+                ctx.lineDashOffset = -Date.now() / 20;
+                
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(px + dx*0.8, py + dy*0.8); // Short arrow line
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset
+            }
+        }
+
+        /*******************************************************
+         * MAIN LOOP
+         *******************************************************/
+        function update() {
+            // Screen Shake Logic
+            let shX = 0, shY = 0;
+            if (shakeTime > 0) {
+                shX = (Math.random() - 0.5) * shakeIntensity;
+                shY = (Math.random() - 0.5) * shakeIntensity;
+                shakeTime--;
+            }
+
+            // Player Movement Logic
+            if (player.isMoving) {
+                let dx = player.targetX - player.x;
+                let dy = player.targetY - player.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < player.speed) {
+                    player.x = player.targetX;
+                    player.y = player.targetY;
+                    onArrive();
+                } else {
+                    player.x += (dx / dist) * player.speed;
+                    player.y += (dy / dist) * player.speed;
+                }
+
+                // Update trails
+                trails.push({x: player.x, y: player.y});
+                if(trails.length > 20) trails.shift();
+                
+                // Trail particles
+                if(Math.random() < 0.3) {
+                    spawnParticle(player.x, player.y, getSkin().trailColor, Math.random()*Math.PI*2, Math.random()*1, 0.1);
+                }
+            } else {
+                // Fade out trail when still
+                if(trails.length > 0) trails.shift();
+            }
+
+            return { shX, shY };
+        }
+
+        function draw(shX, shY) {
+            const theme = getTheme();
+            
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawBackground(ctx, theme);
+
+            // Apply camera shake
+            ctx.save();
+            ctx.translate(shX, shY);
+
+            if (currentState === STATE_PLAYING || currentState === STATE_TRANSITION) {
+                drawGrid(ctx, theme);
+                drawHints(ctx);
+                if (currentState !== STATE_TRANSITION || !player.hitTrap) {
+                    drawPlayer(ctx);
+                }
+            }
+
+            updateAndDrawParticles(ctx);
+
+            ctx.restore();
+        }
+
+        function gameLoop(time) {
+            let dt = time - lastTime;
+            lastTime = time;
+
+            const shake = update();
+            draw(shake.shX, shake.shY);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /*******************************************************
+         * UI & UTILS
+         *******************************************************/
+        function showOverlay(id) {
+            document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+            if (id) {
+                document.getElementById(id).classList.remove('hidden');
+                if (id === 'shopOverlay') renderShop();
+            }
+        }
+
+        function renderShop() {
+            const container = document.getElementById('shopItemsContainer');
+            container.innerHTML = '';
+
+            SHOP_ITEMS.forEach(item => {
+                let isUnlocked = saveData.unlocks[item.id];
+                let isEquipped = (saveData.equippedSkin === item.id) || (saveData.equippedTheme === item.id);
+
+                let btnHtml = '';
+                if (!isUnlocked) {
+                    btnHtml = `<button class="btn btn-buy" onclick="buyItemById('${item.id}')">Buy (${item.cost} SB)</button>`;
+                } else if (item.type === 'upgrade') {
+                    btnHtml = `<button class="btn btn-buy btn-equipped" disabled>Unlocked</button>`;
+                } else if (isEquipped) {
+                    btnHtml = `<button class="btn btn-buy btn-equipped" disabled>Equipped</button>`;
+                } else {
+                    btnHtml = `<button class="btn btn-buy btn-equip" onclick="equipItem('${item.id}', '${item.type}')">Equip</button>`;
+                }
+
+                container.innerHTML += `
+                    <div class="shop-item">
+                        <div class="shop-item-header">
+                            <span class="shop-item-title">${item.name}</span>
+                            ${!isUnlocked ? `<span class="shop-item-cost">⭐ ${item.cost}</span>` : ''}
+                        </div>
+                        <p class="shop-item-desc">${item.desc}</p>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+        }
+
+        // Exposed to global for onclick
+        window.buyItemById = function(id) {
+            const item = SHOP_ITEMS.find(i => i.id === id);
+            if(item) buyItem(item);
+        };
+
+        window.equipItem = function(id, type) {
+            if (type === 'skin') saveData.equippedSkin = id;
+            if (type === 'theme') saveData.equippedTheme = id;
+            saveGameData();
+            renderShop();
+            showToast("Equipped!");
+        };
+
+        function showToast(msg, isError=false) {
+            const t = document.getElementById("toast");
+            t.innerText = msg;
+            t.style.borderColor = isError ? '#e11d48' : 'rgba(255,255,255,0.2)';
+            t.classList.add("toast-show");
+            setTimeout(() => { t.classList.remove("toast-show"); }, 2500);
+        }
+
+        // Start Boot Sequence
+        requestLoadData();
+
+    </script>
+</body>
+</html>

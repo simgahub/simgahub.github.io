@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magnet Maze</title>
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --bg-color: #050510;
+            --panel-bg: rgba(10, 15, 30, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 2px solid var(--neon-blue);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            max-width: 90%;
+            width: 450px;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        h1 {
+            font-size: 3em;
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue);
+        }
+
+        h2 {
+            color: var(--neon-blue);
+            margin-top: 0;
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        button {
+            background: linear-gradient(45deg, #0055ff, #00f3ff);
+            border: none;
+            padding: 12px 25px;
+            margin: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            pointer-events: auto;
+        }
+
+        button:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.8);
+            background: linear-gradient(45deg, #0077ff, #55ffff);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.secondary {
+            background: transparent;
+            border: 2px solid var(--neon-pink);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+        }
+
+        button.secondary:hover {
+            background: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.8);
+        }
+
+        button:disabled {
+            background: #333;
+            border-color: #555;
+            color: #777;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--neon-blue);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-text {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 5px 0;
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        .hud-highlight {
+            color: var(--neon-pink);
+            text-shadow: 0 0 8px var(--neon-pink);
+        }
+
+        /* Shop Styles */
+        .shop-container {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+        }
+
+        .shop-container::-webkit-scrollbar { width: 8px; }
+        .shop-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        .shop-container::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .shop-item-info {
+            text-align: left;
+        }
+
+        .shop-item-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .shop-item-desc {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        .shop-btn {
+            font-size: 0.9em;
+            padding: 8px 15px;
+            margin: 0;
+        }
+
+        .toast-container {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast {
+            background: rgba(10, 20, 40, 0.9);
+            border-left: 4px solid var(--neon-blue);
+            padding: 12px 25px;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s ease-out, fadeOut 0.5s ease-in 2.5s forwards;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .toast.error { border-left-color: #ff3333; }
+        .toast.success { border-left-color: #33ff33; }
+
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+
+        #loading-text {
+            font-size: 1.5em;
+            letter-spacing: 2px;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; text-shadow: 0 0 20px var(--neon-blue); } }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    
+    <div id="hud" class="hidden">
+        <div class="hud-box">
+            <div class="hud-text">LEVEL <span id="hud-level" class="hud-highlight">1</span></div>
+            <div class="hud-text" style="font-size: 0.8em; color: #aaa;">HIGH: <span id="hud-high">0</span></div>
+        </div>
+        <div class="hud-box" style="text-align: right;">
+            <div class="hud-text">CHARGES</div>
+            <div id="hud-charges" class="hud-highlight" style="font-size: 1.5em;">15</div>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="screen-loading" class="screen">
+            <div class="panel">
+                <div id="loading-text">CONNECTING TO PLATFORM...</div>
+            </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="screen-menu" class="screen hidden">
+            <div class="panel">
+                <h1>MAGNET MAZE</h1>
+                <p>Guide the sphere. Click nodes to activate magnetic fields.</p>
+                <button id="btn-play">Start Game</button>
+                <button id="btn-shop-menu" class="secondary">Shop</button>
+            </div>
+        </div>
+
+        <!-- Shop -->
+        <div id="screen-shop" class="screen hidden">
+            <div class="panel" style="width: 550px;">
+                <h2>UPGRADES & SKINS</h2>
+                <div class="shop-container" id="shop-list">
+                    <!-- Shop items generated via JS -->
+                </div>
+                <button id="btn-shop-close" class="secondary">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Level Complete -->
+        <div id="screen-level-complete" class="screen hidden">
+            <div class="panel">
+                <h2>LEVEL CLEARED!</h2>
+                <div id="reward-text" class="hud-text hud-highlight" style="font-size: 1.5em; margin: 20px 0;">+1 SimgaBuck</div>
+                <button id="btn-next-level">Next Level</button>
+                <button id="btn-shop-complete" class="secondary">Shop</button>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="screen-game-over" class="screen hidden">
+            <div class="panel">
+                <h2 style="color: #ff3333; text-shadow: 0 0 10px #ff3333;">SYSTEM FAILURE</h2>
+                <p id="game-over-reason">Hull integrity compromised.</p>
+                <button id="btn-retry">Retry Level</button>
+                <button id="btn-menu-over" class="secondary">Main Menu</button>
+            </div>
+        </div>
+
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+</div>
+
+<script>
+    /* ==========================================================================
+       SYSTEM & API CONSTANTS
+       ========================================================================== */
+    const GAME_ID = "magnetMaze";
+    
+    // Core state
+    let gameState = 'loading'; // loading, menu, playing, shop, levelcomplete, gameover
+    let pendingPurchase = null;
+    let loadMsgId = null;
+    let loadTimeout = null;
+
+    let playerData = {
+        level: 1,
+        highScore: 0,
+        upgrades: {
+            strength: 0,    // max 5
+            maxCharges: 0   // max 5
+        },
+        unlocks: {
+            skin_0: true,   // Default Steel
+            spark_0: true   // Default Blue
+        },
+        equipped: {
+            skin: 'skin_0',
+            spark: 'spark_0'
+        }
+    };
+
+    /* ==========================================================================
+       SHOP DEFINITIONS
+       ========================================================================== */
+    const SHOP_ITEMS = [
+        { id: 'upg_str', name: 'Magnet Power', type: 'upgrade', stat: 'strength', max: 5, baseCost: 5, costMult: 5, desc: 'Increases magnetic pull force.' },
+        { id: 'upg_chg', name: 'Extra Charges', type: 'upgrade', stat: 'maxCharges', max: 5, baseCost: 5, costMult: 5, desc: 'Adds +2 starting charges per upgrade.' },
+        { id: 'skin_1', name: 'Gold Sphere', type: 'unlock', stat: 'skin_1', cost: 15, equipType: 'skin', desc: 'Shiny golden ball skin.' },
+        { id: 'skin_2', name: 'Neon Pink', type: 'unlock', stat: 'skin_2', cost: 25, equipType: 'skin', desc: 'Vibrant pink energy ball.' },
+        { id: 'skin_3', name: 'Plasma Core', type: 'unlock', stat: 'skin_3', cost: 50, equipType: 'skin', desc: 'Intense glowing plasma.' },
+        { id: 'spark_1', name: 'Fire Sparks', type: 'unlock', stat: 'spark_1', cost: 20, equipType: 'spark', desc: 'Red/Orange magnetic arcs.' },
+        { id: 'spark_2', name: 'Matrix Sparks', type: 'unlock', stat: 'spark_2', cost: 30, equipType: 'spark', desc: 'Green glitch arcs.' }
+    ];
+
+    /* ==========================================================================
+       GAME ENGINE & GLOBALS
+       ========================================================================== */
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let lastTime = 0;
+    let canvasW = 0, canvasH = 0;
+    
+    // Camera / Viewport
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let shakeTime = 0;
+    let shakeMag = 0;
+
+    // Game World Entities
+    const CS = 70; // Cell Size
+    const WT = 12; // Wall Thickness
+    let worldWidth = 0;
+    let worldHeight = 0;
+    
+    let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 12 };
+    let walls = [];
+    let nodes = [];
+    let traps = [];
+    let doors = [];
+    let buttons = [];
+    let goal = { x: 0, y: 0, radius: 22, angle: 0 };
+    let particles = [];
+    let trails = [];
+    
+    let charges = 0;
+    let currentLevelMaxCharges = 0;
+
+    /* ==========================================================================
+       INITIALIZATION & PLATFORM COMMS
+       ========================================================================== */
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        setupInputs();
+        
+        // Listen for platform messages
+        window.addEventListener("message", handlePlatformMessage);
+        
+        // Request load data
+        loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+        
+        // Timeout in case platform doesn't respond (run locally)
+        loadTimeout = setTimeout(() => {
+            if (gameState === 'loading') {
+                showToast("Running locally (Platform timeout)", "error");
+                transitionTo('menu');
+            }
+        }, 2000);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function handlePlatformMessage(event) {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            clearTimeout(loadTimeout);
+            if (data.data) {
+                // Merge loaded data carefully
+                const save = data.data;
+                if (save.level) playerData.level = save.level;
+                if (save.highScore) playerData.highScore = save.highScore;
+                if (save.upgrades) Object.assign(playerData.upgrades, save.upgrades);
+                if (save.unlocks) Object.assign(playerData.unlocks, save.unlocks);
+                if (save.equipped) Object.assign(playerData.equipped, save.equipped);
+            }
+            transitionTo('menu');
+        }
+
+        if (data.type === "spendResponse" && pendingPurchase && data.msgId === pendingPurchase.msgId) {
+            if (data.success) {
+                applyPurchaseSuccess();
+            } else {
+                showToast("Not enough SimgaBucks", "error");
+                pendingPurchase = null;
+            }
+            updateShopUI();
+        }
+    }
+
+    function saveData() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: playerData
+        }, "*");
+    }
+
+    /* ==========================================================================
+       UI & FLOW MANAGEMENT
+       ========================================================================== */
+    function transitionTo(newState) {
+        gameState = newState;
+        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+        document.getElementById('hud').classList.add('hidden');
+        
+        if (newState === 'menu') {
+            document.getElementById('screen-menu').classList.remove('hidden');
+            generateBackgroundMaze();
+        } else if (newState === 'playing') {
+            document.getElementById('hud').classList.remove('hidden');
+        } else if (newState === 'shop') {
+            document.getElementById('screen-shop').classList.remove('hidden');
+            updateShopUI();
+        } else if (newState === 'levelcomplete') {
+            document.getElementById('screen-level-complete').classList.remove('hidden');
+            document.getElementById('hud').classList.remove('hidden'); // Keep HUD visible
+        } else if (newState === 'gameover') {
+            document.getElementById('screen-game-over').classList.remove('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+        }
+    }
+
+    // Button Bindings
+    document.getElementById('btn-play').onclick = () => startLevel(playerData.level);
+    document.getElementById('btn-shop-menu').onclick = () => transitionTo('shop');
+    document.getElementById('btn-shop-close').onclick = () => transitionTo('menu');
+    document.getElementById('btn-next-level').onclick = () => startLevel(playerData.level);
+    document.getElementById('btn-shop-complete').onclick = () => transitionTo('shop');
+    document.getElementById('btn-retry').onclick = () => startLevel(playerData.level);
+    document.getElementById('btn-menu-over').onclick = () => transitionTo('menu');
+
+    function showToast(msg, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.innerText = msg;
+        container.appendChild(t);
+        setTimeout(() => { if(t.parentElement) t.remove(); }, 3000);
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-level').innerText = playerData.level;
+        document.getElementById('hud-high').innerText = playerData.highScore;
+        const chgEl = document.getElementById('hud-charges');
+        chgEl.innerText = charges;
+        if (charges <= 3) chgEl.style.color = '#ff3333';
+        else chgEl.style.color = 'var(--neon-pink)';
+    }
+
+    function doScreenShake(mag, time) {
+        shakeMag = mag;
+        shakeTime = time;
+    }
+
+    /* ==========================================================================
+       SHOP LOGIC
+       ========================================================================== */
+    function updateShopUI() {
+        const container = document.getElementById('shop-list');
+        container.innerHTML = '';
+        
+        SHOP_ITEMS.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let html = `<div class="shop-item-info">
+                            <div class="shop-item-title">${item.name}</div>
+                            <div class="shop-item-desc">${item.desc}</div>`;
+            
+            let btnText = '';
+            let cost = 0;
+            let canBuy = false;
+            let actionFn = null;
+
+            if (item.type === 'upgrade') {
+                const currentLvl = playerData.upgrades[item.stat] || 0;
+                if (currentLvl >= item.max) {
+                    html += `<div style="color:var(--neon-blue);font-size:0.8em;margin-top:5px;">MAX LEVEL</div></div>`;
+                    btnText = 'MAXED';
+                } else {
+                    cost = item.baseCost + (currentLvl * item.costMult);
+                    html += `<div style="color:#aaa;font-size:0.8em;margin-top:5px;">Lvl ${currentLvl}/${item.max}</div></div>`;
+                    btnText = `${cost} SB`;
+                    canBuy = true;
+                    actionFn = () => initiatePurchase(item, cost);
+                }
+            } else if (item.type === 'unlock') {
+                const unlocked = playerData.unlocks[item.stat];
+                const equipped = playerData.equipped[item.equipType] === item.stat;
+                
+                if (!unlocked) {
+                    cost = item.cost;
+                    html += `</div>`;
+                    btnText = `${cost} SB`;
+                    canBuy = true;
+                    actionFn = () => initiatePurchase(item, cost);
+                } else if (equipped) {
+                    html += `<div style="color:var(--neon-pink);font-size:0.8em;margin-top:5px;">EQUIPPED</div></div>`;
+                    btnText = 'EQUIPPED';
+                } else {
+                    html += `</div>`;
+                    btnText = 'EQUIP';
+                    canBuy = true;
+                    actionFn = () => {
+                        playerData.equipped[item.equipType] = item.stat;
+                        saveData();
+                        updateShopUI();
+                    };
+                }
+            }
+
+            let btnHtml = `<button class="shop-btn" ${!canBuy ? 'disabled' : ''}>${btnText}</button>`;
+            div.innerHTML = html + btnHtml;
+            
+            if (canBuy && actionFn) {
+                div.querySelector('button').onclick = actionFn;
+            }
+            
+            container.appendChild(div);
+        });
+    }
+
+    function initiatePurchase(item, cost) {
+        if (pendingPurchase) return; // Wait for current transaction
+        
+        const msgId = Math.random().toString(36).substring(2);
+        pendingPurchase = { item: item, cost: cost, msgId: msgId };
+        
+        // Show loading state on button
+        updateShopUI(); 
+        
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+    }
+
+    function applyPurchaseSuccess() {
+        const item = pendingPurchase.item;
+        if (item.type === 'upgrade') {
+            playerData.upgrades[item.stat] = (playerData.upgrades[item.stat] || 0) + 1;
+            showToast(`Upgraded ${item.name}!`, "success");
+        } else if (item.type === 'unlock') {
+            playerData.unlocks[item.stat] = true;
+            playerData.equipped[item.equipType] = item.stat;
+            showToast(`Unlocked ${item.name}!`, "success");
+        }
+        pendingPurchase = null;
+        saveData();
+    }
+
+    /* ==========================================================================
+       GAMEPLAY LOGIC & MAZE GENERATION
+       ========================================================================== */
+    function generateMaze(cols, rows) {
+        let grid = [];
+        for (let r = 0; r < rows; r++) {
+            let row = [];
+            for (let c = 0; c < cols; c++) {
+                row.push({ c, r, visited: false, walls: { top: true, right: true, bottom: true, left: true } });
+            }
+            grid.push(row);
+        }
+
+        let stack = [];
+        let curr = grid[0][0];
+        curr.visited = true;
+        let unvisited = cols * rows - 1;
+
+        while (unvisited > 0) {
+            let neighbors = [];
+            let { c, r } = curr;
+            if (r > 0 && !grid[r - 1][c].visited) neighbors.push({ cell: grid[r - 1][c], dir: 'top' });
+            if (r < rows - 1 && !grid[r + 1][c].visited) neighbors.push({ cell: grid[r + 1][c], dir: 'bottom' });
+            if (c > 0 && !grid[r][c - 1].visited) neighbors.push({ cell: grid[r][c - 1], dir: 'left' });
+            if (c < cols - 1 && !grid[r][c + 1].visited) neighbors.push({ cell: grid[r][c + 1], dir: 'right' });
+
+            if (neighbors.length > 0) {
+                let next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                stack.push(curr);
+                if (next.dir === 'top') { curr.walls.top = false; next.cell.walls.bottom = false; }
+                else if (next.dir === 'bottom') { curr.walls.bottom = false; next.cell.walls.top = false; }
+                else if (next.dir === 'left') { curr.walls.left = false; next.cell.walls.right = false; }
+                else if (next.dir === 'right') { curr.walls.right = false; next.cell.walls.left = false; }
+                
+                curr = next.cell;
+                curr.visited = true;
+                unvisited--;
+            } else if (stack.length > 0) {
+                curr = stack.pop();
+            }
+        }
+        return grid;
+    }
+
+    function findPath(grid, startC, startR, endC, endR) {
+        let queue = [{c: startC, r: startR, path: []}];
+        let visited = new Set();
+        visited.add(`${startC},${startR}`);
+        
+        while(queue.length > 0) {
+            let curr = queue.shift();
+            let cell = grid[curr.r][curr.c];
+            let newPath = [...curr.path, {c: curr.c, r: curr.r}];
+            
+            if (curr.c === endC && curr.r === endR) return newPath;
+            
+            if (!cell.walls.top && !visited.has(`${curr.c},${curr.r-1}`)) { visited.add(`${curr.c},${curr.r-1}`); queue.push({c: curr.c, r: curr.r-1, path: newPath}); }
+            if (!cell.walls.bottom && !visited.has(`${curr.c},${curr.r+1}`)) { visited.add(`${curr.c},${curr.r+1}`); queue.push({c: curr.c, r: curr.r+1, path: newPath}); }
+            if (!cell.walls.left && !visited.has(`${curr.c-1},${curr.r}`)) { visited.add(`${curr.c-1},${curr.r}`); queue.push({c: curr.c-1, r: curr.r, path: newPath}); }
+            if (!cell.walls.right && !visited.has(`${curr.c+1},${curr.r}`)) { visited.add(`${curr.c+1},${curr.r}`); queue.push({c: curr.c+1, r: curr.r, path: newPath}); }
+        }
+        return [];
+    }
+
+    function getAccessibleCells(grid, startC, startR, blockedFrom, blockedTo) {
+        let queue = [{c: startC, r: startR}];
+        let visited = new Set();
+        visited.add(`${startC},${startR}`);
+        let accessible = [];
+        
+        while(queue.length > 0) {
+            let curr = queue.shift();
+            let cell = grid[curr.r][curr.c];
+            accessible.push(cell);
+            
+            let checkAndAdd = (nc, nr, dir) => {
+                if (cell.walls[dir]) return;
+                if ((curr.c === blockedFrom.c && curr.r === blockedFrom.r && nc === blockedTo.c && nr === blockedTo.r) ||
+                    (curr.c === blockedTo.c && curr.r === blockedTo.r && nc === blockedFrom.c && nr === blockedFrom.r)) {
+                    return;
+                }
+                if (!visited.has(`${nc},${nr}`)) {
+                    visited.add(`${nc},${nr}`);
+                    queue.push({c: nc, r: nr});
+                }
+            };
+            
+            if (curr.r > 0) checkAndAdd(curr.c, curr.r-1, 'top');
+            if (curr.r < grid.length-1) checkAndAdd(curr.c, curr.r+1, 'bottom');
+            if (curr.c > 0) checkAndAdd(curr.c-1, curr.r, 'left');
+            if (curr.c < grid[0].length-1) checkAndAdd(curr.c+1, curr.r, 'right');
+        }
+        return accessible;
+    }
+
+    function startLevel(lvl, isBackground = false) {
+        gameState = 'playing';
+        particles = [];
+        trails = [];
+        
+        let cols = 3 + Math.floor(lvl / 2);
+        let rows = 3 + Math.floor(lvl / 2);
+        // Cap size for sanity
+        if (cols > 15) cols = 15;
+        if (rows > 15) rows = 15;
+
+        worldWidth = cols * CS;
+        worldHeight = rows * CS;
+
+        let grid = generateMaze(cols, rows);
+        
+        walls = [];
+        nodes = [];
+        traps = [];
+        doors = [];
+        buttons = [];
+
+        // Build wall colliders
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                let cell = grid[r][c];
+                let x = c * CS;
+                let y = r * CS;
+                // Add tiny overlaps to fix corner gaps visually
+                if (cell.walls.top) walls.push({ x: x - WT/2, y: y - WT/2, w: CS + WT, h: WT });
+                if (cell.walls.bottom) walls.push({ x: x - WT/2, y: y + CS - WT/2, w: CS + WT, h: WT });
+                if (cell.walls.left) walls.push({ x: x - WT/2, y: y - WT/2, w: WT, h: CS + WT });
+                if (cell.walls.right) walls.push({ x: x + CS - WT/2, y: y - WT/2, w: WT, h: CS + WT });
+            }
+        }
+
+        // Place Magnet Nodes at every grid intersection! (THIS WAS MISSING)
+        for (let r = 0; r <= rows; r++) {
+            for (let c = 0; c <= cols; c++) {
+                nodes.push({ x: c * CS, y: r * CS, activeTimer: 0 });
+            }
+        }
+
+        // Place Doors and Buttons
+        let path = findPath(grid, 0, 0, cols-1, rows-1);
+        let buttonPath = [];
+        
+        if (lvl >= 2 && path.length > 4) {
+            let doorIdx = Math.floor(path.length * 0.4 + Math.random() * (path.length * 0.3));
+            let doorCell = path[doorIdx];
+            let nextCell = path[doorIdx+1];
+            
+            let doorX, doorY, doorW, doorH;
+            if (nextCell.c > doorCell.c) { doorX = doorCell.c*CS + CS - WT/2; doorY = doorCell.r*CS - WT/2; doorW = WT; doorH = CS+WT; }
+            else if (nextCell.c < doorCell.c) { doorX = doorCell.c*CS - WT/2; doorY = doorCell.r*CS - WT/2; doorW = WT; doorH = CS+WT; }
+            else if (nextCell.r > doorCell.r) { doorX = doorCell.c*CS - WT/2; doorY = doorCell.r*CS + CS - WT/2; doorW = CS+WT; doorH = WT; }
+            else { doorX = doorCell.c*CS - WT/2; doorY = doorCell.r*CS - WT/2; doorW = CS+WT; doorH = WT; }
+            
+            let validButtonCells = getAccessibleCells(grid, 0, 0, doorCell, nextCell);
+            validButtonCells = validButtonCells.filter(c => !(c.c === 0 && c.r === 0));
+            
+            if (validButtonCells.length > 0) {
+                let bc = validButtonCells[Math.floor(Math.random() * validButtonCells.length)];
+                buttons.push({x: bc.c * CS + CS/2, y: bc.r * CS + CS/2, radius: 16, id: 1, pressed: false});
+                doors.push({x: doorX, y: doorY, w: doorW, h: doorH, id: 1, openVisual: 0});
+                buttonPath = findPath(grid, 0, 0, bc.c, bc.r);
+            }
+        }
+
+        // Place Traps (avoid start, end, and buttons)
+        let trapChance = Math.min(0.08 + (lvl * 0.015), 0.35);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if ((r === 0 && c === 0) || (r === rows - 1 && c === cols - 1)) continue;
+                if (buttons.some(b => Math.floor(b.x/CS) === c && Math.floor(b.y/CS) === r)) continue;
+
+                if (Math.random() < trapChance) {
+                    let onMainPath = path.some(p => p.c === c && p.r === r);
+                    let onBtnPath = buttonPath.some(p => p.c === c && p.r === r);
+                    let isCritical = onMainPath || onBtnPath;
+
+                    let isPulsing = lvl >= 2 && Math.random() < 0.6; // 60% chance to pulse on level 2+
+                    
+                    // If a trap blocks a required path, it MUST pulse so the player can pass.
+                    if (isCritical) {
+                        isPulsing = true;
+                    }
+
+                    let offset = Math.random() * Math.PI * 2;
+                    traps.push({ 
+                        x: c * CS + CS/2, 
+                        y: r * CS + CS/2, 
+                        radius: 12, // Reduced to prevent entirely blocking a path statically
+                        angle: offset,
+                        type: isPulsing ? 'pulse' : 'static',
+                        timer: offset,
+                        phase: 1
+                    });
+                }
+            }
+        }
+
+        // Setup Entities
+        ball = { x: CS/2, y: CS/2, vx: 0, vy: 0, radius: Math.floor(CS * 0.18) };
+        goal = { x: (cols - 1) * CS + CS/2, y: (rows - 1) * CS + CS/2, radius: Math.floor(CS * 0.25), angle: 0 };
+        
+        // Calculate charges
+        currentLevelMaxCharges = Math.floor((cols * rows) * 0.7) + 5 + (playerData.upgrades.maxCharges * 2);
+        charges = currentLevelMaxCharges;
+
+        updateHUD();
+        calcCamera();
+        
+        if (!isBackground) {
+            transitionTo('playing');
+        } else {
+            gameState = 'menu';
+        }
+    }
+
+    function generateBackgroundMaze() {
+        startLevel(3, true); // Small fake level for menu background
+    }
+
+    /* ==========================================================================
+       INPUT HANDLING
+       ========================================================================== */
+    function setupInputs() {
+        canvas.addEventListener('pointerdown', (e) => {
+            if (gameState !== 'playing') return;
+            
+            // Map screen coords to world coords
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let mouseY = e.clientY - rect.top;
+            
+            let worldX = (mouseX - offsetX) / scale;
+            let worldY = (mouseY - offsetY) / scale;
+            
+            activateNearestNode(worldX, worldY);
+        });
+    }
+
+    function activateNearestNode(wx, wy) {
+        if (charges <= 0) {
+            showToast("Out of Charges!", "error");
+            doScreenShake(3, 0.2);
+            return;
+        }
+
+        let closest = null;
+        let minDist = Infinity;
+        
+        // Find node within reasonable distance
+        let searchRadius = CS * 1.5; 
+        
+        for (let n of nodes) {
+            let dx = n.x - wx;
+            let dy = n.y - wy;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < minDist && dist < searchRadius) {
+                minDist = dist;
+                closest = n;
+            }
+        }
+
+        if (closest) {
+            closest.activeTimer = 1.5; // active for 1.5 seconds
+            charges--;
+            updateHUD();
+            spawnRing(closest.x, closest.y, '#00f3ff');
+        }
+    }
+
+    /* ==========================================================================
+       PHYSICS & UPDATE
+       ========================================================================== */
+    function updatePlaying(dt) {
+        // Physics stepping
+        let steps = 2;
+        let sdt = dt / steps;
+        
+        for (let s = 0; s < steps; s++) {
+            
+            // 1. Apply Magnetic Forces
+            let anyActive = false;
+            let baseForce = 600 + (playerData.upgrades.strength * 200);
+
+            for (let n of nodes) {
+                if (n.activeTimer > 0) {
+                    anyActive = true;
+                    n.activeTimer -= sdt;
+                    
+                    let dx = n.x - ball.x;
+                    let dy = n.y - ball.y;
+                    let distSq = dx*dx + dy*dy;
+                    let dist = Math.sqrt(distSq);
+                    
+                    if (dist > 5) {
+                        // Constant acceleration towards node feels better than inverse square
+                        let ax = (dx / dist) * baseForce;
+                        let ay = (dy / dist) * baseForce;
+                        ball.vx += ax * sdt;
+                        ball.vy += ay * sdt;
+                    }
+
+                    // Chance to spawn sparks if close
+                    if (dist < CS * 2 && Math.random() < 0.2) {
+                        spawnSpark(ball.x, ball.y, n.x, n.y);
+                    }
+                }
+            }
+
+            // 2. Apply Friction
+            // Higher friction if no magnets active to make stopping easier
+            let friction = anyActive ? 0.99 : 0.95; 
+            ball.vx *= Math.pow(friction, sdt * 60);
+            ball.vy *= Math.pow(friction, sdt * 60);
+
+            // Cap speed
+            let speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+            let maxSpeed = 600;
+            if (speed > maxSpeed) {
+                ball.vx = (ball.vx / speed) * maxSpeed;
+                ball.vy = (ball.vy / speed) * maxSpeed;
+            }
+
+            // 3. Move Ball
+            ball.x += ball.vx * sdt;
+            ball.y += ball.vy * sdt;
+
+            // 4. Wall Collisions (Circle vs AABB)
+            for (let w of walls) {
+                let closestX = Math.max(w.x, Math.min(ball.x, w.x + w.w));
+                let closestY = Math.max(w.y, Math.min(ball.y, w.y + w.h));
+                
+                let dx = ball.x - closestX;
+                let dy = ball.y - closestY;
+                let distanceSq = dx*dx + dy*dy;
+
+                if (distanceSq < ball.radius * ball.radius) {
+                    let distance = Math.sqrt(distanceSq);
+                    let overlap = ball.radius - distance;
+                    
+                    if (distance === 0) {
+                        ball.y -= ball.radius;
+                        continue;
+                    }
+
+                    // Resolve Penetration
+                    let nx = dx / distance;
+                    let ny = dy / distance;
+                    ball.x += nx * overlap;
+                    ball.y += ny * overlap;
+
+                    // Reflect Velocity
+                    let dot = ball.vx * nx + ball.vy * ny;
+                    if (dot < 0) {
+                        let bounce = 0.5; // lose some energy
+                        ball.vx -= (1 + bounce) * dot * nx;
+                        ball.vy -= (1 + bounce) * dot * ny;
+                        
+                        // Hit effect
+                        if (Math.abs(dot) > 100) {
+                            doScreenShake(1, 0.1);
+                        }
+                    }
+                }
+            }
+            
+            // 5. Door Collisions
+            for (let d of doors) {
+                if (d.openVisual > 0.5) continue; // Door is open enough to pass
+                
+                let closestX = Math.max(d.x, Math.min(ball.x, d.x + d.w));
+                let closestY = Math.max(d.y, Math.min(ball.y, d.y + d.h));
+                let dx = ball.x - closestX;
+                let dy = ball.y - closestY;
+                let distanceSq = dx*dx + dy*dy;
+
+                if (distanceSq < ball.radius * ball.radius) {
+                    let distance = Math.sqrt(distanceSq);
+                    let overlap = ball.radius - distance;
+                    
+                    if (distance === 0) { ball.y -= ball.radius; continue; }
+                    
+                    let nx = dx / distance;
+                    let ny = dy / distance;
+                    ball.x += nx * overlap;
+                    ball.y += ny * overlap;
+                    
+                    let dot = ball.vx * nx + ball.vy * ny;
+                    if (dot < 0) {
+                        let bounce = 0.5; // Reduced from 1.5 to 0.5 to prevent gaining infinite energy
+                        ball.vx -= (1 + bounce) * dot * nx;
+                        ball.vy -= (1 + bounce) * dot * ny;
+                        if (Math.abs(dot) > 100) doScreenShake(1, 0.1);
+                    }
+                }
+            }
+        } // end sub-steps
+
+        // Update trails
+        if (Math.random() < 0.3 && (Math.abs(ball.vx) > 10 || Math.abs(ball.vy) > 10)) {
+            trails.push({ x: ball.x, y: ball.y, life: 0.5, maxLife: 0.5 });
+        }
+        for (let i = trails.length - 1; i >= 0; i--) {
+            trails[i].life -= dt;
+            if (trails[i].life <= 0) trails.splice(i, 1);
+        }
+
+        // Button Updates
+        for (let b of buttons) {
+            if (!b.pressed) {
+                let dx = ball.x - b.x;
+                let dy = ball.y - b.y;
+                if (dx*dx + dy*dy < Math.pow(ball.radius + b.radius, 2)) {
+                    b.pressed = true;
+                    showToast("Gate Opened!", "success");
+                    doScreenShake(3, 0.2);
+                }
+            }
+        }
+
+        // Door Visuals
+        for (let d of doors) {
+            let b = buttons.find(btn => btn.id === d.id);
+            if (b && b.pressed && d.openVisual < 1) {
+                d.openVisual = Math.min(1, d.openVisual + dt * 2);
+            }
+        }
+
+        // Trap Updates & Collisions
+        for (let t of traps) {
+            if (t.type === 'pulse') {
+                t.timer += dt;
+                if (t.timer > 3) t.timer = 0; // 1.5s on, 1.5s off
+                let active = t.timer < 1.5;
+                if (active && t.phase < 1) t.phase = Math.min(1, t.phase + dt * 5);
+                if (!active && t.phase > 0) t.phase = Math.max(0, t.phase - dt * 5);
+            }
+
+            if (t.phase > 0.1) {
+                t.angle += 3 * dt;
+                let currentRadius = t.radius * (0.5 + 0.5 * t.phase);
+                let dx = ball.x - t.x;
+                let dy = ball.y - t.y;
+                if (dx*dx + dy*dy < Math.pow(ball.radius + currentRadius - 2, 2)) {
+                    // Only kill if phase is high enough (visually solid)
+                    if (t.phase > 0.6) {
+                        triggerGameOver("Destroyed by Trap");
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Goal Collision
+        goal.angle -= 2 * dt;
+        let gx = ball.x - goal.x;
+        let gy = ball.y - goal.y;
+        if (gx*gx + gy*gy < Math.pow(ball.radius + goal.radius, 2)) {
+            triggerWin();
+            return;
+        }
+
+        // Check fail condition (no charges & stopped)
+        if (charges <= 0) {
+            let speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+            let anyActive = nodes.some(n => n.activeTimer > 0);
+            if (!anyActive && speed < 15) { // Bumped speed threshold up slightly to ensure it doesn't leave you stuck vibrating
+                triggerGameOver("Out of Energy");
+                return;
+            }
+        }
+    }
+
+    function triggerGameOver(reason) {
+        gameState = 'gameover';
+        document.getElementById('game-over-reason').innerText = reason;
+        
+        // Explode ball
+        for(let i=0; i<30; i++) {
+            let life = 0.6 + Math.random() * 0.6;
+            particles.push({
+                x: ball.x, y: ball.y,
+                vx: (Math.random()-0.5)*400, vy: (Math.random()-0.5)*400,
+                life: life,
+                maxLife: life,
+                color: getBallColor()
+            });
+        }
+        doScreenShake(10, 0.4);
+        
+        setTimeout(() => { if (gameState === 'gameover') transitionTo('gameover'); }, 1000);
+    }
+
+    function triggerWin() {
+        gameState = 'levelcomplete';
+        
+        // Economy & Progression
+        if (playerData.level > playerData.highScore) {
+            playerData.highScore = playerData.level;
+        }
+        
+        // Give SimgaBucks
+        // Reward rule: first reward quick (Lvl 1), ~1 SB per level, +3 on every 5th
+        let reward = 1;
+        if (playerData.level % 5 === 0) reward = 3;
+        
+        document.getElementById('reward-text').innerText = `+${reward} SimgaBucks`;
+        
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: reward
+        }, "*");
+        
+        playerData.level++;
+        saveData();
+
+        spawnRing(goal.x, goal.y, '#0f0');
+        
+        setTimeout(() => { if (gameState === 'levelcomplete') transitionTo('levelcomplete'); }, 800);
+    }
+
+    /* ==========================================================================
+       RENDERING
+       ========================================================================== */
+    function resize() {
+        canvasW = window.innerWidth;
+        canvasH = window.innerHeight;
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        calcCamera();
+    }
+
+    function calcCamera() {
+        if (worldWidth === 0) return;
+        // Fit maze inside screen with some padding
+        scale = Math.min(canvasW / (worldWidth + CS*2), canvasH / (worldHeight + CS*2));
+        // Center it
+        offsetX = canvasW/2 - (worldWidth * scale)/2;
+        offsetY = canvasH/2 - (worldHeight * scale)/2;
+    }
+
+    function drawBackground(dt) {
+        // Deep space gradient
+        let grad = ctx.createRadialGradient(canvasW/2, canvasH/2, 0, canvasW/2, canvasH/2, Math.max(canvasW, canvasH));
+        grad.addColorStop(0, '#0a0a20');
+        grad.addColorStop(1, '#020205');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // Grid parallax (subtle)
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
+        ctx.lineWidth = 1;
+        let t = Date.now() / 3000;
+        let pOffset = (t * 20) % 50;
+        ctx.beginPath();
+        for (let i = pOffset; i < canvasW; i += 50) { ctx.moveTo(i, 0); ctx.lineTo(i, canvasH); }
+        for (let i = pOffset; i < canvasH; i += 50) { ctx.moveTo(0, i); ctx.lineTo(canvasW, i); }
+        ctx.stroke();
+    }
+
+    function getBallColor() {
+        const skin = playerData.equipped.skin;
+        if (skin === 'skin_1') return '#ffcc00'; // Gold
+        if (skin === 'skin_2') return '#ff00ff'; // Pink
+        if (skin === 'skin_3') return '#ffffff'; // Plasma
+        return '#aaaaaa'; // Steel
+    }
+
+    function getSparkColor() {
+        const spark = playerData.equipped.spark;
+        if (spark === 'spark_1') return '#ff5500'; // Fire
+        if (spark === 'spark_2') return '#00ff00'; // Matrix
+        return '#00f3ff'; // Blue
+    }
+
+    function drawPlaying(isBlurred = false) {
+        ctx.save();
+
+        if (shakeTime > 0) {
+            ctx.translate((Math.random()-0.5)*shakeMag, (Math.random()-0.5)*shakeMag);
+        }
+
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+
+        // Draw Walls
+        ctx.fillStyle = 'rgba(10, 15, 30, 0.8)';
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00f3ff';
+
+        ctx.beginPath();
+        for (let w of walls) {
+            ctx.rect(w.x, w.y, w.w, w.h);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        // Reset shadow for performance
+        ctx.shadowBlur = 0;
+
+        // Draw Buttons
+        ctx.shadowBlur = 10;
+        for (let b of buttons) {
+            ctx.shadowColor = b.pressed ? '#00ff00' : '#ffaa00';
+            ctx.fillStyle = b.pressed ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 170, 0, 0.3)';
+            ctx.strokeStyle = b.pressed ? '#00ff00' : '#ffaa00';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Inner detail
+            ctx.fillStyle = b.pressed ? '#00ff00' : '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius * (b.pressed ? 0.8 : 0.4), 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+
+        // Draw Nodes
+        for (let n of nodes) {
+            if (n.activeTimer > 0) {
+                // Active node
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 8 + Math.sin(Date.now()/50)*3, 0, Math.PI*2);
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00f3ff';
+                ctx.fill();
+
+                // Draw pulsing rings
+                ctx.beginPath();
+                let r = (1.5 - n.activeTimer) * 50; // expands outward
+                ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+                ctx.strokeStyle = `rgba(0, 243, 255, ${n.activeTimer/1.5})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Draw magnetic link line
+                ctx.beginPath();
+                ctx.moveTo(n.x, n.y);
+                ctx.lineTo(ball.x, ball.y);
+                ctx.strokeStyle = `rgba(0, 243, 255, ${n.activeTimer/3})`; // faint line
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+            } else {
+                // Inactive node
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 4, 0, Math.PI*2);
+                ctx.fillStyle = '#005588';
+                ctx.fill();
+            }
+        }
+        ctx.shadowBlur = 0;
+
+        // Draw Goal
+        ctx.save();
+        ctx.translate(goal.x, goal.y);
+        ctx.rotate(goal.angle);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#0f0';
+        ctx.strokeStyle = '#0f0';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        // Hexagon
+        for(let i=0; i<6; i++) {
+            let a = (Math.PI / 3) * i;
+            let px = Math.cos(a) * goal.radius;
+            let py = Math.sin(a) * goal.radius;
+            if(i===0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Inner portal
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+        ctx.beginPath();
+        ctx.arc(0, 0, goal.radius * 0.6, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+        ctx.shadowBlur = 0;
+
+        // Draw Traps
+        for (let t of traps) {
+            if (t.phase <= 0) continue; // fully hidden
+
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            ctx.rotate(t.angle);
+            
+            let alpha = t.type === 'pulse' ? t.phase : 1;
+            ctx.globalAlpha = alpha;
+            
+            // Color transition for pulsing (red when solid, dim/orange when fading)
+            let red = 255;
+            let green = 51 + (1-t.phase)*100; // becomes slightly orange when fading
+            ctx.shadowBlur = 15 * t.phase;
+            ctx.shadowColor = `rgba(${red}, 0, 0, ${alpha})`;
+            ctx.fillStyle = `rgb(${red}, ${green}, 51)`;
+            
+            ctx.beginPath();
+            let spikes = 8;
+            let scalePhase = 0.5 + 0.5 * t.phase;
+            for(let i=0; i<spikes*2; i++) {
+                let r = i%2===0 ? t.radius * scalePhase : t.radius * 0.4 * scalePhase;
+                let a = (Math.PI / spikes) * i;
+                let px = Math.cos(a) * r;
+                let py = Math.sin(a) * r;
+                if(i===0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // center hole
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(0, 0, t.radius * 0.2 * scalePhase, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+
+        // Draw Doors
+        for (let d of doors) {
+            if (d.openVisual >= 1) continue;
+            
+            let alpha = 1 - d.openVisual;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(255, 80, 0, 0.4)';
+            ctx.strokeStyle = '#ff5000';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff5000';
+            
+            let cx = d.x + d.w/2;
+            let cy = d.y + d.h/2;
+            
+            ctx.save();
+            ctx.translate(cx, cy);
+            // Scale down to simulate opening
+            if (d.w > d.h) { // Horizontal door
+                ctx.scale(alpha, 1);
+            } else { // Vertical door
+                ctx.scale(1, alpha);
+            }
+            
+            ctx.beginPath();
+            ctx.rect(-d.w/2, -d.h/2, d.w, d.h);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Laser lines inside door
+            ctx.beginPath();
+            if (d.w > d.h) {
+                ctx.moveTo(-d.w/2, 0); ctx.lineTo(d.w/2, 0);
+            } else {
+                ctx.moveTo(0, -d.h/2); ctx.lineTo(0, d.h/2);
+            }
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+
+        // Draw Trails
+        if (trails.length > 1 && gameState === 'playing') {
+            ctx.beginPath();
+            ctx.moveTo(trails[0].x, trails[0].y);
+            for(let i=1; i<trails.length; i++) {
+                ctx.lineTo(trails[i].x, trails[i].y);
+            }
+            ctx.strokeStyle = getBallColor();
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Draw Ball
+        if (gameState === 'playing' || gameState === 'levelcomplete') {
+            const bColor = getBallColor();
+            
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = bColor;
+            
+            let bGrad = ctx.createRadialGradient(ball.x - ball.radius*0.3, ball.y - ball.radius*0.3, 0, ball.x, ball.y, ball.radius);
+            
+            if (playerData.equipped.skin === 'skin_1') { // Gold
+                bGrad.addColorStop(0, '#ffffcc');
+                bGrad.addColorStop(0.5, '#ffcc00');
+                bGrad.addColorStop(1, '#996600');
+            } else if (playerData.equipped.skin === 'skin_2') { // Pink
+                bGrad.addColorStop(0, '#ffffff');
+                bGrad.addColorStop(0.4, '#ff00ff');
+                bGrad.addColorStop(1, '#660066');
+            } else if (playerData.equipped.skin === 'skin_3') { // Plasma
+                bGrad.addColorStop(0, '#ffffff');
+                bGrad.addColorStop(0.7, '#00ffff');
+                bGrad.addColorStop(1, '#0055ff');
+            } else { // Steel
+                bGrad.addColorStop(0, '#ffffff');
+                bGrad.addColorStop(0.5, '#aaaaaa');
+                bGrad.addColorStop(1, '#444444');
+            }
+
+            ctx.fillStyle = bGrad;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.restore();
+    }
+
+    /* ==========================================================================
+       PARTICLE SYSTEM
+       ========================================================================== */
+    function spawnSpark(x1, y1, x2, y2) {
+        let sc = getSparkColor();
+        particles.push({
+            x: x1 + (Math.random()-0.5)*10,
+            y: y1 + (Math.random()-0.5)*10,
+            vx: (x2 - x1) * 2 + (Math.random()-0.5)*100,
+            vy: (y2 - y1) * 2 + (Math.random()-0.5)*100,
+            life: 0.2 + Math.random()*0.2,
+            maxLife: 0.4,
+            color: sc,
+            size: Math.random() * 2 + 1,
+            isSpark: true
+        });
+    }
+
+    function spawnRing(x, y, color) {
+        particles.push({
+            x: x, y: y,
+            vx: 0, vy: 0,
+            life: 0.5,
+            maxLife: 0.5,
+            color: color,
+            isRing: true,
+            size: 0
+        });
+    }
+
+    function drawParticles(dt) {
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.life -= dt;
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+
+            ctx.globalAlpha = p.life / (p.maxLife || 1);
+            
+            if (p.isRing) {
+                p.size += 150 * dt;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            } else if (p.isSpark) {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            } else {
+                // generic explosion
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size || 3, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+        
+        ctx.restore();
+    }
+
+    /* ==========================================================================
+       MAIN LOOP
+       ========================================================================== */
+    function gameLoop(timestamp) {
+        let dt = (timestamp - lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1; // safety cap
+        lastTime = timestamp;
+
+        if (shakeTime > 0) {
+            shakeTime -= dt;
+            if (shakeTime <= 0) shakeMag = 0;
+        }
+
+        ctx.clearRect(0, 0, canvasW, canvasH);
+        drawBackground(dt);
+
+        if (gameState === 'playing') {
+            updatePlaying(dt);
+            drawPlaying(false);
+        } else {
+            // Draw scene then apply a cheap dark overlay instead of expensive CSS blur
+            drawPlaying(false);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(0, 0, canvasW, canvasH);
+            
+            // Dummy update for background simulation
+            if (gameState === 'menu' && !document.getElementById('screen-menu').classList.contains('hidden')) {
+                // simple idle animation
+                goal.angle -= 1 * dt;
+                for (let t of traps) t.angle += 2 * dt;
+            }
+        }
+
+        drawParticles(dt);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Start engine
+    window.onload = init;
+
+</script>
+</body>
+</html>

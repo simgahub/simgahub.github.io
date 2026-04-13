@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bubble Pop Rush</title>
+    <style>
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --dark: #0a0e29;
+            --panel-bg: rgba(15, 23, 42, 0.7);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050814;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            touch-action: none; /* Moved here to prevent blocking UI clicks on mobile */
+        }
+
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through empty space */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 10;
+        }
+
+        .hidden {
+            opacity: 0;
+            visibility: hidden; /* Safely removes from interaction when hidden */
+        }
+
+        .active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 242, 254, 0.1);
+            text-align: center;
+            color: white;
+            pointer-events: auto; /* Catch clicks only on the actual UI panel */
+            max-width: 90%;
+            width: 400px;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        /* Typography */
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 3rem;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 242, 254, 0.5);
+        }
+
+        h2 {
+            margin: 0 0 20px 0;
+            font-size: 2rem;
+            color: white;
+        }
+
+        p {
+            color: #cbd5e1;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(45deg, var(--secondary), var(--primary));
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            margin: 10px;
+            box-shadow: 0 5px 15px rgba(0, 242, 254, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            outline: none;
+            position: relative; /* Ensure z-index context */
+            z-index: 2;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #475569, #334155);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .hud-stat {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #misses-bar {
+            color: #ff4757;
+        }
+
+        /* Shop Grid */
+        .shop-section {
+            text-align: left;
+            margin-bottom: 25px;
+        }
+        .shop-section h3 {
+            margin: 0 0 10px 0;
+            color: #94a3b8;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .shop-items {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        .shop-item {
+            flex: 0 0 auto;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            width: 120px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .shop-item.active-item {
+            border-color: #00f2fe;
+            background: rgba(0, 242, 254, 0.1);
+            box-shadow: 0 0 15px rgba(0,242,254,0.2);
+        }
+        .shop-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .shop-item .cost {
+            color: #f6d365;
+            font-weight: bold;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+        .shop-item .name {
+            font-size: 0.95rem;
+            color: white;
+        }
+        .shop-item.locked {
+            opacity: 0.7;
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .toast {
+            background: rgba(20, 30, 60, 0.9);
+            backdrop-filter: blur(5px);
+            border-left: 4px solid #00f2fe;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .toast.sb-reward {
+            border-left-color: #f6d365;
+        }
+        .toast.error {
+            border-left-color: #ff4757;
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { height: 6px; width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-stat" id="score-disp">Score: 0</div>
+        <div class="hud-stat" id="misses-bar">Misses: 0/5</div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="ui-menu" class="ui-layer active">
+        <div class="panel">
+            <h1>Bubble Pop<br>Rush</h1>
+            <p>Pop the ascending bubbles. Don't let them escape!</p>
+            <p>High Score: <span id="menu-highscore">0</span></p>
+            <button class="btn" id="btn-play-now">Play Now</button>
+            <button class="btn btn-secondary" id="btn-menu-shop">Shop</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="ui-gameover" class="ui-layer hidden">
+        <div class="panel">
+            <h2>Game Over</h2>
+            <p>You popped <span id="go-score" style="font-weight:bold; color:#00f2fe; font-size:1.5rem;">0</span> bubbles!</p>
+            <p>High Score: <span id="go-highscore">0</span></p>
+            <button class="btn" id="btn-play-again">Play Again</button>
+            <button class="btn btn-secondary" id="btn-go-shop">Shop</button>
+        </div>
+    </div>
+
+    <!-- Shop -->
+    <div id="ui-shop" class="ui-layer hidden">
+        <div class="panel" style="width: 600px;">
+            <h2>Upgrades & Customization</h2>
+            
+            <div class="shop-section">
+                <h3>Bubble Skins</h3>
+                <div class="shop-items" id="shop-skins"></div>
+            </div>
+
+            <div class="shop-section">
+                <h3>Pop Particles</h3>
+                <div class="shop-items" id="shop-particles"></div>
+            </div>
+
+            <div class="shop-section">
+                <h3>Power-ups (Permanent)</h3>
+                <div class="shop-items" id="shop-powerups"></div>
+            </div>
+
+            <button class="btn btn-secondary" id="btn-close-shop" style="width: 100%; margin: 10px 0 0 0;">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Toasts -->
+    <div id="toast-container"></div>
+
+    <script>
+        /**
+         * BUBBLE POP RUSH
+         * A highly polished canvas mini-game integrated with a parent platform.
+         */
+
+        // --- PLATFORM CONSTANTS ---
+        const GAME_ID = "bubble";
+
+        // --- GAME STATE ---
+        let gameState = "MENU"; // MENU, PLAYING, GAMEOVER, SHOP
+        let canvas, ctx;
+        let lastTime = 0;
+        let animationFrameId;
+
+        // Game Variables
+        let score = 0;
+        let misses = 0;
+        let wave = 1;
+        let sessionPops = 0; // For SimgaBucks tracking
+        
+        // Dynamic Difficulty
+        let spawnTimer = 0;
+        let spawnInterval = 1000;
+        let baseSpeedMult = 1.0;
+
+        // Visual Polish Variables
+        let screenShake = 0;
+        
+        // Save Data Object (Defaults)
+        let saveData = {
+            highScore: 0,
+            upgrades: {
+                skin: 0,
+                particle: 0,
+                slowLevel: 0,      // Max 3
+                toleranceLevel: 0  // Max 3
+            },
+            unlocked: {
+                skins: [0],        // Array of unlocked skin IDs
+                particles: [0]     // Array of unlocked particle IDs
+            }
+        };
+
+        // --- ECONOMY / SHOP DEFINITIONS ---
+        const SHOP_DATA = {
+            skins: [
+                { id: 0, name: "Aqua Blue", cost: 0, colors: ["#00f2fe", "#4facfe"] },
+                { id: 1, name: "Golden Sun", cost: 20, colors: ["#f6d365", "#fda085"] },
+                { id: 2, name: "Cosmic", cost: 40, colors: ["#a18cd1", "#fbc2eb"] },
+                { id: 3, name: "Neon Matrix", cost: 60, colors: ["#00ff87", "#60efff"] }
+            ],
+            particles: [
+                { id: 0, name: "Splashes", cost: 0, type: "splash" },
+                { id: 1, name: "Star Dust", cost: 30, type: "star" },
+                { id: 2, name: "Hearts", cost: 50, type: "heart" }
+            ],
+            powerups: [
+                { id: "slow", name: "Slower Bubbles", costs: [20, 40, 60], maxLevel: 3, desc: "-10% Speed per Lvl" },
+                { id: "tolerance", name: "Extra Tolerance", costs: [25, 50, 75], maxLevel: 3, desc: "+2 Misses per Lvl" }
+            ]
+        };
+
+        let pendingPurchases = {}; // Track in-flight purchases via msgId
+
+        // --- ENTITY ARRAYS ---
+        let bubbles = [];
+        let particles = [];
+        let floatingTexts = [];
+        let bgOrbs = [];
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            canvas = document.getElementById("gameCanvas");
+            ctx = canvas.getContext("2d", { alpha: false }); // Optimize
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Interaction listeners
+            canvas.addEventListener('pointerdown', handleInteraction);
+            
+            // Button Listeners - Safer for strict iframes than inline HTML onclick
+            document.getElementById("btn-play-now").addEventListener("click", startGame);
+            document.getElementById("btn-menu-shop").addEventListener("click", openShop);
+            document.getElementById("btn-play-again").addEventListener("click", startGame);
+            document.getElementById("btn-go-shop").addEventListener("click", openShop);
+            document.getElementById("btn-close-shop").addEventListener("click", closeShop);
+
+            // Init Background
+            initBackground();
+
+            // Load Data from Platform
+            requestLoadData();
+
+            // Start Render Loop
+            requestAnimationFrame(gameLoop);
+        };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Re-init background elements to fill new space
+            if (bgOrbs.length === 0) initBackground();
+        }
+
+        // --- PLATFORM MESSAGING ---
+        
+        function requestLoadData() {
+            const loadMsgId = "load_" + Date.now();
+            window.parent.postMessage({
+                type: "loadData",
+                gameId: GAME_ID,
+                msgId: loadMsgId
+            }, "*");
+        }
+
+        function saveGameData() {
+            window.parent.postMessage({
+                type: "saveData",
+                gameId: GAME_ID,
+                data: saveData
+            }, "*");
+        }
+
+        function rewardSimgaBucks(amount, reason) {
+            window.parent.postMessage({
+                type: "addSimgaBucks",
+                amount: amount
+            }, "*");
+            showToast(`+${amount} SimgaBucks! (${reason})`, "sb-reward");
+        }
+
+        function requestPurchase(category, itemData, cost) {
+            const msgId = Math.random().toString(36).substring(2);
+            pendingPurchases[msgId] = { category, itemData };
+            
+            window.parent.postMessage({
+                type: "spendSimgaBucks",
+                amount: cost,
+                msgId: msgId
+            }, "*");
+        }
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+                if (data.data) {
+                    // Merge saved data with defaults
+                    saveData = {
+                        highScore: data.data.highScore || 0,
+                        upgrades: { ...saveData.upgrades, ...(data.data.upgrades || {}) },
+                        unlocked: { ...saveData.unlocked, ...(data.data.unlocked || {}) }
+                    };
+                    updateMenuUI();
+                }
+            }
+            else if (data.type === "spendResponse") {
+                const purchase = pendingPurchases[data.msgId];
+                if (purchase) {
+                    if (data.success) {
+                        applyPurchase(purchase.category, purchase.itemData);
+                        showToast("Purchase Successful!");
+                        saveGameData();
+                        renderShop(); // Refresh UI
+                    } else {
+                        showToast("Not enough SimgaBucks!", "error");
+                    }
+                    delete pendingPurchases[data.msgId];
+                }
+            }
+        });
+
+        // --- GAMEPLAY FUNCTIONS ---
+
+        function startGame() {
+            gameState = "PLAYING";
+            score = 0;
+            misses = 0;
+            wave = 1;
+            sessionPops = 0;
+            spawnTimer = 0;
+            bubbles = [];
+            particles = [];
+            floatingTexts = [];
+            screenShake = 0;
+            
+            // Calculate effective stats from upgrades
+            baseSpeedMult = 1.0 - (saveData.upgrades.slowLevel * 0.1);
+            spawnInterval = 1200;
+
+            document.getElementById("ui-menu").classList.replace("active", "hidden");
+            document.getElementById("ui-gameover").classList.replace("active", "hidden");
+            document.getElementById("hud").classList.replace("hidden", "active");
+            
+            updateHUD();
+        }
+
+        function gameOver() {
+            gameState = "GAMEOVER";
+            document.getElementById("hud").classList.replace("active", "hidden");
+            document.getElementById("ui-gameover").classList.replace("hidden", "active");
+            
+            document.getElementById("go-score").innerText = score;
+            
+            if (score > saveData.highScore) {
+                saveData.highScore = score;
+                showToast("New High Score!", "sb-reward");
+                saveGameData();
+            }
+            document.getElementById("go-highscore").innerText = saveData.highScore;
+            
+            // Minor explosion of all current bubbles
+            bubbles.forEach(b => spawnParticles(b.x, b.y, b.radius, b.colors[0]));
+            bubbles = [];
+            screenShake = 15;
+        }
+
+        function updateHUD() {
+            document.getElementById("score-disp").innerText = `Score: ${score}`;
+            const maxMiss = 5 + (saveData.upgrades.toleranceLevel * 2);
+            document.getElementById("misses-bar").innerText = `Misses: ${misses}/${maxMiss}`;
+        }
+
+        // --- INPUT HANDLING ---
+        function handleInteraction(e) {
+            if (gameState !== "PLAYING") return;
+            
+            // Adjust for canvas position if necessary
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let hit = false;
+
+            // Iterate backwards to click top-most bubbles first
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                const b = bubbles[i];
+                const dx = mouseX - b.x;
+                const dy = mouseY - b.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Add a small forgiving margin (padding) for clicks/taps
+                if (dist <= b.radius + 15) {
+                    popBubble(i);
+                    hit = true;
+                    break; 
+                }
+            }
+
+            if (!hit) {
+                // Missed click effect
+                spawnClickEffect(mouseX, mouseY);
+            }
+        }
+
+        function popBubble(index) {
+            const b = bubbles[index];
+            bubbles.splice(index, 1);
+            
+            score++;
+            sessionPops++;
+            
+            // Visuals
+            spawnParticles(b.x, b.y, b.radius, b.colors[0]);
+            spawnFloatingText(b.x, b.y, "+1");
+            
+            updateHUD();
+            checkEconomyMilestones();
+            
+            // Difficulty progression
+            if (score % 25 === 0) {
+                wave++;
+                spawnInterval = Math.max(400, spawnInterval - 150); // Gets faster
+                spawnFloatingText(canvas.width/2, canvas.height/2, `WAVE ${wave}`, "#f6d365", 40, true);
+                rewardSimgaBucks(2, "Wave Cleared"); // +2 SB for waves
+            }
+        }
+
+        function checkEconomyMilestones() {
+            // Early game fast reward (First ~15 seconds / 10 pops)
+            if (sessionPops === 10) {
+                rewardSimgaBucks(1, "Early Bird");
+            }
+            // Steady reward (+1 SB every 20 pops)
+            else if (sessionPops > 10 && sessionPops % 20 === 0) {
+                rewardSimgaBucks(1, "Milestone");
+            }
+            // Larger reward for big scores
+            if (score > 0 && score % 100 === 0) {
+                rewardSimgaBucks(5, "Century Pop!");
+            }
+        }
+
+        // --- ENTITY CLASSES ---
+
+        class Bubble {
+            constructor() {
+                this.radius = Math.random() * 20 + 30; // 30-50 radius
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = canvas.height + this.radius;
+                
+                // Speed depends on wave and upgrades
+                let baseSpd = (Math.random() * 1.5 + 1.5 + (wave * 0.3)) * baseSpeedMult;
+                this.vy = -baseSpd;
+                
+                // Sideways wobble
+                this.wobbleSpeed = Math.random() * 0.03 + 0.02;
+                this.wobbleAmp = Math.random() * 2 + (wave * 0.5);
+                this.wobblePhase = Math.random() * Math.PI * 2;
+                
+                // Visuals
+                const activeSkinId = saveData.upgrades.skin;
+                const skin = SHOP_DATA.skins.find(s => s.id === activeSkinId) || SHOP_DATA.skins[0];
+                this.colors = skin.colors;
+                this.birthTime = Date.now();
+            }
+
+            update(dt) {
+                this.y += this.vy * (dt / 16.6); // normalized to 60fps
+                this.x += Math.sin((Date.now() * this.wobbleSpeed) + this.wobblePhase) * this.wobbleAmp * (dt / 16.6);
+                
+                // Keep in bounds
+                if (this.x < this.radius) this.x = this.radius;
+                if (this.x > canvas.width - this.radius) this.x = canvas.width - this.radius;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Pulsate/Wobble scale slightly based on time
+                const age = Date.now() - this.birthTime;
+                const scaleWobble = Math.sin(age * 0.005) * 0.05;
+                ctx.scale(1 + scaleWobble, 1 - scaleWobble);
+
+                // Gradient
+                const grad = ctx.createRadialGradient(-this.radius*0.3, -this.radius*0.3, this.radius*0.1, 0, 0, this.radius);
+                grad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+                grad.addColorStop(0.3, this.colors[0]);
+                grad.addColorStop(1, this.colors[1]);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                
+                // Glassy shadow
+                ctx.shadowColor = this.colors[0];
+                ctx.shadowBlur = 15;
+                ctx.fill();
+
+                // Inner highlight reflection
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(-this.radius*0.4, -this.radius*0.4, this.radius*0.2, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, type) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.type = type; // "splash", "star", "heart"
+                
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.life = 1.0; // 1.0 to 0.0
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.size = Math.random() * 6 + 3;
+                this.gravity = 0.1;
+            }
+
+            update(dt) {
+                this.x += this.vx * (dt / 16.6);
+                this.vy += this.gravity * (dt / 16.6);
+                this.y += this.vy * (dt / 16.6);
+                this.life -= this.decay * (dt / 16.6);
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.translate(this.x, this.y);
+
+                ctx.fillStyle = this.color;
+                
+                if (this.type === "star") {
+                    // Draw Star
+                    ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*this.size, -Math.sin((18+i*72)/180*Math.PI)*this.size);
+                        ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*this.size*0.4, -Math.sin((54+i*72)/180*Math.PI)*this.size*0.4);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (this.type === "heart") {
+                    // Draw Heart
+                    const s = this.size * 0.8;
+                    ctx.beginPath();
+                    ctx.moveTo(0, s/2);
+                    ctx.bezierCurveTo(-s, -s/2, -s*2, s/3, 0, s*1.5);
+                    ctx.bezierCurveTo(s*2, s/3, s, -s/2, 0, s/2);
+                    ctx.fill();
+                } else {
+                    // Splash / Circle
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        class FloatingText {
+            constructor(x, y, text, color = "#ffffff", size = 20, isCenter = false) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.size = size;
+                this.life = 1.0;
+                this.vy = -1.5;
+                this.isCenter = isCenter; // Used for wave announcements
+            }
+
+            update(dt) {
+                this.y += this.vy * (dt / 16.6);
+                this.life -= 0.015 * (dt / 16.6);
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.font = `bold ${this.size}px 'Segoe UI', sans-serif`;
+                
+                if (this.isCenter) {
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    // Add stroke for center text
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+                    ctx.strokeText(this.text, this.x, this.y);
+                } else {
+                    ctx.textAlign = "center";
+                    ctx.shadowColor = "black";
+                    ctx.shadowBlur = 4;
+                }
+                
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // --- BACKGROUND EFFECTS ---
+        function initBackground() {
+            bgOrbs = [];
+            for (let i = 0; i < 30; i++) {
+                bgOrbs.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    r: Math.random() * 40 + 10,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: -Math.random() * 1.5 - 0.5,
+                    opacity: Math.random() * 0.15 + 0.05
+                });
+            }
+        }
+
+        function drawBackground(ctx, dt) {
+            // Deep gradient
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, "#050814");
+            grad.addColorStop(1, "#1a1c3a");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Floating Orbs
+            ctx.save();
+            bgOrbs.forEach(orb => {
+                orb.x += orb.vx * (dt/16.6);
+                orb.y += orb.vy * (dt/16.6);
+
+                // Wrap around
+                if (orb.y + orb.r < 0) {
+                    orb.y = canvas.height + orb.r;
+                    orb.x = Math.random() * canvas.width;
+                }
+
+                ctx.beginPath();
+                ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${orb.opacity})`;
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        // --- VISUAL FX HELPERS ---
+        function spawnParticles(x, y, radius, color) {
+            const activeParticleId = saveData.upgrades.particle;
+            const ptData = SHOP_DATA.particles.find(p => p.id === activeParticleId) || SHOP_DATA.particles[0];
+            const pType = ptData.type;
+            
+            const count = Math.floor(Math.random() * 5) + 10;
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color, pType));
+            }
+        }
+
+        function spawnClickEffect(x, y) {
+            // Little ripple on miss
+            let life = 1.0;
+            const effect = {
+                update: (dt) => { life -= 0.05 * (dt/16.6); },
+                draw: (ctx) => {
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, life);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 20 * (1.5 - life), 0, Math.PI*2);
+                    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.restore();
+                },
+                getLife: () => life
+            };
+            // Hacky insert to particles list
+            effect.isRipple = true;
+            particles.push(effect);
+        }
+
+        function spawnFloatingText(x, y, text, color, size, isCenter) {
+            floatingTexts.push(new FloatingText(x, y, text, color, size, isCenter));
+        }
+
+        // --- MAIN LOOP ---
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            let dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Cap dt to prevent massive jumps when switching tabs
+            if (dt > 100) dt = 16.6;
+
+            // 1. Draw Background
+            drawBackground(ctx, dt);
+
+            // 2. Apply Screen Shake
+            ctx.save();
+            if (screenShake > 0) {
+                const dx = (Math.random() - 0.5) * screenShake;
+                const dy = (Math.random() - 0.5) * screenShake;
+                ctx.translate(dx, dy);
+                screenShake *= 0.9; // decay
+                if (screenShake < 0.5) screenShake = 0;
+            }
+
+            if (gameState === "PLAYING") {
+                // Spawning Logic
+                spawnTimer += dt;
+                if (spawnTimer >= spawnInterval) {
+                    spawnTimer = 0;
+                    bubbles.push(new Bubble());
+                }
+
+                // Update & Draw Bubbles
+                for (let i = bubbles.length - 1; i >= 0; i--) {
+                    const b = bubbles[i];
+                    b.update(dt);
+                    b.draw(ctx);
+
+                    // Check if escaped
+                    if (b.y < -b.radius) {
+                        bubbles.splice(i, 1);
+                        misses++;
+                        screenShake = 5; // small shake
+                        spawnFloatingText(b.x, 30, "Miss!", "#ff4757");
+                        updateHUD();
+
+                        const maxMiss = 5 + (saveData.upgrades.toleranceLevel * 2);
+                        if (misses >= maxMiss) {
+                            gameOver();
+                        }
+                    }
+                }
+            } else if (gameState === "GAMEOVER") {
+                // Just draw fading bubbles if any exist
+                bubbles.forEach(b => b.draw(ctx));
+            }
+
+            // Update & Draw Particles (Active everywhere)
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.isRipple) {
+                    p.update(dt);
+                    p.draw(ctx);
+                    if (p.getLife() <= 0) particles.splice(i, 1);
+                } else {
+                    p.update(dt);
+                    p.draw(ctx);
+                    if (p.life <= 0) particles.splice(i, 1);
+                }
+            }
+
+            // Update & Draw Text
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.update(dt);
+                ft.draw(ctx);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            ctx.restore(); // Restore screen shake
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- SHOP & UI LOGIC ---
+
+        function updateMenuUI() {
+            document.getElementById("menu-highscore").innerText = saveData.highScore;
+        }
+
+        function openShop() {
+            gameState = "SHOP";
+            document.getElementById("ui-menu").classList.replace("active", "hidden");
+            document.getElementById("ui-gameover").classList.replace("active", "hidden");
+            document.getElementById("ui-shop").classList.replace("hidden", "active");
+            renderShop();
+        }
+
+        function closeShop() {
+            gameState = "MENU";
+            document.getElementById("ui-shop").classList.replace("active", "hidden");
+            document.getElementById("ui-menu").classList.replace("hidden", "active");
+            updateMenuUI();
+        }
+
+        function renderShop() {
+            // Skins
+            const skinsContainer = document.getElementById("shop-skins");
+            skinsContainer.innerHTML = "";
+            SHOP_DATA.skins.forEach(skin => {
+                const isUnlocked = saveData.unlocked.skins.includes(skin.id);
+                const isActive = saveData.upgrades.skin === skin.id;
+                
+                const div = document.createElement("div");
+                div.className = `shop-item ${isActive ? 'active-item' : ''} ${!isUnlocked && skin.cost > 0 ? 'locked' : ''}`;
+                
+                // Color preview
+                const preview = document.createElement("div");
+                preview.style.width = "40px";
+                preview.style.height = "40px";
+                preview.style.borderRadius = "50%";
+                preview.style.background = `linear-gradient(135deg, ${skin.colors[0]}, ${skin.colors[1]})`;
+                preview.style.margin = "0 auto 10px auto";
+                preview.style.boxShadow = `0 0 10px ${skin.colors[0]}`;
+                
+                div.innerHTML = `
+                    <div class="name">${skin.name}</div>
+                    <div class="cost">${isUnlocked ? (isActive ? 'EQUIPPED' : 'SELECT') : skin.cost + ' SB'}</div>
+                `;
+                div.insertBefore(preview, div.firstChild);
+
+                div.onclick = () => {
+                    if (isUnlocked) {
+                        saveData.upgrades.skin = skin.id;
+                        saveGameData();
+                        renderShop();
+                    } else {
+                        requestPurchase("skin", skin.id, skin.cost);
+                    }
+                };
+                skinsContainer.appendChild(div);
+            });
+
+            // Particles
+            const ptContainer = document.getElementById("shop-particles");
+            ptContainer.innerHTML = "";
+            SHOP_DATA.particles.forEach(pt => {
+                const isUnlocked = saveData.unlocked.particles.includes(pt.id);
+                const isActive = saveData.upgrades.particle === pt.id;
+                
+                const div = document.createElement("div");
+                div.className = `shop-item ${isActive ? 'active-item' : ''} ${!isUnlocked && pt.cost > 0 ? 'locked' : ''}`;
+                
+                let icon = "🫧";
+                if(pt.type === "star") icon = "⭐";
+                if(pt.type === "heart") icon = "💖";
+
+                div.innerHTML = `
+                    <div style="font-size: 24px; margin-bottom: 5px;">${icon}</div>
+                    <div class="name">${pt.name}</div>
+                    <div class="cost">${isUnlocked ? (isActive ? 'EQUIPPED' : 'SELECT') : pt.cost + ' SB'}</div>
+                `;
+
+                div.onclick = () => {
+                    if (isUnlocked) {
+                        saveData.upgrades.particle = pt.id;
+                        saveGameData();
+                        renderShop();
+                    } else {
+                        requestPurchase("particle", pt.id, pt.cost);
+                    }
+                };
+                ptContainer.appendChild(div);
+            });
+
+            // Powerups (Progressive)
+            const puContainer = document.getElementById("shop-powerups");
+            puContainer.innerHTML = "";
+            SHOP_DATA.powerups.forEach(pu => {
+                const currentLevel = pu.id === "slow" ? saveData.upgrades.slowLevel : saveData.upgrades.toleranceLevel;
+                const isMax = currentLevel >= pu.maxLevel;
+                const nextCost = isMax ? "-" : pu.costs[currentLevel];
+
+                const div = document.createElement("div");
+                div.className = `shop-item ${isMax ? 'active-item' : ''}`;
+                div.style.width = "160px";
+                
+                div.innerHTML = `
+                    <div class="name">${pu.name} (Lv ${currentLevel}/${pu.maxLevel})</div>
+                    <div style="font-size: 0.8rem; color:#94a3b8; margin-top:5px;">${pu.desc}</div>
+                    <div class="cost">${isMax ? 'MAXED OUT' : 'UPGRADE: ' + nextCost + ' SB'}</div>
+                `;
+
+                div.onclick = () => {
+                    if (!isMax) {
+                        requestPurchase("powerup", pu.id, nextCost);
+                    }
+                };
+                puContainer.appendChild(div);
+            });
+        }
+
+        function applyPurchase(category, itemData) {
+            if (category === "skin") {
+                saveData.unlocked.skins.push(itemData);
+                saveData.upgrades.skin = itemData; // Auto equip
+            } else if (category === "particle") {
+                saveData.unlocked.particles.push(itemData);
+                saveData.upgrades.particle = itemData; // Auto equip
+            } else if (category === "powerup") {
+                if (itemData === "slow") {
+                    saveData.upgrades.slowLevel++;
+                } else if (itemData === "tolerance") {
+                    saveData.upgrades.toleranceLevel++;
+                }
+            }
+        }
+
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(message, typeClass = "") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = `toast ${typeClass}`;
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(10px)";
+                toast.style.transition = "all 0.3s ease";
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mirror Beam</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #bc13fe;
+            --bg-dark: #0a0a1a;
+            --panel-bg: rgba(20, 20, 35, 0.85);
+            --text-light: #e0e0ff;
+            --glass-border: rgba(0, 243, 255, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            background-color: #000;
+            color: var(--text-light);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 16 / 9;
+            background: var(--bg-dark);
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.1);
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 5, 15, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden { display: none !important; }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            max-width: 80%;
+            width: 500px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+        }
+
+        h2 { font-size: 2rem; margin-bottom: 20px; color: var(--primary); }
+        p { font-size: 1.1rem; margin-bottom: 20px; color: #aaa; line-height: 1.5; }
+
+        .btn {
+            background: linear-gradient(45deg, #0055ff, #00d2ff);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 5px 15px rgba(0, 210, 255, 0.4);
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0, 210, 255, 0.6); }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-shop { background: linear-gradient(45deg, #8a2be2, #bc13fe); box-shadow: 0 5px 15px rgba(188, 19, 254, 0.4); }
+        .btn-shop:hover { box-shadow: 0 8px 25px rgba(188, 19, 254, 0.6); }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            padding: 2vw;
+        }
+
+        .hud-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .hud-item {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(3px);
+        }
+
+        .hud-timer { color: #ff3366; }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .shop-item {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .shop-item:hover { border-color: var(--primary); }
+        .shop-item h3 { font-size: 1.1rem; color: #fff; margin-bottom: 5px; }
+        .shop-item p { font-size: 0.8rem; margin-bottom: 10px; flex-grow: 1; }
+        .buy-btn {
+            background: #2a2a4a;
+            border: 1px solid var(--primary);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .buy-btn:hover:not(:disabled) { background: var(--primary); color: #000; }
+        .buy-btn:disabled { border-color: #555; color: #555; cursor: not-allowed; }
+        .buy-btn.equipped { background: #00ff88; color: #000; border-color: #00ff88; }
+
+        /* Notifications */
+        #notification {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 30px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--primary);
+            border-radius: 20px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 2rem; }
+            .panel { width: 90%; padding: 20px; }
+            .shop-grid { grid-template-columns: 1fr; }
+            .hud-bar { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <!-- Fixed internal resolution to maintain gameplay consistency -->
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-bar">
+            <div class="hud-item">Level: <span id="ui-level">1</span></div>
+            <div class="hud-item hud-timer">Time: <span id="ui-time">60</span>s</div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menuScreen" class="overlay">
+        <div class="panel">
+            <h1>Mirror Beam</h1>
+            <p>Guide the light to the crystal. Click/drag the center of a mirror to move it. Drag the outer ring to rotate.</p>
+            <button class="btn" onclick="startGame()">Start Game</button>
+            <button class="btn btn-shop" onclick="openShop()">Shop</button>
+            <div style="margin-top: 15px; font-size: 0.9rem; color: #888;">
+                High Score: <span id="menu-highscore">0</span> Levels
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shopScreen" class="overlay hidden">
+        <div class="panel" style="width: 600px;">
+            <h2>SimgaShop</h2>
+            <div class="shop-grid" id="shopItemsContainer">
+                <!-- Populated via JS -->
+            </div>
+            <button class="btn" onclick="closeShop()">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Level Complete -->
+    <div id="levelCompleteScreen" class="overlay hidden">
+        <div class="panel">
+            <h2 style="color: #00ff88; text-shadow: 0 0 10px #00ff88;">Level Cleared!</h2>
+            <p id="rewardText" style="font-size: 1.5rem; font-weight: bold; color: #ffd700;"></p>
+            <button class="btn" onclick="nextLevel()">Next Level</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameOverScreen" class="overlay hidden">
+        <div class="panel">
+            <h2 style="color: #ff3366; text-shadow: 0 0 10px #ff3366;">Game Over</h2>
+            <p>Out of Time!</p>
+            <p>Levels Completed: <span id="go-score"></span></p>
+            <button class="btn" onclick="returnToMenu()">Main Menu</button>
+        </div>
+    </div>
+
+    <div id="notification"></div>
+</div>
+
+<script>
+    // ==========================================
+    // PLATFORM INTEGRATION & STATE
+    // ==========================================
+    const GAME_ID = "mirror";
+    
+    let saveData = {
+        highScore: 0,
+        level: 1,
+        unlockedSkins: [0], // 0: default, 1: gold, 2: neon
+        unlockedBg: [0],    // 0: space, 1: cyber, 2: nebula
+        skinIndex: 0,
+        bgIndex: 0,
+        hasExtraMirror: false,
+        hasHintBeam: false
+    };
+
+    let pendingPurchase = null;
+
+    function saveProgress() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    }
+
+    function loadProgress() {
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: loadMsgId
+        }, "*");
+
+        // Temporary listener for load response
+        const loadListener = (event) => {
+            const data = event.data;
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    saveData = { ...saveData, ...data.data };
+                    document.getElementById('menu-highscore').innerText = saveData.highScore;
+                }
+                window.removeEventListener("message", loadListener);
+            }
+        };
+        window.addEventListener("message", loadListener);
+    }
+
+    function rewardSimgaBucks(amount) {
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+    }
+
+    function requestPurchase(id, cost, type, value) {
+        if(pendingPurchase) return; // Wait for current transaction
+        
+        pendingPurchase = { id, type, value, cost };
+        const msgId = "buy_" + Math.random().toString(36).substring(2);
+        
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: cost,
+            msgId: msgId
+        }, "*");
+    }
+
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data.type === "spendResponse") {
+            if (data.success && pendingPurchase) {
+                applyPurchase(pendingPurchase);
+                showNotification(`Purchased ${pendingPurchase.id}!`, "#00ff88");
+            } else {
+                showNotification("Not enough SimgaBucks!", "#ff3366");
+            }
+            pendingPurchase = null;
+            renderShop();
+        }
+    });
+
+    function applyPurchase(purchase) {
+        if(purchase.type === 'skin') {
+            if(!saveData.unlockedSkins.includes(purchase.value)) saveData.unlockedSkins.push(purchase.value);
+            saveData.skinIndex = purchase.value;
+        } else if(purchase.type === 'bg') {
+            if(!saveData.unlockedBg.includes(purchase.value)) saveData.unlockedBg.push(purchase.value);
+            saveData.bgIndex = purchase.value;
+        } else if(purchase.type === 'upgrade') {
+            if(purchase.id === 'extra_mirror') saveData.hasExtraMirror = true;
+            if(purchase.id === 'hint_beam') saveData.hasHintBeam = true;
+        }
+        saveProgress();
+    }
+
+    // ==========================================
+    // SHOP DATA & UI
+    // ==========================================
+    const shopItems = [
+        { id: 'skin_gold', type: 'skin', value: 1, name: 'Gold Frame', cost: 20, desc: 'An elegant golden mirror design.' },
+        { id: 'skin_neon', type: 'skin', value: 2, name: 'Neon Cyber', cost: 40, desc: 'Sleek neon cyber aesthetics.' },
+        { id: 'bg_cyber', type: 'bg', value: 1, name: 'Cyber Grid', cost: 30, desc: 'Digital synthwave background.' },
+        { id: 'bg_nebula', type: 'bg', value: 2, name: 'Deep Nebula', cost: 50, desc: 'Beautiful cosmic gas clouds.' },
+        { id: 'extra_mirror', type: 'upgrade', value: true, name: '+1 Mirror', cost: 60, desc: 'Start every puzzle with an extra mirror.' },
+        { id: 'hint_beam', type: 'upgrade', value: true, name: 'Hint Beam', cost: 45, desc: 'See a faint outline of the entire beam path.' }
+    ];
+
+    function renderShop() {
+        const container = document.getElementById('shopItemsContainer');
+        container.innerHTML = '';
+        
+        shopItems.forEach(item => {
+            let isUnlocked = false;
+            let isEquipped = false;
+
+            if(item.type === 'skin') {
+                isUnlocked = saveData.unlockedSkins.includes(item.value);
+                isEquipped = saveData.skinIndex === item.value;
+            } else if(item.type === 'bg') {
+                isUnlocked = saveData.unlockedBg.includes(item.value);
+                isEquipped = saveData.bgIndex === item.value;
+            } else if(item.type === 'upgrade') {
+                isUnlocked = (item.id === 'extra_mirror' && saveData.hasExtraMirror) || 
+                             (item.id === 'hint_beam' && saveData.hasHintBeam);
+                isEquipped = isUnlocked; // Upgrades are always equipped once bought
+            }
+
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let btnHTML = '';
+            if (isEquipped) {
+                btnHTML = `<button class="buy-btn equipped" disabled>Equipped</button>`;
+            } else if (isUnlocked) {
+                btnHTML = `<button class="buy-btn" onclick="equipItem('${item.type}', ${item.value})">Equip</button>`;
+            } else {
+                btnHTML = `<button class="buy-btn" onclick="requestPurchase('${item.id}', ${item.cost}, '${item.type}', ${item.value})">Buy (${item.cost} SB)</button>`;
+            }
+
+            div.innerHTML = `
+                <h3>${item.name}</h3>
+                <p>${item.desc}</p>
+                ${btnHTML}
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function equipItem(type, value) {
+        if(type === 'skin') saveData.skinIndex = value;
+        if(type === 'bg') saveData.bgIndex = value;
+        saveProgress();
+        renderShop();
+    }
+
+    // ==========================================
+    // NOTIFICATION SYSTEM
+    // ==========================================
+    let notifTimeout;
+    function showNotification(text, color = "var(--primary)") {
+        const el = document.getElementById('notification');
+        el.innerText = text;
+        el.style.borderColor = color;
+        el.style.boxShadow = `0 0 15px ${color}`;
+        el.style.opacity = 1;
+        
+        clearTimeout(notifTimeout);
+        notifTimeout = setTimeout(() => {
+            el.style.opacity = 0;
+        }, 2000);
+    }
+
+    // ==========================================
+    // GAME ENGINE & LOGIC
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Virtual resolution
+    const CW = 1280;
+    const CH = 720;
+    
+    let gameState = "menu"; // menu, playing, complete, gameover
+    let lastTime = 0;
+    let timeRemaining = 60;
+    let currentLevel = 1;
+    let timeSinceHit = 0; // Requires beam to stay on target for 1 second
+    
+    // Entities
+    let source = { x: 80, y: CH/2, angle: 0 };
+    let target = { x: CW-80, y: CH/2, r: 25 };
+    let mirrors = [];
+    let asteroids = [];
+    let particles = [];
+    let bgElements = [];
+    
+    // Interaction State
+    let activeMirror = null;
+    let dragMode = null; // 'move' or 'rotate'
+    let mouse = { x: 0, y: 0 };
+
+    // ==========================================
+    // MATH HELPERS
+    // ==========================================
+    function distance(p1, p2) {
+        return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    }
+
+    // Line segment intersection. Returns intersection point + normal if valid.
+    function lineIntersect(rayP, rayDir, segA, segB) {
+        const r_px = rayP.x, r_py = rayP.y;
+        const r_dx = rayDir.x, r_dy = rayDir.y;
+        const s_px = segA.x, s_py = segA.y;
+        const s_dx = segB.x - segA.x, s_dy = segB.y - segA.y;
+
+        const cross = r_dx * s_dy - r_dy * s_dx;
+        if (Math.abs(cross) < 0.0001) return null; // Parallel
+
+        const t = ((s_px - r_px) * s_dy - (s_py - r_py) * s_dx) / cross;
+        const u = ((s_px - r_px) * r_dy - (s_py - r_py) * r_dx) / cross;
+
+        if (t > 0.05 && u >= 0 && u <= 1) { // t > 0.05 avoids self-intersection instantly
+            // Normal of mirror
+            let nx = -s_dy;
+            let ny = s_dx;
+            let len = Math.hypot(nx, ny);
+            nx /= len; ny /= len;
+            // Ensure normal faces incoming ray
+            if (r_dx * nx + r_dy * ny > 0) {
+                nx = -nx; ny = -ny;
+            }
+            return { x: r_px + t * r_dx, y: r_py + t * r_dy, t: t, nx, ny };
+        }
+        return null;
+    }
+
+    // Ray to circle intersection
+    function rayCircleIntersect(rayP, rayDir, circle) {
+        const fx = rayP.x - circle.x;
+        const fy = rayP.y - circle.y;
+        const b = 2 * (fx * rayDir.x + fy * rayDir.y);
+        const c = (fx * fx + fy * fy) - circle.r * circle.r;
+        let disc = b * b - 4 * c; // a = 1
+        
+        if (disc >= 0) {
+            disc = Math.sqrt(disc);
+            const t1 = (-b - disc) / 2;
+            if (t1 > 0.05) return { x: rayP.x + t1 * rayDir.x, y: rayP.y + t1 * rayDir.y, t: t1 };
+        }
+        return null;
+    }
+
+    // ==========================================
+    // PROCEDURAL GENERATION
+    // ==========================================
+    function initLevel(level) {
+        currentLevel = level;
+        timeRemaining = 60 + Math.floor(level / 2) * 10;
+        timeSinceHit = 0;
+        
+        // Setup Source and Target with slight randomness
+        source.x = 80;
+        source.y = CH * 0.2 + Math.random() * (CH * 0.6);
+        source.angle = 0; // Pointing right
+
+        target.x = CW - 100;
+        target.y = CH * 0.2 + Math.random() * (CH * 0.6);
+        
+        mirrors = [];
+        asteroids = [];
+        particles = [];
+        
+        // Generate Asteroids (Obstacles)
+        const numAsteroids = Math.min(1 + Math.floor(level / 2), 6);
+        for(let i=0; i<numAsteroids; i++) {
+            // Keep away from source and target
+            let ax, ay;
+            let attempts = 0;
+            do {
+                ax = 200 + Math.random() * (CW - 400);
+                ay = 100 + Math.random() * (CH - 200);
+                attempts++;
+            } while((distance({x: ax, y: ay}, source) < 150 || distance({x: ax, y: ay}, target) < 150) && attempts < 20);
+            
+            asteroids.push({
+                x: ax,
+                y: ay,
+                r: 40 + Math.random() * 40,
+                seed: Math.random()
+            });
+        }
+
+        // Generate Mirrors
+        let numMirrors = Math.min(2 + Math.floor(level / 2), 8);
+        if (saveData.hasExtraMirror) numMirrors++;
+
+        for(let i=0; i<numMirrors; i++) {
+            let mx, my;
+            let attempts = 0;
+            do {
+                mx = 150 + Math.random() * (CW - 300);
+                my = 100 + Math.random() * (CH - 200);
+                attempts++;
+            } while(inAsteroid(mx, my) && attempts < 20);
+
+            mirrors.push({
+                x: mx,
+                y: my,
+                angle: Math.random() * Math.PI,
+                length: 120
+            });
+        }
+
+        initBackground();
+    }
+
+    function inAsteroid(x, y) {
+        return asteroids.some(a => distance({x,y}, a) < a.r + 30);
+    }
+
+    function initBackground() {
+        bgElements = [];
+        if (saveData.bgIndex === 0) { // Space
+            for(let i=0; i<100; i++) {
+                bgElements.push({
+                    x: Math.random() * CW, y: Math.random() * CH,
+                    r: Math.random() * 2, speed: Math.random() * 0.5,
+                    alpha: Math.random(), blink: Math.random() * 0.05
+                });
+            }
+        } else if (saveData.bgIndex === 1) { // Cyber
+            // Handled mostly in render
+        } else if (saveData.bgIndex === 2) { // Nebula
+            for(let i=0; i<5; i++) {
+                bgElements.push({
+                    x: Math.random() * CW, y: Math.random() * CH,
+                    r: 300 + Math.random() * 200,
+                    color: `hsla(${260 + Math.random()*60}, 80%, 30%, 0.1)`,
+                    vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5
+                });
+            }
+        }
+    }
+
+    // ==========================================
+    // INPUT HANDLING
+    // ==========================================
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        // Scale handles CSS scaling maintaining aspect ratio
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        let clientX = evt.clientX;
+        let clientY = evt.clientY;
+        if(evt.touches && evt.touches.length > 0) {
+            clientX = evt.touches[0].clientX;
+            clientY = evt.touches[0].clientY;
+        }
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function handlePointerDown(e) {
+        if (gameState !== "playing") return;
+        mouse = getMousePos(e);
+        
+        // Find if clicked on a mirror
+        activeMirror = null;
+        dragMode = null;
+        
+        // Sort by reverse index so top-most is selected
+        for(let i = mirrors.length-1; i >= 0; i--) {
+            const m = mirrors[i];
+            const dist = distance(mouse, m);
+            
+            // Interaction Zones: Center = Move, Outer Ring = Rotate
+            if (dist < 30) {
+                activeMirror = m;
+                dragMode = 'move';
+                break;
+            } else if (dist < 80) { // Ring area
+                activeMirror = m;
+                dragMode = 'rotate';
+                break;
+            }
+        }
+    }
+
+    function handlePointerMove(e) {
+        if (gameState !== "playing") return;
+        if (e.type === "touchmove") e.preventDefault(); // Prevent scrolling
+        mouse = getMousePos(e);
+
+        if (activeMirror) {
+            if (dragMode === 'move') {
+                activeMirror.x = mouse.x;
+                activeMirror.y = mouse.y;
+                // Clamp
+                activeMirror.x = Math.max(50, Math.min(CW - 50, activeMirror.x));
+                activeMirror.y = Math.max(50, Math.min(CH - 50, activeMirror.y));
+            } else if (dragMode === 'rotate') {
+                activeMirror.angle = Math.atan2(mouse.y - activeMirror.y, mouse.x - activeMirror.x);
+            }
+        }
+    }
+
+    function handlePointerUp() {
+        activeMirror = null;
+        dragMode = null;
+    }
+
+    canvas.addEventListener('mousedown', handlePointerDown);
+    canvas.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+    canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
+    window.addEventListener('touchend', handlePointerUp);
+
+    // ==========================================
+    // PARTICLES
+    // ==========================================
+    function spawnSparks(x, y, nx, ny, count, color) {
+        for(let i=0; i<count; i++) {
+            const spread = (Math.random() - 0.5) * Math.PI;
+            const speed = 2 + Math.random() * 4;
+            const baseAngle = Math.atan2(ny, nx);
+            const vx = Math.cos(baseAngle + spread) * speed;
+            const vy = Math.sin(baseAngle + spread) * speed;
+            particles.push({
+                x: x, y: y, vx: vx, vy: vy,
+                life: 1.0, maxLife: 0.5 + Math.random() * 0.5,
+                color: color, size: 1 + Math.random() * 3
+            });
+        }
+    }
+
+    function updateParticles(dt) {
+        for(let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= dt;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    // ==========================================
+    // GAME LOOP & RAYCASTING
+    // ==========================================
+    function update(dt) {
+        if (gameState !== "playing") return;
+
+        timeRemaining -= dt;
+        document.getElementById('ui-time').innerText = Math.ceil(timeRemaining);
+
+        if (timeRemaining <= 0) {
+            endGame(false);
+            return;
+        }
+
+        updateParticles(dt);
+
+        // Update Backgrounds
+        if (saveData.bgIndex === 0) {
+            bgElements.forEach(s => {
+                s.x -= s.speed;
+                s.alpha += s.blink;
+                if(s.alpha > 1 || s.alpha < 0) s.blink *= -1;
+                if(s.x < 0) s.x = CW;
+            });
+        } else if (saveData.bgIndex === 2) {
+            bgElements.forEach(n => {
+                n.x += n.vx; n.y += n.vy;
+                if(n.x < 0 || n.x > CW) n.vx *= -1;
+                if(n.y < 0 || n.y > CH) n.vy *= -1;
+            });
+        }
+
+        // Raycasting Logic
+        calculateBeam();
+    }
+
+    let currentBeamPath = [];
+    let isTargetHit = false;
+
+    function calculateBeam() {
+        currentBeamPath = [];
+        let rP = { x: source.x + 20, y: source.y };
+        let rDir = { x: Math.cos(source.angle), y: Math.sin(source.angle) };
+        
+        currentBeamPath.push({x: rP.x, y: rP.y});
+        
+        let maxBounces = 20;
+        isTargetHit = false;
+
+        for (let bounce = 0; bounce < maxBounces; bounce++) {
+            let closestHit = null;
+            let hitType = null; // 'mirror', 'asteroid', 'target', 'bounds'
+
+            // Check Mirrors
+            mirrors.forEach(m => {
+                const dx = Math.cos(m.angle) * (m.length/2);
+                const dy = Math.sin(m.angle) * (m.length/2);
+                const segA = { x: m.x - dx, y: m.y - dy };
+                const segB = { x: m.x + dx, y: m.y + dy };
+                
+                let hit = lineIntersect(rP, rDir, segA, segB);
+                if (hit && (!closestHit || hit.t < closestHit.t)) {
+                    closestHit = hit;
+                    hitType = 'mirror';
+                }
+            });
+
+            // Check Asteroids
+            asteroids.forEach(a => {
+                let hit = rayCircleIntersect(rP, rDir, a);
+                if (hit && (!closestHit || hit.t < closestHit.t)) {
+                    closestHit = hit;
+                    hitType = 'asteroid';
+                    // normal for asteroid particle reflection
+                    closestHit.nx = (closestHit.x - a.x) / a.r;
+                    closestHit.ny = (closestHit.y - a.y) / a.r;
+                }
+            });
+
+            // Check Target
+            let targetHit = rayCircleIntersect(rP, rDir, target);
+            if (targetHit && (!closestHit || targetHit.t < closestHit.t)) {
+                closestHit = targetHit;
+                hitType = 'target';
+                closestHit.nx = (closestHit.x - target.x) / target.r;
+                closestHit.ny = (closestHit.y - target.y) / target.r;
+            }
+
+            // Screen Bounds check
+            let bx = rDir.x > 0 ? (CW - rP.x)/rDir.x : -rP.x/rDir.x;
+            let by = rDir.y > 0 ? (CH - rP.y)/rDir.y : -rP.y/rDir.y;
+            let boundT = Math.min(bx > 0 ? bx : Infinity, by > 0 ? by : Infinity);
+
+            if (!closestHit || boundT < closestHit.t) {
+                // Hit bounds
+                currentBeamPath.push({ x: rP.x + rDir.x * boundT, y: rP.y + rDir.y * boundT });
+                break;
+            } else {
+                currentBeamPath.push({ x: closestHit.x, y: closestHit.y });
+                
+                if (hitType === 'mirror') {
+                    // Reflection math: dir - 2*(dir dot normal)*normal
+                    const dot = rDir.x * closestHit.nx + rDir.y * closestHit.ny;
+                    rDir.x = rDir.x - 2 * dot * closestHit.nx;
+                    rDir.y = rDir.y - 2 * dot * closestHit.ny;
+                    rP = { x: closestHit.x, y: closestHit.y };
+                    
+                    // Spark visual
+                    if(Math.random() < 0.2) spawnSparks(rP.x, rP.y, closestHit.nx, closestHit.ny, 1, '#fff');
+
+                } else if (hitType === 'asteroid') {
+                    // Absorbed
+                    spawnSparks(closestHit.x, closestHit.y, closestHit.nx, closestHit.ny, 2, '#ff3366');
+                    break; 
+                } else if (hitType === 'target') {
+                    isTargetHit = true;
+                    spawnSparks(closestHit.x, closestHit.y, closestHit.nx, closestHit.ny, 3, '#00ffff');
+                    break;
+                }
+            }
+        }
+
+        // Win Condition Check
+        if (isTargetHit) {
+            timeSinceHit += 1/60; // Approx
+            if (timeSinceHit >= 1.0) { // Hold for 1 second
+                endGame(true);
+            }
+        } else {
+            timeSinceHit = 0;
+        }
+    }
+
+    // ==========================================
+    // RENDERING
+    // ==========================================
+    function render(time) {
+        ctx.clearRect(0, 0, CW, CH);
+        
+        // 1. Render Background
+        if (saveData.bgIndex === 0) {
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, CW, CH);
+            bgElements.forEach(s => {
+                ctx.fillStyle = `rgba(255,255,255,${s.alpha})`;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+            });
+        } else if (saveData.bgIndex === 1) {
+            ctx.fillStyle = '#0a1510';
+            ctx.fillRect(0, 0, CW, CH);
+            ctx.strokeStyle = 'rgba(0, 255, 100, 0.1)';
+            ctx.lineWidth = 2;
+            const offset = (time * 0.05) % 50;
+            ctx.beginPath();
+            for(let y=0; y<CH; y+=50) { ctx.moveTo(0, y + offset); ctx.lineTo(CW, y + offset); }
+            for(let x=0; x<CW; x+=50) { ctx.moveTo(x, 0); ctx.lineTo(x, CH); }
+            ctx.stroke();
+        } else if (saveData.bgIndex === 2) {
+            ctx.fillStyle = '#100015';
+            ctx.fillRect(0, 0, CW, CH);
+            ctx.globalCompositeOperation = 'screen';
+            bgElements.forEach(n => {
+                let grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+                grad.addColorStop(0, n.color);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // 2. Render Asteroids
+        asteroids.forEach(a => {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0055';
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // Texture
+            ctx.strokeStyle = '#331122';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(a.x, a.y, a.r - 5, a.seed * Math.PI*2, a.seed * Math.PI*2 + Math.PI);
+            ctx.stroke();
+        });
+
+        // 3. Render Source
+        ctx.save();
+        ctx.translate(source.x, source.y);
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#00f3ff';
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-20, -15, 40, 30);
+        ctx.fillStyle = '#00f3ff';
+        ctx.beginPath(); ctx.arc(20, 0, 10, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // 4. Render Target
+        ctx.save();
+        const tHover = Math.sin(time * 0.003) * 10;
+        ctx.translate(target.x, target.y + tHover);
+        ctx.rotate(time * 0.001);
+        ctx.shadowBlur = isTargetHit ? 40 : 20 + Math.sin(time * 0.005) * 10;
+        ctx.shadowColor = isTargetHit ? '#ffffff' : '#00ffff';
+        ctx.fillStyle = isTargetHit ? '#ffffff' : 'rgba(100, 255, 255, 0.8)';
+        ctx.beginPath();
+        for(let i=0; i<6; i++) {
+            ctx.lineTo(target.r * Math.cos(i * Math.PI/3), target.r * Math.sin(i * Math.PI/3));
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Inner core
+        ctx.fillStyle = '#ccffff';
+        ctx.beginPath();
+        for(let i=0; i<6; i++) {
+            ctx.lineTo(target.r*0.5 * Math.cos(i * Math.PI/3), target.r*0.5 * Math.sin(i * Math.PI/3));
+        }
+        ctx.fill();
+        ctx.restore();
+
+        // Progress ring if hitting target
+        if (isTargetHit && timeSinceHit > 0 && gameState === "playing") {
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(target.x, target.y + tHover, target.r + 15, -Math.PI/2, -Math.PI/2 + (timeSinceHit * Math.PI * 2));
+            ctx.stroke();
+        }
+
+        // 5. Render Mirrors
+        mirrors.forEach(m => {
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.rotate(m.angle);
+
+            // Skin styles
+            let frameColor = '#555';
+            let glowColor = '#00f3ff';
+            if(saveData.skinIndex === 1) { frameColor = '#ffd700'; glowColor = '#ffaa00'; } // Gold
+            if(saveData.skinIndex === 2) { frameColor = '#222'; glowColor = '#ff00aa'; } // Neon
+            
+            // Frame
+            ctx.fillStyle = frameColor;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = glowColor;
+            ctx.fillRect(-m.length/2, -8, m.length, 16);
+            
+            // Glass/Reflection line
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(-m.length/2 + 2, -2, m.length - 4, 4);
+
+            ctx.restore();
+
+            // Interaction Rings
+            if (activeMirror === m) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(m.x, m.y, 80, 0, Math.PI*2); ctx.stroke();
+                
+                // Rotation nodes
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(m.x + Math.cos(m.angle)*80, m.y + Math.sin(m.angle)*80, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(m.x - Math.cos(m.angle)*80, m.y - Math.sin(m.angle)*80, 8, 0, Math.PI*2); ctx.fill();
+            }
+        });
+
+        // Hint Beam (if unlocked and actively rotating)
+        if (saveData.hasHintBeam && activeMirror && dragMode === 'rotate') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(currentBeamPath[0].x, currentBeamPath[0].y);
+            for(let i=1; i<currentBeamPath.length; i++) ctx.lineTo(currentBeamPath[i].x, currentBeamPath[i].y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 6. Render Beam (Main visual)
+        if (currentBeamPath.length > 1) {
+            let beamColor = saveData.skinIndex === 2 ? '#ff00aa' : '#00f3ff';
+            
+            ctx.globalCompositeOperation = 'lighter';
+            
+            // Outer Glow
+            ctx.beginPath();
+            ctx.moveTo(currentBeamPath[0].x, currentBeamPath[0].y);
+            for(let i=1; i<currentBeamPath.length; i++) ctx.lineTo(currentBeamPath[i].x, currentBeamPath[i].y);
+            ctx.strokeStyle = beamColor;
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = beamColor;
+            ctx.stroke();
+            
+            // Inner Core
+            ctx.beginPath();
+            ctx.moveTo(currentBeamPath[0].x, currentBeamPath[0].y);
+            for(let i=1; i<currentBeamPath.length; i++) ctx.lineTo(currentBeamPath[i].x, currentBeamPath[i].y);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 0;
+            ctx.stroke();
+            
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // 7. Render Particles
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+            const alpha = p.life / p.maxLife;
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = alpha;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function gameLoop(time) {
+        let dt = (time - lastTime) / 1000;
+        lastTime = time;
+        if(dt > 0.1) dt = 0.1; // Cap delta
+
+        update(dt);
+        render(time);
+        
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ==========================================
+    // GAME STATE TRANSITIONS
+    // ==========================================
+    function startGame() {
+        document.getElementById('menuScreen').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        gameState = "playing";
+        initLevel(1);
+    }
+
+    function nextLevel() {
+        document.getElementById('levelCompleteScreen').classList.add('hidden');
+        initLevel(currentLevel + 1);
+        gameState = "playing";
+    }
+
+    function endGame(win) {
+        gameState = win ? "complete" : "gameover";
+        
+        // Save logic
+        if(currentLevel > saveData.highScore) {
+            saveData.highScore = currentLevel;
+        }
+        saveData.level = currentLevel;
+        saveProgress();
+
+        if (win) {
+            // Give SimgaBucks based on level logic
+            // 1-3 min session = 5-15 SB. Short levels give 2. Boss/milestones give 5.
+            let reward = (currentLevel % 5 === 0) ? 5 : 2;
+            
+            document.getElementById('rewardText').innerText = `+${reward} SimgaBucks!`;
+            document.getElementById('levelCompleteScreen').classList.remove('hidden');
+            
+            rewardSimgaBucks(reward);
+            
+            // Massive particle explosion
+            for(let i=0; i<100; i++) {
+                spawnSparks(target.x, target.y, (Math.random()-0.5), (Math.random()-0.5), 1, '#fff');
+            }
+        } else {
+            document.getElementById('go-score').innerText = currentLevel - 1;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+        }
+    }
+
+    function returnToMenu() {
+        document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('menuScreen').classList.remove('hidden');
+        document.getElementById('menu-highscore').innerText = saveData.highScore;
+        gameState = "menu";
+    }
+
+    function openShop() {
+        renderShop();
+        document.getElementById('menuScreen').classList.add('hidden');
+        document.getElementById('shopScreen').classList.remove('hidden');
+    }
+
+    function closeShop() {
+        document.getElementById('shopScreen').classList.add('hidden');
+        document.getElementById('menuScreen').classList.remove('hidden');
+    }
+
+    // Init
+    loadProgress();
+    requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

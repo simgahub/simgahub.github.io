@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gear Timing</title>
+    <style>
+        :root {
+            --bg-color: #050510;
+            --text-color: #ffffff;
+            --accent-cyan: #00f3ff;
+            --accent-magenta: #ff00ea;
+            --accent-gold: #ffcc00;
+            --panel-bg: rgba(10, 10, 25, 0.9);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            background: radial-gradient(circle, rgba(5,5,16,0.6) 0%, rgba(0,0,0,0.9) 100%);
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 15px var(--accent-cyan), 0 0 30px var(--accent-cyan);
+            color: #fff;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px var(--accent-magenta);
+        }
+
+        .btn {
+            background: transparent;
+            border: 2px solid var(--accent-cyan);
+            color: #fff;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), inset 0 0 10px rgba(0, 243, 255, 0.1);
+            transition: all 0.2s ease;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover, .btn:active {
+            background: var(--accent-cyan);
+            color: #000;
+            box-shadow: 0 0 20px var(--accent-cyan);
+        }
+
+        .btn-secondary {
+            border-color: var(--accent-magenta);
+            box-shadow: 0 0 10px rgba(255, 0, 234, 0.2), inset 0 0 10px rgba(255, 0, 234, 0.1);
+        }
+
+        .btn-secondary:hover, .btn-secondary:active {
+            background: var(--accent-magenta);
+            box-shadow: 0 0 20px var(--accent-magenta);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            z-index: 5;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 5px #000, 0 0 10px var(--accent-cyan);
+        }
+
+        .hud-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .simgabucks-earned {
+            font-size: 1rem;
+            color: var(--accent-gold);
+            text-shadow: 0 0 10px var(--accent-gold);
+        }
+
+        /* Shop UI */
+        #shopOverlay {
+            background: rgba(5, 5, 15, 0.95);
+            justify-content: flex-start;
+            padding-top: 50px;
+            overflow-y: auto;
+        }
+
+        .shop-container {
+            width: 90%;
+            max-width: 800px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding-bottom: 50px;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .shop-item h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: var(--accent-cyan);
+        }
+
+        .shop-item p {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 15px;
+            min-height: 40px;
+        }
+
+        .shop-btn {
+            padding: 10px;
+            border: 1px solid var(--accent-gold);
+            background: transparent;
+            color: var(--accent-gold);
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .shop-btn:hover {
+            background: var(--accent-gold);
+            color: #000;
+        }
+
+        .shop-btn.equipped {
+            border-color: #555;
+            color: #888;
+            cursor: default;
+        }
+
+        .shop-btn.equipped:hover {
+            background: transparent;
+            color: #888;
+        }
+
+        .shop-btn.equip {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .shop-btn.equip:hover {
+            background: var(--accent-cyan);
+            color: #000;
+        }
+
+        .close-shop {
+            margin-top: 20px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud" class="hidden">
+        <div class="hud-stats">
+            <div id="scoreDisplay">Score: 0</div>
+            <div id="sbDisplay" class="simgabucks-earned">+0 SB</div>
+        </div>
+        <div id="highScoreHUDDisplay" style="font-size: 1.2rem; opacity: 0.8;">Best: 0</div>
+    </div>
+
+    <div id="mainMenu" class="overlay">
+        <h1>Gear Timing</h1>
+        <div id="menuHighScore" style="margin-bottom: 30px; font-size: 1.2rem; color: #aaa;">High Score: 0</div>
+        <button class="btn" onclick="startGame()">Tap to Play</button>
+        <button class="btn btn-secondary" onclick="openShop()">Shop</button>
+        <div style="margin-top: 30px; font-size: 1rem; color: #ddd; text-align: center; text-shadow: 0 0 5px #000;">
+            Drag to steer.<br>Tap to <b>DASH</b> through!
+        </div>
+    </div>
+
+    <div id="gameOverMenu" class="overlay hidden">
+        <h1 style="color: #ff3333; text-shadow: 0 0 20px #ff0000;">System Failure</h1>
+        <h2 id="finalScoreDisplay">Score: 0</h2>
+        <div id="sbEarnedDisplay" style="margin-bottom: 20px; color: var(--accent-gold); font-size: 1.2rem;"></div>
+        <button class="btn" onclick="startGame()">Play Again</button>
+        <button class="btn btn-secondary" onclick="showMainMenu()">Main Menu</button>
+    </div>
+
+    <div id="shopOverlay" class="overlay hidden">
+        <h2 style="color: var(--accent-gold); text-shadow: 0 0 15px var(--accent-gold); font-size: 2.5rem;">Simga Store</h2>
+        <button class="btn btn-secondary close-shop" onclick="closeShop()">Back to Menu</button>
+        
+        <div class="shop-container" id="shopItemsContainer">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & CONFIG ---
+        const GAME_ID = "gearTiming";
+        const CANVAS = document.getElementById("gameCanvas");
+        const CTX = CANVAS.getContext("2d", { alpha: false });
+
+        // Colors
+        const COLORS = {
+            cyan: "#00f3ff",
+            magenta: "#ff00ea",
+            gold: "#ffcc00",
+            bg: "#050510",
+            metallic: "#a0aab5",
+            danger: "#ff3333"
+        };
+
+        // Game State variables
+        let state = "MENU"; // MENU, PLAYING, GAMEOVER
+        let lastTime = 0;
+        let score = 0;
+        let sbEarnedThisRun = 0;
+        
+        // Physics & Engine
+        let baseGearSpeed = 70; // Very slow passive moving, forcing player to rely on dash
+        let globalSpeedMultiplier = 1;
+        let shakeTime = 0;
+
+        // Entities
+        let player = { y: 0, x: 0, radius: 8, color: COLORS.cyan, trail: [], vy: 0 };
+        let targetX = window.innerWidth / 2;
+        let gears = [];
+        let particles = [];
+        let stars = [];
+
+        // --- PLATFORM API (SIMGABUCKS & SAVING) ---
+        let saveData = {
+            highScore: 0,
+            unlockedSkins: ['cyan'],
+            currentSkin: 'cyan',
+            unlockedUpgrades: [],
+            unlockedTextures: ['neon'],
+            currentTexture: 'neon'
+        };
+
+        let pendingPurchase = null;
+
+        // Load data on startup
+        const loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+
+        // Setup message listener
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            
+            if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+                if (data.data) {
+                    saveData = { ...saveData, ...data.data };
+                    if (!saveData.unlockedSkins) saveData.unlockedSkins = ['cyan'];
+                    if (!saveData.unlockedUpgrades) saveData.unlockedUpgrades = [];
+                    if (!saveData.unlockedTextures) saveData.unlockedTextures = ['neon'];
+                    updateUIFromSave();
+                }
+            }
+
+            if (data.type === "spendResponse") {
+                if (data.success && pendingPurchase) {
+                    handleSuccessfulPurchase(pendingPurchase);
+                } else if (!data.success) {
+                    alert("Not enough SimgaBucks!");
+                }
+                pendingPurchase = null;
+                renderShop();
+            }
+        });
+
+        function saveGame() {
+            window.parent.postMessage({ type: "saveData", gameId: GAME_ID, data: saveData }, "*");
+            updateUIFromSave();
+        }
+
+        function addSimgaBucks(amount) {
+            window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+        }
+
+        function spendSimgaBucks(amount, itemDetails) {
+            if (pendingPurchase) return; 
+            const msgId = Math.random().toString(36);
+            pendingPurchase = itemDetails;
+            window.parent.postMessage({ type: "spendSimgaBucks", amount: amount, msgId: msgId }, "*");
+        }
+
+        function updateUIFromSave() {
+            document.getElementById("menuHighScore").innerText = "High Score: " + saveData.highScore;
+            document.getElementById("highScoreHUDDisplay").innerText = "Best: " + saveData.highScore;
+            
+            if (saveData.currentSkin === 'magenta') player.color = COLORS.magenta;
+            else if (saveData.currentSkin === 'gold') player.color = COLORS.gold;
+            else player.color = COLORS.cyan;
+
+            if (saveData.unlockedUpgrades.includes('slowGears')) {
+                globalSpeedMultiplier = 0.85;
+            } else {
+                globalSpeedMultiplier = 1.0;
+            }
+        }
+
+        // --- SHOP ITEMS CONFIG ---
+        const SHOP_ITEMS = [
+            { id: 'cyan', type: 'skin', name: 'Neon Core', desc: 'Default blue plasma core.', cost: 0 },
+            { id: 'magenta', type: 'skin', name: 'Magenta Spark', desc: 'A vibrant pink energy core.', cost: 20 },
+            { id: 'gold', type: 'skin', name: 'Solar Flare', desc: 'Radiant golden energy.', cost: 50 },
+            { id: 'slowGears', type: 'upgrade', name: 'Dampener Field', desc: 'Reduces the rotation speed of all gears by 15%.', cost: 100 },
+            { id: 'gapHighlight', type: 'upgrade', name: 'Path Predictor', desc: 'Draws a faint line revealing the gear gap trajectory.', cost: 75 },
+            { id: 'neon', type: 'texture', name: 'Holo-Gears', desc: 'Default holographic neon gears.', cost: 0 },
+            { id: 'metallic', type: 'texture', name: 'Heavy Metal', desc: 'Solid metallic gear plating.', cost: 40 }
+        ];
+
+        function openShop() {
+            document.getElementById("mainMenu").classList.add("hidden");
+            document.getElementById("shopOverlay").classList.remove("hidden");
+            renderShop();
+        }
+
+        function closeShop() {
+            document.getElementById("shopOverlay").classList.add("hidden");
+            document.getElementById("mainMenu").classList.remove("hidden");
+            saveGame(); 
+        }
+
+        function renderShop() {
+            const container = document.getElementById("shopItemsContainer");
+            container.innerHTML = "";
+
+            SHOP_ITEMS.forEach(item => {
+                const el = document.createElement("div");
+                el.className = "shop-item";
+                
+                let isUnlocked = false;
+                let isEquipped = false;
+
+                if (item.type === 'skin') {
+                    isUnlocked = saveData.unlockedSkins.includes(item.id);
+                    isEquipped = saveData.currentSkin === item.id;
+                } else if (item.type === 'upgrade') {
+                    isUnlocked = saveData.unlockedUpgrades.includes(item.id);
+                    isEquipped = isUnlocked;
+                } else if (item.type === 'texture') {
+                    isUnlocked = saveData.unlockedTextures.includes(item.id);
+                    isEquipped = saveData.currentTexture === item.id;
+                }
+
+                let btnHTML = "";
+                if (isEquipped) {
+                    btnHTML = `<button class="shop-btn equipped">${item.type === 'upgrade' ? 'ACTIVE' : 'EQUIPPED'}</button>`;
+                } else if (isUnlocked) {
+                    btnHTML = `<button class="shop-btn equip" onclick="equipItem('${item.id}', '${item.type}')">EQUIP</button>`;
+                } else {
+                    let btnText = pendingPurchase && pendingPurchase.id === item.id ? "PROCESSING..." : `BUY (${item.cost} SB)`;
+                    btnHTML = `<button class="shop-btn" onclick="buyItem('${item.id}', '${item.type}', ${item.cost})">${btnText}</button>`;
+                }
+
+                el.innerHTML = `
+                    <div>
+                        <h3>${item.name}</h3>
+                        <p>${item.desc}</p>
+                    </div>
+                    ${btnHTML}
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function buyItem(id, type, cost) {
+            if (cost === 0) {
+                handleSuccessfulPurchase({ id, type });
+            } else {
+                spendSimgaBucks(cost, { id, type });
+                renderShop(); 
+            }
+        }
+
+        function handleSuccessfulPurchase(item) {
+            if (item.type === 'skin') {
+                saveData.unlockedSkins.push(item.id);
+                saveData.currentSkin = item.id;
+            } else if (item.type === 'upgrade') {
+                saveData.unlockedUpgrades.push(item.id);
+            } else if (item.type === 'texture') {
+                saveData.unlockedTextures.push(item.id);
+                saveData.currentTexture = item.id;
+            }
+            saveGame();
+            renderShop();
+        }
+
+        function equipItem(id, type) {
+            if (type === 'skin') saveData.currentSkin = id;
+            if (type === 'texture') saveData.currentTexture = id;
+            saveGame();
+            renderShop();
+        }
+
+        // --- GAME ENGINE ---
+
+        function resize() {
+            CANVAS.width = window.innerWidth;
+            CANVAS.height = window.innerHeight;
+            player.x = CANVAS.width / 2;
+            targetX = player.x;
+            player.y = CANVAS.height * 0.8; // Rest near bottom
+            initBackground();
+        }
+        window.addEventListener("resize", resize);
+
+        function initBackground() {
+            stars = [];
+            for(let i=0; i<100; i++) {
+                stars.push({
+                    x: Math.random() * CANVAS.width,
+                    y: Math.random() * CANVAS.height,
+                    speed: Math.random() * 2 + 0.5,
+                    size: Math.random() * 2 + 0.5
+                });
+            }
+        }
+
+        function spawnGear(yOffset) {
+            // Randomize gear placement across a wide portion of the screen
+            const padding = Math.max(CANVAS.width * 0.15, 80);
+            const cx = padding + Math.random() * (CANVAS.width - padding * 2);
+            
+            // Rotation physics
+            let dir = Math.random() > 0.5 ? 1 : -1;
+            let speedBase = 0.4 + (score * 0.015);
+            let rotSpeed = dir * speedBase * globalSpeedMultiplier;
+
+            // Gap size gets slightly smaller over time, but starts much larger
+            let gapSize = Math.max(Math.PI / 2.5, (Math.PI / 1.5) - (score * 0.01));
+
+            gears.push({
+                x: cx,
+                y: yOffset,
+                outerRadius: 240,
+                innerRadius: 90,
+                hubRadius: 40,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: rotSpeed,
+                gapSize: gapSize,
+                passed: false,
+                numTeeth: 14,
+                toothDepth: 25
+            });
+        }
+
+        function startGame() {
+            document.getElementById("mainMenu").classList.add("hidden");
+            document.getElementById("gameOverMenu").classList.add("hidden");
+            document.getElementById("hud").classList.remove("hidden");
+            
+            updateUIFromSave();
+            
+            score = 0;
+            sbEarnedThisRun = 0;
+            gears = [];
+            particles = [];
+            player.vy = 0;
+            player.x = CANVAS.width / 2;
+            targetX = player.x;
+            player.y = CANVAS.height * 0.8;
+            state = "PLAYING";
+            
+            document.getElementById("scoreDisplay").innerText = "Score: 0";
+            document.getElementById("sbDisplay").innerText = "+0 SB";
+
+            // Spawn first few gears with adjusted vertical spacing
+            for(let i=0; i<3; i++) {
+                spawnGear(player.y - 450 - (i * 550));
+            }
+            
+            createExplosion(player.x, player.y, player.color, 30); 
+            
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function showMainMenu() {
+            document.getElementById("gameOverMenu").classList.add("hidden");
+            document.getElementById("mainMenu").classList.remove("hidden");
+            document.getElementById("hud").classList.add("hidden");
+            state = "MENU";
+        }
+
+        function gameOver() {
+            state = "GAMEOVER";
+            shakeTime = 0.5;
+            createExplosion(player.x, player.y, COLORS.danger, 100);
+            
+            document.getElementById("hud").classList.add("hidden");
+            document.getElementById("gameOverMenu").classList.remove("hidden");
+            document.getElementById("finalScoreDisplay").innerText = "Score: " + score;
+            
+            let sbText = sbEarnedThisRun > 0 ? `Earned +${sbEarnedThisRun} SimgaBucks!` : "";
+            document.getElementById("sbEarnedDisplay").innerText = sbText;
+
+            if (score > saveData.highScore) {
+                saveData.highScore = score;
+            }
+            saveGame();
+        }
+
+        // Input
+        function handleMove(e) {
+            if (state !== "PLAYING") return;
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            targetX = clientX;
+        }
+
+        window.addEventListener("mousemove", handleMove);
+        window.addEventListener("touchmove", handleMove, {passive: false});
+
+        function handleInput(e) {
+            if (state !== "PLAYING") return;
+            
+            // Allow clicking UI buttons, but prevent default zooming/scrolling on the canvas
+            if (e.target === CANVAS) {
+                e.preventDefault(); 
+            }
+            
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            targetX = clientX;
+            
+            // Limit dash height to keep player on screen
+            if (player.y > CANVAS.height * 0.3) {
+                // Physical leap forward
+                player.vy = -1000; 
+                createExplosion(player.x, player.y + 10, player.color, 15, 2); 
+            }
+        }
+
+        window.addEventListener("mousedown", handleInput);
+        window.addEventListener("touchstart", handleInput, {passive: false});
+
+        function checkMilestones() {
+            let reward = 0;
+            if (score === 3) reward = 1;
+            else if (score > 3 && score % 20 === 0) reward = 5; 
+            else if (score > 3 && score % 5 === 0) reward = 2; 
+            
+            if (reward > 0) {
+                sbEarnedThisRun += reward;
+                addSimgaBucks(reward);
+                document.getElementById("sbDisplay").innerText = `+${sbEarnedThisRun} SB`;
+                
+                let sbEl = document.getElementById("sbDisplay");
+                sbEl.style.transform = "scale(1.5)";
+                setTimeout(() => sbEl.style.transform = "scale(1)", 200);
+                
+                createExplosion(player.x, player.y, COLORS.gold, 40);
+            }
+        }
+
+        // Geometry Utils
+        function isAngleInGap(angle, rot, gapSize) {
+            let nAngle = (angle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+            let nRot = (rot % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+            
+            let diff = Math.abs(nAngle - nRot);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            
+            // Forgive slightly to make it feel better (Very forgiving now)
+            return diff < (gapSize / 1.2);
+        }
+
+        function drawLaserBarrier(g) {
+            CTX.save();
+            CTX.shadowBlur = 10;
+            CTX.shadowColor = COLORS.danger;
+            CTX.strokeStyle = COLORS.danger;
+            CTX.lineWidth = 4;
+            
+            // Draw lines connecting gear outer edge to screen walls
+            CTX.beginPath();
+            CTX.moveTo(0, g.y);
+            CTX.lineTo(g.x - g.outerRadius, g.y);
+            CTX.moveTo(g.x + g.outerRadius, g.y);
+            CTX.lineTo(CANVAS.width, g.y);
+            CTX.stroke();
+            
+            // Pulsing inner core for the laser
+            CTX.shadowBlur = 0;
+            CTX.globalAlpha = Math.abs(Math.sin(performance.now() / 150)) * 0.5 + 0.5;
+            CTX.strokeStyle = "#ffffff";
+            CTX.lineWidth = 2;
+            CTX.stroke();
+            CTX.restore();
+        }
+
+        // Drawing Utils
+        function drawGear(g) {
+            CTX.save();
+            CTX.translate(g.x, g.y);
+            CTX.rotate(g.rotation);
+
+            const isMetallic = saveData.currentTexture === 'metallic';
+            const accentColor = isMetallic ? COLORS.metallic : player.color;
+            const glowAmount = isMetallic ? 5 : 20;
+
+            CTX.shadowBlur = glowAmount;
+            CTX.shadowColor = accentColor;
+            CTX.lineWidth = isMetallic ? 2 : 4;
+            CTX.strokeStyle = accentColor;
+            
+            if (isMetallic) {
+                let grad = CTX.createRadialGradient(0,0, g.hubRadius, 0,0, g.outerRadius);
+                grad.addColorStop(0, "#111");
+                grad.addColorStop(1, "#333");
+                CTX.fillStyle = grad;
+            } else {
+                CTX.fillStyle = "rgba(0, 0, 0, 0.7)";
+            }
+
+            const startAngle = g.gapSize / 2;
+            const endAngle = Math.PI * 2 - (g.gapSize / 2);
+            const angleRange = endAngle - startAngle;
+            
+            CTX.beginPath();
+            
+            // Inner hub start
+            CTX.arc(0, 0, g.hubRadius, startAngle, endAngle);
+            CTX.lineTo(Math.cos(endAngle) * g.innerRadius, Math.sin(endAngle) * g.innerRadius);
+            
+            // Outer teeth rim
+            let teethSteps = g.numTeeth * 2;
+            let stepAngle = angleRange / teethSteps;
+            
+            for (let i = 0; i <= teethSteps; i++) {
+                let a = endAngle - (i * stepAngle); 
+                let r = (i % 2 === 0) ? g.outerRadius : g.outerRadius - g.toothDepth;
+                CTX.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            
+            CTX.lineTo(Math.cos(startAngle) * g.hubRadius, Math.sin(startAngle) * g.hubRadius);
+            CTX.closePath();
+            
+            CTX.fill();
+            CTX.stroke();
+
+            // Draw clear "doorway" markers to help visual timing
+            CTX.beginPath();
+            CTX.moveTo(Math.cos(startAngle) * g.innerRadius, Math.sin(startAngle) * g.innerRadius);
+            CTX.lineTo(Math.cos(startAngle) * g.outerRadius, Math.sin(startAngle) * g.outerRadius);
+            CTX.moveTo(Math.cos(endAngle) * g.innerRadius, Math.sin(endAngle) * g.innerRadius);
+            CTX.lineTo(Math.cos(endAngle) * g.outerRadius, Math.sin(endAngle) * g.outerRadius);
+            CTX.strokeStyle = "#ffffff";
+            CTX.lineWidth = 5;
+            CTX.stroke();
+
+            // Spokes
+            CTX.beginPath();
+            CTX.strokeStyle = accentColor;
+            CTX.lineWidth = isMetallic ? 2 : 4;
+            for(let i=0; i<6; i++) {
+                let spokeAngle = (i/6) * Math.PI * 2;
+                if (spokeAngle > startAngle && spokeAngle < endAngle) {
+                    CTX.moveTo(Math.cos(spokeAngle) * g.hubRadius, Math.sin(spokeAngle) * g.hubRadius);
+                    CTX.lineTo(Math.cos(spokeAngle) * g.innerRadius, Math.sin(spokeAngle) * g.innerRadius);
+                }
+            }
+            CTX.stroke();
+
+            CTX.restore();
+        }
+
+        function drawGapHighlight(g) {
+            CTX.save();
+            CTX.translate(g.x, g.y);
+            
+            CTX.rotate(g.rotation);
+            CTX.beginPath();
+            CTX.moveTo(0,0);
+            CTX.arc(0, 0, CANVAS.height, -g.gapSize/2, g.gapSize/2);
+            CTX.lineTo(0,0);
+            
+            let grad = CTX.createRadialGradient(0,0,0, 0,0, CANVAS.height);
+            grad.addColorStop(0, "rgba(255, 255, 255, 0.15)");
+            grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+            
+            CTX.fillStyle = grad;
+            CTX.fill();
+            CTX.restore();
+        }
+
+        function createExplosion(x, y, color, count, speedMod = 1) {
+            for(let i=0; i<count; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let spd = (Math.random() * 200 + 50) * speedMod;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    life: 1.0,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        // Update Loop
+        function update(dt) {
+            if (state === "GAMEOVER") {
+                if (shakeTime > 0) shakeTime -= dt;
+            }
+
+            // Update particles
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt * 1.5;
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            if (state !== "PLAYING") return;
+
+            // --- Spring Physics for Player ---
+            let targetY = CANVAS.height * 0.8;
+            
+            // Horizontal smooth movement (Increased speed for snappier horizontal control)
+            player.x += (targetX - player.x) * 20 * dt;
+
+            // Spring force pushing player back to targetY
+            let diff = targetY - player.y;
+            player.vy += diff * 15 * dt; // Spring tension
+            player.vy -= player.vy * 8 * dt; // Damping so it doesn't bounce endlessly
+            player.y += player.vy * dt;
+
+            // Prevent flying off the top entirely
+            if (player.y < CANVAS.height * 0.1) {
+                player.y = CANVAS.height * 0.1;
+                player.vy = 0;
+            }
+
+            // Generate dash trails when moving fast upwards
+            if (player.vy < -200 && Math.random() > 0.3) {
+                player.trail.push({x: player.x, y: player.y, life: 1.0});
+            }
+
+            for(let i = player.trail.length - 1; i >= 0; i--) {
+                player.trail[i].life -= dt * 5;
+                if (player.trail[i].life <= 0) player.trail.splice(i, 1);
+            }
+
+            // --- World & Camera Scrolling ---
+            let cameraSpeed = baseGearSpeed;
+            // If the player leaped up, the camera speeds up to catch them, pulling the world down faster
+            if (player.y < targetY) {
+                cameraSpeed += (targetY - player.y) * 4;
+            }
+
+            // Update Background Stars
+            let bgSpeed = cameraSpeed;
+            stars.forEach(s => {
+                s.y += (s.speed * dt * bgSpeed * 0.1);
+                if (s.y > CANVAS.height) {
+                    s.y = 0;
+                    s.x = Math.random() * CANVAS.width;
+                }
+            });
+
+            // Move and Logic Gears
+            let highestY = CANVAS.height;
+
+            for(let i=0; i<gears.length; i++) {
+                let g = gears[i];
+                g.y += cameraSpeed * dt;
+                g.rotation += g.rotSpeed * dt;
+
+                if (g.y < highestY) highestY = g.y;
+
+                let distY = player.y - g.y;
+                let distX = player.x - g.x;
+                let distToCenter = Math.hypot(distX, distY);
+
+                // Laser barrier continuous collision (side-swiping)
+                if (Math.abs(distY) < player.radius) {
+                    if (Math.abs(distX) > g.outerRadius - player.radius) {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                if (distToCenter < g.outerRadius + player.radius && distToCenter > g.innerRadius - player.radius) {
+                    let angleToPlayer = Math.atan2(distY, distX);
+                    if (!isAngleInGap(angleToPlayer, g.rotation, g.gapSize)) {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                if (distToCenter < g.hubRadius + player.radius) {
+                    gameOver();
+                    return;
+                }
+
+                if (!g.passed && g.y > player.y) {
+                    // Tunneling catch: If they bypass the gear completely by going around it
+                    if (Math.abs(distX) > g.outerRadius - player.radius) {
+                        gameOver();
+                        return;
+                    }
+
+                    g.passed = true;
+                    score++;
+                    document.getElementById("scoreDisplay").innerText = "Score: " + score;
+                    createExplosion(player.x, player.y, COLORS.cyan, 15, 0.5); 
+                    checkMilestones();
+                }
+            }
+
+            gears = gears.filter(g => g.y < CANVAS.height + 300);
+            
+            while (highestY > 0) {
+                spawnGear(highestY - 550);
+                highestY -= 550;
+            }
+        }
+
+        // Render Loop
+        function render() {
+            CTX.fillStyle = COLORS.bg;
+            CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+
+            CTX.save();
+
+            if (shakeTime > 0) {
+                let mag = shakeTime * 20;
+                CTX.translate((Math.random()-0.5)*mag, (Math.random()-0.5)*mag);
+            }
+
+            CTX.fillStyle = "#fff";
+            stars.forEach(s => {
+                CTX.globalAlpha = s.size / 3;
+                CTX.fillRect(s.x, s.y, s.size, s.size * (player.vy < -200 ? 5 : 1)); 
+            });
+            CTX.globalAlpha = 1.0;
+
+            gears.forEach(g => {
+                if (saveData.unlockedUpgrades.includes('gapHighlight') && g.y > -200 && g.y < CANVAS.height) {
+                    drawGapHighlight(g);
+                }
+                drawLaserBarrier(g);
+                drawGear(g);
+            });
+
+            // Pulse text tutorial for first jump
+            if (state === "PLAYING" && score === 0) {
+                let closestGear = gears.find(g => g.y < player.y);
+                if (closestGear && closestGear.y > CANVAS.height * 0.1) {
+                    CTX.globalAlpha = Math.abs(Math.sin(performance.now() / 300));
+                    CTX.fillStyle = "#ffffff";
+                    CTX.font = "bold 20px 'Segoe UI', Tahoma, sans-serif";
+                    CTX.textAlign = "center";
+                    CTX.fillText("STEER, THEN TAP TO DASH!", CANVAS.width / 2, player.y - 100);
+                    CTX.globalAlpha = 1.0;
+                }
+            }
+
+            particles.forEach(p => {
+                CTX.globalAlpha = p.life;
+                CTX.fillStyle = p.color;
+                CTX.shadowBlur = 10;
+                CTX.shadowColor = p.color;
+                CTX.beginPath();
+                CTX.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                CTX.fill();
+            });
+            CTX.globalAlpha = 1.0;
+            CTX.shadowBlur = 0;
+
+            if (state !== "GAMEOVER") {
+                player.trail.forEach((t, i) => {
+                    CTX.globalAlpha = t.life * 0.5;
+                    CTX.fillStyle = player.color;
+                    CTX.beginPath();
+                    CTX.arc(t.x, t.y, player.radius * t.life, 0, Math.PI*2);
+                    CTX.fill();
+                });
+                CTX.globalAlpha = 1.0;
+
+                CTX.shadowBlur = 20;
+                CTX.shadowColor = player.color;
+                CTX.fillStyle = "#fff";
+                CTX.beginPath();
+                
+                // Stretch character when dashing up
+                let stretch = player.vy < -200 ? 1.5 : 1;
+                CTX.ellipse(player.x, player.y, player.radius * (1/stretch), player.radius * stretch, 0, 0, Math.PI*2);
+                CTX.fill();
+
+                CTX.strokeStyle = player.color;
+                CTX.lineWidth = 2;
+                CTX.beginPath();
+                CTX.ellipse(player.x, player.y, (player.radius + 4) * (1/stretch), (player.radius + 4) * stretch, 0, 0, Math.PI*2);
+                CTX.stroke();
+                CTX.shadowBlur = 0;
+            }
+
+            CTX.restore();
+        }
+
+        function gameLoop(timestamp) {
+            let dt = (timestamp - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1; 
+            lastTime = timestamp;
+
+            update(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        resize();
+        requestAnimationFrame(gameLoop);
+
+    </script>
+</body>
+</html>

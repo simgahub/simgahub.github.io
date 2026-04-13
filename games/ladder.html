@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ladder Escape</title>
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --secondary: #ff007f;
+            --dark: #0a0a12;
+            --panel: rgba(20, 20, 30, 0.85);
+            --text: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--dark);
+            color: var(--text);
+            overflow: hidden;
+            touch-action: none; /* Prevent default touch actions like scrolling */
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            background: radial-gradient(circle at center, rgba(10,10,20,0.4) 0%, rgba(5,5,10,0.9) 100%);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 2px solid rgba(0, 255, 204, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            color: #aaa;
+        }
+
+        button {
+            background: linear-gradient(45deg, #0088ff, #00ffcc);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 12px 24px;
+            margin: 10px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.7);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: none;
+        }
+
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hud-box span {
+            color: var(--primary);
+        }
+
+        /* Shop Grid */
+        .shop-items {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            max-height: 50vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 5px;
+        }
+
+        /* Scrollbar styling */
+        .shop-items::-webkit-scrollbar { width: 6px; }
+        .shop-items::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .shop-items::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .item-info {
+            text-align: left;
+        }
+
+        .item-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .item-desc {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .shop-btn {
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            margin: 0;
+            min-width: 90px;
+        }
+        
+        .shop-btn.equipped {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            box-shadow: none;
+            cursor: default;
+        }
+
+        .shop-btn.equip {
+            background: var(--dark);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        #notifications {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(0, 255, 127, 0.2);
+            border: 1px solid rgba(0, 255, 127, 0.5);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 255, 127, 0.8);
+            animation: slideUp 0.3s ease-out, fadeOut 0.5s ease-in 2s forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.9rem;
+            pointer-events: none;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud" style="display: none;">
+        <div class="hud-box">Score: <span id="hud-score">0</span></div>
+        <div class="hud-box" id="hud-shield" style="display: none; color: #0088ff; border-color: #0088ff;">🛡️ Shield Active</div>
+    </div>
+
+    <div class="controls-hint" id="controls-hint" style="display: none;">
+        Tap Left/Right to Move • Swipe Up to Jump
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu-screen" class="overlay active">
+        <div class="panel">
+            <h1>Ladder Escape</h1>
+            <p>Climb high. Dodge debris. Survive.</p>
+            <div style="margin-bottom: 15px; color: #00ffcc; font-weight: bold;">
+                High Score: <span id="menu-highscore">0</span>
+            </div>
+            <button onclick="startGame()">PLAY NOW</button>
+            <button class="secondary" onclick="openShop()">SHOP & UPGRADES</button>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shop-screen" class="overlay">
+        <div class="panel" style="max-width: 500px;">
+            <h2>Upgrades & Skins</h2>
+            <div class="shop-items" id="shop-container">
+                <!-- Populated by JS -->
+            </div>
+            <button class="secondary" style="width: 100%;" onclick="closeShop()">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay">
+        <div class="panel">
+            <h1 style="color: var(--secondary); text-shadow: 0 0 10px var(--secondary);">GAME OVER</h1>
+            <p>Distance Climbed: <span id="go-score" style="color: #fff; font-weight: bold;">0</span>m</p>
+            <p id="new-best-tag" style="color: var(--primary); font-weight: bold; display: none;">NEW BEST!</p>
+            <button onclick="startGame()">PLAY AGAIN</button>
+            <button class="secondary" onclick="showMenu()">MAIN MENU</button>
+        </div>
+    </div>
+
+    <div id="notifications"></div>
+
+<script>
+/**
+ * LADDER ESCAPE
+ * A visually polished, single-file HTML5 Canvas game.
+ * Integrates SimgaBucks economy and saving/loading via parent postMessage.
+ */
+
+// --- 1. PLATFORM INTEGRATION & STATE ---
+
+const GAME_ID = "ladder";
+
+let saveData = {
+    highScore: 0,
+    unlocked: ['skin_cyan'],
+    activeSkin: 'skin_cyan',
+    hasSpeed: false,
+    hasShield: false,
+    hasDust: false
+};
+
+const SHOP_CATALOG = [
+    { id: 'skin_cyan', name: 'Neon Cyan Skin', desc: 'Default slick climber.', cost: 0, type: 'skin', color: '#00ffcc' },
+    { id: 'skin_pink', name: 'Blazing Pink Skin', desc: 'Stand out in the dark.', cost: 20, type: 'skin', color: '#ff007f' },
+    { id: 'skin_gold', name: 'Plasma Gold Skin', desc: 'For elite climbers.', cost: 50, type: 'skin', color: '#ffd700' },
+    { id: 'upg_speed', name: 'Climb Boost', desc: 'Score increases 20% faster.', cost: 15, type: 'upgrade', prop: 'hasSpeed' },
+    { id: 'upg_shield', name: 'Energy Helmet', desc: 'Absorb 1 hit per run.', cost: 25, type: 'upgrade', prop: 'hasShield' },
+    { id: 'upg_dust', name: 'Stardust Trail', desc: 'Epic visual particle effects.', cost: 10, type: 'upgrade', prop: 'hasDust' }
+];
+
+let pendingPurchaseId = null;
+
+function saveGameData() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function loadGameData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+    // We store the msgId if we needed to validate, but a global listener handles it
+}
+
+function giveSimgaBucks(amount, reason = "") {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks!`);
+}
+
+function requestPurchase(itemId, cost) {
+    pendingPurchaseId = itemId;
+    const msgId = "buy_" + Math.random().toString(36).substring(2);
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    
+    // Handle Load Response
+    if (data.type === "loadResponse") {
+        if (data.data) {
+            // Merge loaded data with defaults
+            saveData = { ...saveData, ...data.data };
+            updateMenuUI();
+        }
+    }
+    
+    // Handle Purchase Response
+    if (data.type === "spendResponse") {
+        if (data.success && pendingPurchaseId) {
+            handleSuccessfulPurchase(pendingPurchaseId);
+        } else {
+            alert("Transaction failed or not enough SimgaBucks.");
+        }
+        pendingPurchaseId = null;
+    }
+});
+
+function handleSuccessfulPurchase(id) {
+    const item = SHOP_CATALOG.find(i => i.id === id);
+    if (!item) return;
+
+    if (item.type === 'skin') {
+        saveData.unlocked.push(id);
+        saveData.activeSkin = id;
+    } else if (item.type === 'upgrade') {
+        saveData[item.prop] = true;
+    }
+    
+    saveGameData();
+    renderShop();
+    showToast(`${item.name} Acquired!`);
+}
+
+function showToast(msg) {
+    const container = document.getElementById('notifications');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+        if(toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 2500);
+}
+
+// Initial load request
+loadGameData();
+
+// --- 2. GAME ENGINE SETUP ---
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for solid background
+
+let width, height;
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game State Enum
+const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2 };
+let currentState = STATE.MENU;
+
+// Visual settings
+const LADDER_WIDTH = 240; // Total width of climbable area
+const LANE_COUNT = 3;
+const LANE_WIDTH = LADDER_WIDTH / LANE_COUNT;
+// Lanes: -1 (left), 0 (center), 1 (right)
+
+// Game Variables
+let lastTime = 0;
+let animationFrameId;
+let score = 0;
+let distance = 0;
+let speedMult = 1;
+let shieldActive = false;
+
+// Entities
+let player;
+let obstacles = [];
+let particles = [];
+let collectibles = [];
+let bgLines = [];
+
+// Input handling
+const keys = { left: false, right: false, up: false };
+let touchStartX = 0;
+let touchStartY = 0;
+
+window.addEventListener('keydown', (e) => {
+    if (currentState !== STATE.PLAYING) return;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') handleMove(-1);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') handleMove(1);
+    if ((e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') && !keys.up) {
+        keys.up = true;
+        player.jump();
+    }
+});
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') keys.up = false;
+});
+
+// Touch controls
+window.addEventListener('touchstart', (e) => {
+    if (currentState !== STATE.PLAYING) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+});
+window.addEventListener('touchend', (e) => {
+    if (currentState !== STATE.PLAYING) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const dx = touchEndX - touchStartX;
+    const dy = touchEndY - touchStartY;
+    
+    if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal swipe or tap
+        if (Math.abs(dx) > 30) {
+            handleMove(dx > 0 ? 1 : -1);
+        } else {
+            // Tap
+            if (touchEndX < width / 2) handleMove(-1);
+            else handleMove(1);
+        }
+    } else {
+        // Vertical swipe
+        if (dy < -30) {
+            player.jump();
+        }
+    }
+});
+
+function handleMove(dir) {
+    if (player.dead) return;
+    player.targetLane += dir;
+    // Clamp
+    if (player.targetLane < -1) player.targetLane = -1;
+    if (player.targetLane > 1) player.targetLane = 1;
+}
+
+// --- 3. CLASSES ---
+
+class Player {
+    constructor() {
+        this.yBase = height * 0.75; // Fixed vertical position on screen
+        this.yOffset = 0; // For jumping
+        this.targetLane = 0;
+        this.currentX = 0; // -1 to 1 continuous
+        this.jumpVel = 0;
+        this.isJumping = false;
+        this.dead = false;
+        this.color = SHOP_CATALOG.find(i => i.id === saveData.activeSkin)?.color || '#00ffcc';
+        this.trail = [];
+        this.invulnTimer = 0;
+    }
+
+    jump() {
+        if (!this.isJumping && !this.dead) {
+            this.isJumping = true;
+            this.jumpVel = -12; // Initial jump burst
+            spawnParticles(this.getScreenX(), this.yBase, this.color, 10, 2);
+        }
+    }
+
+    update() {
+        if (this.dead) return;
+
+        // Smooth lane switching
+        this.currentX += (this.targetLane - this.currentX) * 0.2;
+
+        // Jump logic (Gravity)
+        if (this.isJumping) {
+            this.yOffset += this.jumpVel;
+            this.jumpVel += 0.8; // Gravity
+            if (this.yOffset >= 0) {
+                this.yOffset = 0;
+                this.isJumping = false;
+                this.jumpVel = 0;
+                // Landing dust
+                if (saveData.hasDust) spawnParticles(this.getScreenX(), this.yBase, '#fff', 5, 1);
+            }
+        }
+
+        // Invulnerability timing
+        if (this.invulnTimer > 0) this.invulnTimer--;
+
+        // Trail effect
+        this.trail.push({ x: this.getScreenX(), y: this.yBase + this.yOffset });
+        if (this.trail.length > 10) this.trail.shift();
+        
+        // Continuous dust if unlocked
+        if (saveData.hasDust && Math.random() < 0.2 && !this.isJumping) {
+            spawnParticles(this.getScreenX(), this.yBase, this.color, 1, 0.5);
+        }
+    }
+
+    getScreenX() {
+        return (width / 2) + (this.currentX * LANE_WIDTH);
+    }
+
+    draw(ctx) {
+        if (this.dead) return;
+        
+        const cx = this.getScreenX();
+        const cy = this.yBase + this.yOffset;
+
+        // Blink if invulnerable
+        if (this.invulnTimer > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
+            return; 
+        }
+
+        // Draw trail
+        if (this.trail.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(this.trail[0].x, this.trail[0].y);
+            for (let i = 1; i < this.trail.length; i++) {
+                ctx.lineTo(this.trail[i].x, this.trail[i].y);
+            }
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.globalAlpha = 0.3;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Draw Player Body (Stylized futuristic shape)
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        // Shadow (on the ladder)
+        if (this.yOffset < 0) {
+            ctx.beginPath();
+            ctx.ellipse(0, -this.yOffset, 15 + this.yOffset/10, 5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fill();
+        }
+
+        // Shield Aura
+        if (shieldActive) {
+            ctx.beginPath();
+            ctx.arc(0, -10, 25, 0, Math.PI * 2);
+            ctx.strokeStyle = '#0088ff';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#0088ff';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Main shape (diamond/kite like ninja)
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(15, 0);
+        ctx.lineTo(0, 20);
+        ctx.lineTo(-15, 0);
+        ctx.fill();
+
+        // Inner dark core
+        ctx.fillStyle = varColor('--dark');
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(-8, 0);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Obstacle {
+    constructor() {
+        this.lane = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+        this.y = -50;
+        // Obstacles fall down. Speed is base game speed * multiplier
+        this.speedOffset = Math.random() * 2 + 1; 
+        this.type = Math.random() > 0.8 ? 'laser' : 'rock';
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.1;
+        this.markedForDeletion = false;
+    }
+
+    update(baseSpeed) {
+        this.y += baseSpeed + (this.type === 'rock' ? this.speedOffset : 0);
+        this.rotation += this.rotSpeed;
+        if (this.y > height + 50) this.markedForDeletion = true;
+    }
+
+    draw(ctx) {
+        const cx = (width / 2) + (this.lane * LANE_WIDTH);
+        
+        ctx.save();
+        ctx.translate(cx, this.y);
+
+        if (this.type === 'rock') {
+            // Jagged asteroid/debris
+            ctx.rotate(this.rotation);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff4444';
+            ctx.fillStyle = '#333';
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            for(let i=0; i<6; i++) {
+                const ang = (i / 6) * Math.PI * 2;
+                const rad = 15 + Math.random() * 5; // pseudo-randomness for jaggedness is okay here if static, but for simplicity we'll just use fixed shape
+                const x = Math.cos(ang) * (i%2===0 ? 20 : 15);
+                const y = Math.sin(ang) * (i%2===0 ? 20 : 15);
+                if(i===0) ctx.moveTo(x,y);
+                else ctx.lineTo(x,y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+        } else if (this.type === 'laser') {
+            // Low sweeping laser (must jump)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff00ff';
+            ctx.fillStyle = '#ff00ff';
+            ctx.fillRect(-LANE_WIDTH/2 + 5, -5, LANE_WIDTH - 10, 10);
+            
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-LANE_WIDTH/2 + 5, -2, LANE_WIDTH - 10, 4);
+        }
+
+        ctx.restore();
+    }
+}
+
+class Collectible {
+    constructor() {
+        this.lane = Math.floor(Math.random() * 3) - 1;
+        this.y = -50;
+        this.markedForDeletion = false;
+        this.phase = Math.random() * Math.PI * 2;
+    }
+
+    update(baseSpeed) {
+        this.y += baseSpeed;
+        this.phase += 0.05;
+        if (this.y > height + 50) this.markedForDeletion = true;
+    }
+
+    draw(ctx) {
+        const cx = (width / 2) + (this.lane * LANE_WIDTH);
+        
+        ctx.save();
+        ctx.translate(cx, this.y);
+        
+        // Floating hover
+        const hoverY = Math.sin(this.phase) * 5;
+        ctx.translate(0, hoverY);
+
+        // Rotating width
+        const scaleX = Math.abs(Math.cos(this.phase * 0.5));
+        ctx.scale(scaleX, 1);
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ffaa';
+        ctx.fillStyle = '#00ffaa';
+        
+        // Diamond shape
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(10, 0);
+        ctx.lineTo(0, 15);
+        ctx.lineTo(-10, 0);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(5, 0);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(-5, 0);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color, speed) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * speed * 2;
+        this.vy = (Math.random() - 0.5) * speed * 2 - 2; // Bias upwards
+        this.color = color;
+        this.life = 1.0;
+        this.decay = 0.02 + Math.random() * 0.03;
+        this.size = Math.random() * 4 + 2;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// --- 4. GAME LOGIC ---
+
+function spawnParticles(x, y, color, count, speed) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(x, y, color, speed));
+    }
+}
+
+function initGame() {
+    player = new Player();
+    obstacles = [];
+    collectibles = [];
+    particles = [];
+    bgLines = [];
+    
+    // Setup background stars/dust
+    for(let i=0; i<50; i++) {
+        bgLines.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            length: Math.random() * 50 + 10,
+            speed: Math.random() * 2 + 0.5
+        });
+    }
+
+    score = 0;
+    distance = 0;
+    speedMult = 1;
+    shieldActive = saveData.hasShield;
+    
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('hud-shield').style.display = shieldActive ? 'flex' : 'none';
+    document.getElementById('controls-hint').style.display = 'block';
+    
+    // Hide controls hint after 4 seconds
+    setTimeout(() => {
+        document.getElementById('controls-hint').style.display = 'none';
+    }, 4000);
+}
+
+function startGame() {
+    document.getElementById('menu-screen').classList.remove('active');
+    document.getElementById('game-over-screen').classList.remove('active');
+    currentState = STATE.PLAYING;
+    initGame();
+    lastTime = performance.now();
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    gameLoop(lastTime);
+}
+
+function gameOver() {
+    currentState = STATE.GAMEOVER;
+    player.dead = true;
+    spawnParticles(player.getScreenX(), player.yBase + player.yOffset, player.color, 50, 5);
+    
+    // Screen shake simulation handled in draw
+    
+    setTimeout(() => {
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('game-over-screen').classList.add('active');
+        document.getElementById('go-score').innerText = Math.floor(distance);
+        
+        const isNewBest = distance > saveData.highScore;
+        document.getElementById('new-best-tag').style.display = isNewBest ? 'block' : 'none';
+        
+        if (isNewBest) {
+            saveData.highScore = Math.floor(distance);
+        }
+        
+        // Give milestone SimgaBucks based on distance (short session rewards)
+        // e.g., 2 SB every 1000m.
+        let reward = Math.floor(distance / 1000) * 2;
+        // Cap max reward per run to fit short session guidelines
+        reward = Math.min(reward, 10);
+        if (reward > 0) {
+            giveSimgaBucks(reward, "Distance Milestone");
+        }
+        
+        saveGameData();
+    }, 1500);
+}
+
+let spawnTimer = 0;
+let gemSpawnTimer = 0;
+
+function update(dt) {
+    if (currentState !== STATE.PLAYING) return;
+
+    // Difficulty scaling
+    speedMult += dt * 0.00002;
+    const baseSpeed = 5 * speedMult;
+    
+    // Score logic (base distance + speed upgrade)
+    const climbMod = saveData.hasSpeed ? 1.2 : 1.0;
+    distance += (baseSpeed / 10) * climbMod;
+    document.getElementById('hud-score').innerText = Math.floor(distance) + 'm';
+
+    player.update();
+
+    // Spawning Obstacles
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+        obstacles.push(new Obstacle());
+        // Reduce spawn time slightly as speed increases
+        spawnTimer = Math.max(400, 1000 - (speedMult * 100)) + Math.random() * 500;
+    }
+
+    // Spawning Collectibles (Simga Gems)
+    gemSpawnTimer -= dt;
+    if (gemSpawnTimer <= 0) {
+        collectibles.push(new Collectible());
+        gemSpawnTimer = 8000 + Math.random() * 5000; // ~1 every 8-13 seconds
+    }
+
+    // Update Arrays
+    obstacles.forEach(obs => obs.update(baseSpeed));
+    collectibles.forEach(gem => gem.update(baseSpeed));
+    particles.forEach(p => p.update());
+
+    // Clean up
+    obstacles = obstacles.filter(o => !o.markedForDeletion);
+    collectibles = collectibles.filter(c => !c.markedForDeletion);
+    particles = particles.filter(p => p.life > 0);
+
+    // Update Background
+    bgLines.forEach(line => {
+        line.y += line.speed * baseSpeed * 0.5;
+        if (line.y > height) {
+            line.y = -line.length;
+            line.x = Math.random() * width;
+        }
+    });
+
+    // Collision Detection
+    checkCollisions();
+}
+
+function checkCollisions() {
+    if (player.dead || player.invulnTimer > 0) return;
+
+    const pX = player.targetLane; // Logical lane
+    const pY = player.yBase + player.yOffset;
+    const hitRadius = 20;
+
+    // Obstacles
+    for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
+        if (obs.lane === pX) {
+            // Check Y overlap
+            if (Math.abs(obs.y - pY) < hitRadius + 15) {
+                // Determine if jump cleared it
+                if (obs.type === 'rock') {
+                    // Rock is tall, jump doesn't fully clear unless perfectly timed high, but let's say rocks cannot be jumped. Must change lanes.
+                    hitPlayer();
+                    break;
+                } else if (obs.type === 'laser') {
+                    // Laser is on ground. Jump clears it.
+                    if (player.yOffset > -30) {
+                        hitPlayer();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Collectibles
+    for (let i = 0; i < collectibles.length; i++) {
+        const gem = collectibles[i];
+        if (gem.lane === pX && Math.abs(gem.y - pY) < hitRadius + 20) {
+            gem.markedForDeletion = true;
+            // Collect Reward!
+            spawnParticles(gem.getScreenX ? gem.getScreenX() : (width/2 + gem.lane*LANE_WIDTH), gem.y, '#00ffaa', 15, 3);
+            giveSimgaBucks(1, "Gem Collected");
+        }
+    }
+}
+
+function hitPlayer() {
+    if (shieldActive) {
+        shieldActive = false;
+        player.invulnTimer = 60; // ~1 second at 60fps
+        document.getElementById('hud-shield').style.display = 'none';
+        spawnParticles(player.getScreenX(), player.yBase, '#0088ff', 20, 4);
+    } else {
+        gameOver();
+    }
+}
+
+function draw() {
+    // Motion blur / trail effect via semi-transparent clear
+    ctx.fillStyle = `rgba(10, 10, 18, ${currentState === STATE.GAMEOVER ? 0.1 : 0.4})`;
+    ctx.fillRect(0, 0, width, height);
+
+    // If game over just draw particles and fade
+    if (currentState === STATE.GAMEOVER) {
+        particles.forEach(p => p.draw(ctx));
+        return;
+    }
+
+    // Draw Background Lines (speed effect)
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    bgLines.forEach(line => {
+        ctx.moveTo(line.x, line.y);
+        ctx.lineTo(line.x, line.y + line.length);
+    });
+    ctx.stroke();
+
+    // Draw Ladder
+    const centerX = width / 2;
+    const halfLad = LADDER_WIDTH / 2;
+    
+    // Rails
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#0055ff';
+    ctx.fillStyle = '#112244';
+    ctx.strokeStyle = '#0055ff';
+    ctx.lineWidth = 4;
+    
+    // Left rail
+    ctx.fillRect(centerX - halfLad - 10, 0, 10, height);
+    ctx.strokeRect(centerX - halfLad - 10, 0, 10, height);
+    // Right rail
+    ctx.fillRect(centerX + halfLad, 0, 10, height);
+    ctx.strokeRect(centerX + halfLad, 0, 10, height);
+
+    ctx.shadowBlur = 0;
+
+    // Rungs (Scrolling)
+    const baseSpeed = 5 * speedMult;
+    const rungSpacing = 100;
+    // Calculate offset based on distance
+    const offsetY = (distance * 10) % rungSpacing;
+    
+    ctx.fillStyle = '#223355';
+    ctx.strokeStyle = '#0044aa';
+    ctx.lineWidth = 2;
+    for (let y = -rungSpacing + offsetY; y < height; y += rungSpacing) {
+        ctx.fillRect(centerX - halfLad, y, LADDER_WIDTH, 10);
+        ctx.strokeRect(centerX - halfLad, y, LADDER_WIDTH, 10);
+    }
+
+    // Lane indicators (subtle)
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(centerX - LANE_WIDTH/2, 0); ctx.lineTo(centerX - LANE_WIDTH/2, height);
+    ctx.moveTo(centerX + LANE_WIDTH/2, 0); ctx.lineTo(centerX + LANE_WIDTH/2, height);
+    ctx.stroke();
+
+    // Draw Entities
+    collectibles.forEach(gem => gem.draw(ctx));
+    obstacles.forEach(obs => obs.draw(ctx));
+    player.draw(ctx);
+    particles.forEach(p => p.draw(ctx));
+    
+    // Vignette
+    const grad = ctx.createRadialGradient(width/2, height/2, height*0.3, width/2, height/2, height);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+}
+
+function gameLoop(timestamp) {
+    let dt = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // Cap dt to prevent massive jumps if tab is inactive
+    if (dt > 100) dt = 16;
+
+    update(dt);
+    draw();
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+// --- 5. UI CONTROLLERS ---
+
+function showMenu() {
+    document.getElementById('menu-screen').classList.add('active');
+    document.getElementById('game-over-screen').classList.remove('active');
+    document.getElementById('shop-screen').classList.remove('active');
+    updateMenuUI();
+}
+
+function updateMenuUI() {
+    document.getElementById('menu-highscore').innerText = saveData.highScore + 'm';
+}
+
+function openShop() {
+    document.getElementById('menu-screen').classList.remove('active');
+    document.getElementById('shop-screen').classList.add('active');
+    renderShop();
+}
+
+function closeShop() {
+    document.getElementById('shop-screen').classList.remove('active');
+    showMenu();
+}
+
+function renderShop() {
+    const container = document.getElementById('shop-container');
+    container.innerHTML = '';
+
+    SHOP_CATALOG.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        
+        const isUnlocked = item.type === 'skin' ? saveData.unlocked.includes(item.id) : saveData[item.prop];
+        const isEquipped = item.type === 'skin' && saveData.activeSkin === item.id;
+
+        let btnHTML = '';
+        if (isEquipped) {
+            btnHTML = `<button class="shop-btn equipped">Equipped</button>`;
+        } else if (isUnlocked && item.type === 'skin') {
+            btnHTML = `<button class="shop-btn equip" onclick="equipSkin('${item.id}')">Equip</button>`;
+        } else if (isUnlocked && item.type === 'upgrade') {
+            btnHTML = `<button class="shop-btn equipped">Owned</button>`;
+        } else {
+            btnHTML = `<button class="shop-btn" onclick="requestPurchase('${item.id}', ${item.cost})">${item.cost} SB</button>`;
+        }
+
+        div.innerHTML = `
+            <div class="item-info">
+                <div class="item-name" style="color: ${item.color || '#fff'}">${item.name}</div>
+                <div class="item-desc">${item.desc}</div>
+            </div>
+            <div>${btnHTML}</div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function equipSkin(id) {
+    saveData.activeSkin = id;
+    saveGameData();
+    renderShop();
+}
+
+// Helpers
+function varColor(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Initial draw to screen before play
+ctx.fillStyle = '#0a0a12';
+ctx.fillRect(0, 0, width, height);
+
+</script>
+</body>
+</html>

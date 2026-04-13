@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ice Block Escape</title>
+    <style>
+        :root {
+            --ui-bg: rgba(10, 15, 25, 0.85);
+            --ui-border: #00e5ff;
+            --ui-text: #e0f7fa;
+            --ui-accent: #ff0055;
+            --btn-bg: rgba(0, 229, 255, 0.2);
+            --btn-hover: rgba(0, 229, 255, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050811;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 0 50px rgba(0, 229, 255, 0.1);
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(5,8,17,0.4) 0%, rgba(5,8,17,0.9) 100%);
+            z-index: 10;
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .panel {
+            background: var(--ui-bg);
+            border: 2px solid var(--ui-border);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            color: var(--ui-text);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.2), inset 0 0 20px rgba(0, 229, 255, 0.1);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 36px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--ui-border), 0 0 20px var(--ui-border);
+        }
+
+        p { margin: 0 0 20px 0; font-size: 16px; opacity: 0.8; }
+
+        button {
+            background: var(--btn-bg);
+            border: 1px solid var(--ui-border);
+            color: #fff;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0,229,255,0.1);
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--btn-hover);
+            box-shadow: 0 0 20px rgba(0,229,255,0.4);
+            transform: translateY(-2px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #555;
+            color: #888;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .hud-box {
+            background: rgba(10, 15, 25, 0.6);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 18px;
+            pointer-events: all;
+            backdrop-filter: blur(2px);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 5;
+            pointer-events: all;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .shop-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(0,229,255,0.2);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .shop-item h3 { margin: 0 0 5px 0; font-size: 18px; }
+        .shop-item p { margin: 0 0 10px 0; font-size: 14px; color: #aaa; }
+        .shop-item .price { font-weight: bold; color: #ffd700; margin-bottom: 10px;}
+        .shop-item button { margin: 0; padding: 8px; font-size: 14px; width: 100%; }
+
+        .owned { border-color: #00ff88; }
+        .equipped { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; }
+
+        /* Mobile D-Pad (hidden on desktop) */
+        #dpad {
+            position: absolute;
+            bottom: 30px; left: 30px;
+            width: 150px; height: 150px;
+            display: none;
+            z-index: 5;
+            pointer-events: all;
+        }
+
+        .d-btn {
+            position: absolute;
+            background: rgba(0, 229, 255, 0.2);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            border-radius: 50%;
+            width: 45px; height: 45px;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-weight: bold; font-size: 20px;
+            border-radius: 10px;
+        }
+        .d-btn:active { background: rgba(0, 229, 255, 0.5); }
+        #d-up { top: 0; left: 52px; }
+        #d-down { bottom: 0; left: 52px; }
+        #d-left { top: 52px; left: 0; }
+        #d-right { top: 52px; right: 0; }
+
+        @media (max-width: 768px) {
+            #dpad { display: block; }
+            h1 { font-size: 24px; }
+            .panel { padding: 15px; }
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--ui-border);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" style="display: none;">
+        <div class="hud-box">
+            Level: <span id="levelDisplay">1</span><br>
+            <span style="font-size: 12px; color: #aaa;">Moves: <span id="movesDisplay">0</span></span>
+        </div>
+        <div id="controls">
+            <button id="btnUndo" onclick="Game.undo()" style="display:none; padding: 8px 12px; margin:0; font-size:14px;">↺ Undo</button>
+            <button onclick="Game.restartLevel()" style="padding: 8px 12px; margin:0; font-size:14px;">⟲ Restart</button>
+        </div>
+    </div>
+
+    <!-- Mobile D-PAD -->
+    <div id="dpad">
+        <div class="d-btn" id="d-up" ontouchstart="Input.handleTouchDir('up', event)">↑</div>
+        <div class="d-btn" id="d-down" ontouchstart="Input.handleTouchDir('down', event)">↓</div>
+        <div class="d-btn" id="d-left" ontouchstart="Input.handleTouchDir('left', event)">←</div>
+        <div class="d-btn" id="d-right" ontouchstart="Input.handleTouchDir('right', event)">→</div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu-main" class="overlay active">
+        <div class="panel">
+            <h1>Ice Block Escape</h1>
+            <p>Push blocks. Block the frost. Escape before you freeze.</p>
+            <div id="loadingIndicator" class="loading-spinner"></div>
+            <div id="mainButtons" style="display:none;">
+                <button onclick="UI.startGame()">Play</button>
+                <button onclick="UI.showShop()">Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Menu -->
+    <div id="menu-shop" class="overlay">
+        <div class="panel" style="width: 800px;">
+            <h1>SimgaShop</h1>
+            <p>Spend SimgaBucks to customize your experience!</p>
+            <button onclick="UI.showMain()" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px;">X</button>
+            
+            <div class="shop-grid" id="shopContainer">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="menu-over" class="overlay">
+        <div class="panel">
+            <h1 style="color: var(--ui-accent); text-shadow: 0 0 10px var(--ui-accent);">Frozen!</h1>
+            <p>The cold caught up to you.</p>
+            <p>Levels Cleared: <span id="scoreDisplay" style="color: #00ff88; font-weight:bold;">0</span></p>
+            <button onclick="UI.startGame()">Try Again</button>
+            <button onclick="UI.showMain()">Main Menu</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ICE BLOCK ESCAPE
+ * A responsive, visually polished HTML5 Canvas puzzle game.
+ */
+
+// --- CONFIG & CONSTANTS ---
+const GAME_ID = "iceBlock";
+
+const TILE_SIZE = 50;
+const GRID_SIZE = 11;
+
+const CELL_EMPTY = 0;
+const CELL_WALL = 1;
+const CELL_BLOCK = 2;
+const CELL_FROST = 3;
+const CELL_EXIT = 4;
+
+// --- STATE ---
+let gameState = {
+    grid: [],
+    player: { x: 5, y: 5, rx: 5, ry: 5 }, // logical x/y, render rx/ry for interpolation
+    exit: { x: 0, y: 0 },
+    blocks: [],
+    frostQueue: [],
+    level: 1,
+    moves: 0,
+    frostTimer: 0,
+    state: 'MENU', // MENU, PLAYING, OVER
+    history: [], // For undo
+    cameraShake: 0
+};
+
+// --- SAVED DATA ---
+let saveData = {
+    upgrades: {
+        undo: false,
+        freezeDelayLevel: 0,
+    },
+    unlockedSkins: ['default'],
+    currentSkin: 'default',
+    unlockedThemes: ['arctic'],
+    currentTheme: 'arctic',
+    highScore: 0
+};
+
+// --- SHOP ITEMS ---
+const SHOP_ITEMS = [
+    { id: 'skin_red', type: 'skin', name: 'Crimson Scarf', desc: 'A warm red glow.', price: 15 },
+    { id: 'skin_gold', type: 'skin', name: 'Golden Aura', desc: 'Shine like a star.', price: 50 },
+    { id: 'upg_undo', type: 'upgrade', name: 'Time Rewind', desc: 'Unlock the ability to undo 1 move per level.', price: 30 },
+    { id: 'upg_freeze1', type: 'upgrade', name: 'Frost Resistance I', desc: 'Frost spreads 20% slower.', price: 40 },
+    { id: 'upg_freeze2', type: 'upgrade', name: 'Frost Resistance II', desc: 'Frost spreads 40% slower. (Requires Tier I)', price: 80, requires: 'upg_freeze1' },
+    { id: 'theme_neon', type: 'theme', name: 'Neon Synth Theme', desc: 'Cyberpunk styled grid and ice.', price: 60 }
+];
+
+// --- PLATFORM API ---
+const Platform = {
+    loadMsgId: null,
+    pendingPurchaseId: null,
+    pendingPurchaseItem: null,
+
+    init() {
+        window.addEventListener("message", this.handleMessage.bind(this));
+        this.requestLoad();
+    },
+
+    requestLoad() {
+        this.loadMsgId = "load_" + Date.now();
+        window.parent.postMessage({
+            type: "loadData",
+            gameId: GAME_ID,
+            msgId: this.loadMsgId
+        }, "*");
+        
+        // Fallback if not in platform iframe
+        setTimeout(() => {
+            if (document.getElementById('loadingIndicator').style.display !== 'none') {
+                console.log("No platform detected. Using local defaults.");
+                UI.onDataLoaded();
+            }
+        }, 1500);
+    },
+
+    save() {
+        window.parent.postMessage({
+            type: "saveData",
+            gameId: GAME_ID,
+            data: saveData
+        }, "*");
+    },
+
+    reward(amount) {
+        if(amount <= 0) return;
+        window.parent.postMessage({
+            type: "addSimgaBucks",
+            amount: amount
+        }, "*");
+    },
+
+    purchase(itemId, price) {
+        if(this.pendingPurchaseId) return; // Wait for previous
+        this.pendingPurchaseId = Math.random().toString(36);
+        this.pendingPurchaseItem = itemId;
+
+        window.parent.postMessage({
+            type: "spendSimgaBucks",
+            amount: price,
+            msgId: this.pendingPurchaseId
+        }, "*");
+    },
+
+    handleMessage(event) {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "loadResponse" && data.msgId === this.loadMsgId) {
+            if (data.data) {
+                // Merge loaded data with defaults
+                saveData = { ...saveData, ...data.data };
+                if(!saveData.upgrades) saveData.upgrades = {};
+                if(!saveData.unlockedSkins) saveData.unlockedSkins = ['default'];
+                if(!saveData.unlockedThemes) saveData.unlockedThemes = ['arctic'];
+            }
+            UI.onDataLoaded();
+        }
+
+        if (data.type === "spendResponse" && data.msgId === this.pendingPurchaseId) {
+            if (data.success) {
+                this.applyPurchase(this.pendingPurchaseItem);
+            } else {
+                alert("Transaction failed! Not enough SimgaBucks.");
+            }
+            this.pendingPurchaseId = null;
+            this.pendingPurchaseItem = null;
+            UI.renderShop();
+        }
+    },
+
+    applyPurchase(itemId) {
+        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        if(!item) return;
+
+        if(item.type === 'skin') {
+            if(!saveData.unlockedSkins.includes(item.id)) saveData.unlockedSkins.push(item.id);
+            saveData.currentSkin = item.id;
+        } else if(item.type === 'theme') {
+            if(!saveData.unlockedThemes.includes(item.id)) saveData.unlockedThemes.push(item.id);
+            saveData.currentTheme = item.id;
+        } else if(item.type === 'upgrade') {
+            if(item.id === 'upg_undo') saveData.upgrades.undo = true;
+            if(item.id === 'upg_freeze1') saveData.upgrades.freezeDelayLevel = 1;
+            if(item.id === 'upg_freeze2') saveData.upgrades.freezeDelayLevel = 2;
+        }
+        this.save();
+    }
+};
+
+// --- VISUALS & PARTICLES ---
+const ctx = document.getElementById('gameCanvas').getContext('2d');
+let width, height, offsetX, offsetY;
+
+const particles = [];
+
+const Colors = {
+    arctic: {
+        bg: '#050811', grid: '#0a1429', wall: '#131e36', wallOutline: '#21355c',
+        blockBody: 'rgba(0, 200, 255, 0.6)', blockEdge: '#88e0ff',
+        frostLight: '#00ffff', frostDark: '#0044aa',
+        playerCore: '#ffffff',
+        exitPrimary: '#ff8800', exitSecondary: '#ffcc00'
+    },
+    theme_neon: {
+        bg: '#0a0014', grid: '#26004d', wall: '#1a0033', wallOutline: '#ff00ff',
+        blockBody: 'rgba(255, 0, 128, 0.6)', blockEdge: '#ff66b2',
+        frostLight: '#00ff00', frostDark: '#006600',
+        playerCore: '#00ffff',
+        exitPrimary: '#ffff00', exitSecondary: '#ffffff'
+    }
+};
+
+function getColors() {
+    return Colors[saveData.currentTheme] || Colors.arctic;
+}
+
+function spawnParticles(x, y, count, color, speedScale = 1) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 2 * speedScale + 0.5;
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            life: 1.0, decay: Math.random() * 0.02 + 0.01,
+            color: color, size: Math.random() * 3 + 1
+        });
+    }
+}
+
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life -= p.decay;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+function drawParticles() {
+    ctx.globalCompositeOperation = "lighter";
+    particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = "source-over";
+}
+
+// --- GAME LOGIC ---
+const Game = {
+    init() {
+        this.loop = this.loop.bind(this);
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        
+        // Robust resize tracking for iframes
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => this.resize());
+            ro.observe(document.body);
+        }
+
+        requestAnimationFrame(this.loop);
+    },
+
+    resize() {
+        const c = document.getElementById('gameCanvas');
+        width = window.innerWidth || document.body.clientWidth || 800;
+        height = window.innerHeight || document.body.clientHeight || 600;
+        
+        // Prevent zero dimensions which cause canvas rendering crashes
+        width = Math.max(width, 100);
+        height = Math.max(height, 100);
+
+        c.width = width;
+        c.height = height;
+        
+        // Calculate offset to center grid
+        const gridPixelSize = GRID_SIZE * TILE_SIZE;
+        offsetX = (width - gridPixelSize) / 2;
+        offsetY = (height - gridPixelSize) / 2;
+    },
+
+    startLevel(levelNumber) {
+        gameState.level = levelNumber;
+        gameState.moves = 0;
+        gameState.frostTimer = 0;
+        gameState.state = 'PLAYING';
+        gameState.history = [];
+        document.getElementById('levelDisplay').innerText = levelNumber;
+        document.getElementById('movesDisplay').innerText = "0";
+        document.getElementById('btnUndo').style.display = saveData.upgrades.undo ? 'inline-block' : 'none';
+        
+        this.generateLevel();
+        UI.showHUD();
+    },
+
+    restartLevel() {
+        this.startLevel(gameState.level);
+    },
+
+    generateLevel() {
+        // Init Empty Grid
+        gameState.grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(CELL_EMPTY));
+        gameState.blocks = [];
+        gameState.frostQueue = [];
+
+        // Place Player
+        gameState.player.x = Math.floor(GRID_SIZE/2);
+        gameState.player.y = Math.floor(GRID_SIZE/2);
+        gameState.player.rx = gameState.player.x;
+        gameState.player.ry = gameState.player.y;
+
+        // Place Exit on edge
+        const edge = Math.floor(Math.random() * 4);
+        let ex = 0, ey = 0;
+        if(edge === 0) { ex = Math.floor(Math.random()*GRID_SIZE); ey = 0; }
+        else if(edge === 1) { ex = Math.floor(Math.random()*GRID_SIZE); ey = GRID_SIZE-1; }
+        else if(edge === 2) { ex = 0; ey = Math.floor(Math.random()*GRID_SIZE); }
+        else { ex = GRID_SIZE-1; ey = Math.floor(Math.random()*GRID_SIZE); }
+        gameState.exit = {x: ex, y: ey};
+        gameState.grid[ey][ex] = CELL_EXIT;
+
+        // Place Frost Sources
+        const numFrost = Math.min(2 + Math.floor(gameState.level / 3), 4);
+        const corners = [[0,0], [GRID_SIZE-1,0], [0,GRID_SIZE-1], [GRID_SIZE-1,GRID_SIZE-1]];
+        for(let i=0; i<numFrost; i++) {
+            let p = corners[i % 4];
+            if(gameState.grid[p[1]][p[0]] === CELL_EMPTY) {
+                gameState.grid[p[1]][p[0]] = CELL_FROST;
+            }
+        }
+
+        // Place Obstacles (Walls & Blocks)
+        const diff = Math.min(gameState.level, 10);
+        let wallsToPlace = 10 + diff;
+        let blocksToPlace = 4 + diff;
+
+        const attemptPlace = (type, count) => {
+            let placed = 0;
+            let maxTries = 100;
+            while(placed < count && maxTries > 0) {
+                maxTries--;
+                let rx = 1 + Math.floor(Math.random()*(GRID_SIZE-2));
+                let ry = 1 + Math.floor(Math.random()*(GRID_SIZE-2));
+                
+                // Don't place on player, exit, frost
+                if(gameState.grid[ry][rx] !== CELL_EMPTY) continue;
+                if(Math.abs(rx - gameState.player.x) < 2 && Math.abs(ry - gameState.player.y) < 2) continue; // Give player space
+
+                gameState.grid[ry][rx] = type;
+                if(type === CELL_BLOCK) gameState.blocks.push({x: rx, y: ry, rx: rx, ry: ry});
+                
+                // Ensure path exists
+                if(!this.checkPath()) {
+                    gameState.grid[ry][rx] = CELL_EMPTY; // Revert
+                    if(type === CELL_BLOCK) gameState.blocks.pop();
+                } else {
+                    placed++;
+                }
+            }
+        };
+
+        attemptPlace(CELL_WALL, wallsToPlace);
+        attemptPlace(CELL_BLOCK, blocksToPlace);
+
+        // Initial snow burst
+        for(let i=0; i<50; i++) {
+            spawnParticles(width/2, height/2, 1, '#ffffff', 5);
+        }
+    },
+
+    checkPath() {
+        // BFS to ensure path from player to exit exists
+        let q = [{x: gameState.player.x, y: gameState.player.y}];
+        let visited = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false));
+        visited[gameState.player.y][gameState.player.x] = true;
+
+        while(q.length > 0) {
+            let curr = q.shift();
+            if(curr.x === gameState.exit.x && curr.y === gameState.exit.y) return true;
+
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            for(let d of dirs) {
+                let nx = curr.x + d[0], ny = curr.y + d[1];
+                if(nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE && !visited[ny][nx]) {
+                    // Treat blocks as passable for initial check since player can push them
+                    // But walls and frost are solid
+                    if(gameState.grid[ny][nx] !== CELL_WALL && gameState.grid[ny][nx] !== CELL_FROST) {
+                        visited[ny][nx] = true;
+                        q.push({x: nx, y: ny});
+                    }
+                }
+            }
+        }
+        return false;
+    },
+
+    saveState() {
+        if(!saveData.upgrades.undo) return;
+        // Deep copy minimal state
+        let st = {
+            grid: JSON.parse(JSON.stringify(gameState.grid)),
+            px: gameState.player.x, py: gameState.player.y,
+            blocks: JSON.parse(JSON.stringify(gameState.blocks.map(b => ({x:b.x, y:b.y})))),
+            moves: gameState.moves,
+            frostTimer: gameState.frostTimer
+        };
+        gameState.history.push(st);
+        if(gameState.history.length > 5) gameState.history.shift(); // keep last 5
+    },
+
+    undo() {
+        if(gameState.history.length === 0 || gameState.state !== 'PLAYING') return;
+        let st = gameState.history.pop();
+        gameState.grid = st.grid;
+        gameState.player.x = st.px; gameState.player.y = st.py;
+        gameState.player.rx = st.px; gameState.player.ry = st.py; // snap
+        gameState.moves = st.moves;
+        gameState.frostTimer = st.frostTimer;
+        
+        // Restore blocks
+        gameState.blocks = st.blocks.map(b => ({x:b.x, y:b.y, rx:b.x, ry:b.y}));
+        
+        document.getElementById('movesDisplay').innerText = gameState.moves;
+        gameState.cameraShake = 5;
+    },
+
+    movePlayer(dx, dy) {
+        if(gameState.state !== 'PLAYING') return;
+
+        let nx = gameState.player.x + dx;
+        let ny = gameState.player.y + dy;
+
+        // Bounds check
+        if(nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) {
+            this.bumpEffect(); return;
+        }
+
+        let targetCell = gameState.grid[ny][nx];
+        if(targetCell === CELL_WALL || targetCell === CELL_FROST) {
+            this.bumpEffect(); return;
+        }
+
+        this.saveState();
+
+        if(targetCell === CELL_BLOCK) {
+            // Attempt push
+            let bx = nx + dx, by = ny + dy;
+            if(bx >= 0 && bx < GRID_SIZE && by >= 0 && by < GRID_SIZE && gameState.grid[by][bx] === CELL_EMPTY) {
+                // Push successful
+                gameState.grid[ny][nx] = CELL_EMPTY;
+                gameState.grid[by][bx] = CELL_BLOCK;
+                
+                // Find block obj
+                let bObj = gameState.blocks.find(b => b.x === nx && b.y === ny);
+                if(bObj) { bObj.x = bx; bObj.y = by; }
+
+                this.doMove(nx, ny);
+                spawnParticles(offsetX + bx*TILE_SIZE + TILE_SIZE/2, offsetY + by*TILE_SIZE + TILE_SIZE/2, 10, getColors().blockEdge);
+            } else {
+                // Blocked
+                gameState.history.pop(); // cancel save
+                this.bumpEffect();
+                return;
+            }
+        } else {
+            // Move into empty or exit
+            this.doMove(nx, ny);
+        }
+    },
+
+    doMove(nx, ny) {
+        gameState.player.x = nx;
+        gameState.player.y = ny;
+        gameState.moves++;
+        document.getElementById('movesDisplay').innerText = gameState.moves;
+
+        if(gameState.grid[ny][nx] === CELL_EXIT) {
+            this.winLevel();
+            return;
+        }
+
+        this.advanceTurn();
+    },
+
+    bumpEffect() {
+        gameState.cameraShake = 4;
+    },
+
+    advanceTurn() {
+        gameState.frostTimer++;
+        let maxDelay = 2; // base
+        if(saveData.upgrades.freezeDelayLevel === 1) maxDelay = 3;
+        if(saveData.upgrades.freezeDelayLevel === 2) maxDelay = 4;
+
+        if(gameState.frostTimer >= maxDelay) {
+            gameState.frostTimer = 0;
+            this.spreadFrost();
+        }
+    },
+
+    spreadFrost() {
+        let newGrid = JSON.parse(JSON.stringify(gameState.grid));
+        let expanded = false;
+        let c = getColors();
+
+        for(let y=0; y<GRID_SIZE; y++) {
+            for(let x=0; x<GRID_SIZE; x++) {
+                if(gameState.grid[y][x] === CELL_FROST) {
+                    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                    for(let d of dirs) {
+                        let nx = x + d[0], ny = y + d[1];
+                        if(nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                            if(gameState.grid[ny][nx] === CELL_EMPTY) {
+                                newGrid[ny][nx] = CELL_FROST;
+                                expanded = true;
+                                spawnParticles(offsetX + nx*TILE_SIZE + TILE_SIZE/2, offsetY + ny*TILE_SIZE + TILE_SIZE/2, 5, c.frostLight);
+                            }
+                            // Frost DOES NOT spread into blocks or walls. Blocks act as barricades!
+                        }
+                    }
+                }
+            }
+        }
+        gameState.grid = newGrid;
+
+        if(expanded) gameState.cameraShake = 2;
+
+        // Check if player frozen
+        if(gameState.grid[gameState.player.y][gameState.player.x] === CELL_FROST) {
+            this.loseGame();
+        }
+    },
+
+    winLevel() {
+        gameState.state = 'TRANSITION';
+        spawnParticles(offsetX + gameState.player.x*TILE_SIZE + TILE_SIZE/2, offsetY + gameState.player.y*TILE_SIZE + TILE_SIZE/2, 50, getColors().exitPrimary, 2);
+        
+        // Rewards Logic (Quick short session rewards)
+        let reward = 2; // base completion
+        if(gameState.moves < 15) reward += 2; // speed bonus
+        else if(gameState.moves < 25) reward += 1;
+        
+        // Give first reward very fast (level 1)
+        if(gameState.level === 1) reward += 3; 
+
+        Platform.reward(reward);
+
+        setTimeout(() => {
+            this.startLevel(gameState.level + 1);
+        }, 1000);
+    },
+
+    loseGame() {
+        gameState.state = 'OVER';
+        gameState.cameraShake = 15;
+        spawnParticles(offsetX + gameState.player.x*TILE_SIZE + TILE_SIZE/2, offsetY + gameState.player.y*TILE_SIZE + TILE_SIZE/2, 40, getColors().frostLight, 3);
+        
+        if(gameState.level - 1 > saveData.highScore) {
+            saveData.highScore = gameState.level - 1;
+        }
+        Platform.save();
+
+        setTimeout(() => {
+            document.getElementById('scoreDisplay').innerText = (gameState.level - 1);
+            UI.showOver();
+        }, 1000);
+    },
+
+    loop() {
+        try {
+            this.update();
+            this.draw();
+        } catch(e) {
+            console.error("Game loop error: ", e);
+            // Reset canvas state on error to prevent cascading visual bugs
+            ctx.restore();
+            ctx.globalAlpha = 1.0;
+            ctx.globalCompositeOperation = "source-over";
+            ctx.shadowBlur = 0;
+        }
+        requestAnimationFrame(this.loop);
+    },
+
+    update() {
+        // Interpolate Player
+        gameState.player.rx += (gameState.player.x - gameState.player.rx) * 0.3;
+        gameState.player.ry += (gameState.player.y - gameState.player.ry) * 0.3;
+
+        // Interpolate Blocks
+        gameState.blocks.forEach(b => {
+            b.rx += (b.x - b.rx) * 0.3;
+            b.ry += (b.y - b.ry) * 0.3;
+        });
+
+        // Camera Shake
+        if(gameState.cameraShake > 0) gameState.cameraShake *= 0.8;
+        if(gameState.cameraShake < 0.1) gameState.cameraShake = 0;
+
+        updateParticles();
+    },
+
+    draw() {
+        const c = getColors();
+
+        // Clear BG
+        ctx.fillStyle = c.bg;
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw Ambient Background effects (Grid glow)
+        let cx = width/2, cy = height/2;
+        let radius = Math.max(width, height, 100) * 0.7;
+        let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        grad.addColorStop(0, 'rgba(0, 229, 255, 0.05)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0,0,width,height);
+
+        ctx.save();
+        if(gameState.cameraShake > 0) {
+            ctx.translate((Math.random()-0.5)*gameState.cameraShake, (Math.random()-0.5)*gameState.cameraShake);
+        }
+
+        // Translate to center grid
+        ctx.translate(offsetX, offsetY);
+
+        // Draw Grid floor
+        ctx.strokeStyle = c.grid;
+        ctx.lineWidth = 2;
+        for(let y=0; y<GRID_SIZE; y++) {
+            for(let x=0; x<GRID_SIZE; x++) {
+                ctx.strokeRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+
+        // Draw Static Entities
+        for(let y=0; y<GRID_SIZE; y++) {
+            for(let x=0; x<GRID_SIZE; x++) {
+                let cell = gameState.grid[y][x];
+                let px = x*TILE_SIZE;
+                let py = y*TILE_SIZE;
+
+                if(cell === CELL_WALL) {
+                    ctx.fillStyle = c.wall;
+                    ctx.fillRect(px+2, py+2, TILE_SIZE-4, TILE_SIZE-4);
+                    ctx.strokeStyle = c.wallOutline;
+                    ctx.strokeRect(px+4, py+4, TILE_SIZE-8, TILE_SIZE-8);
+                    // Add some crystalline shape details
+                    ctx.beginPath();
+                    ctx.moveTo(px+4, py+4); ctx.lineTo(px+12, py+12);
+                    ctx.moveTo(px+TILE_SIZE-4, py+4); ctx.lineTo(px+TILE_SIZE-12, py+12);
+                    ctx.stroke();
+                }
+                else if(cell === CELL_FROST) {
+                    // Frost jagged rendering
+                    ctx.fillStyle = c.frostDark;
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = c.frostLight;
+                    ctx.fillStyle = c.frostLight;
+                    
+                    let timeOffset = Date.now() * 0.005;
+                    ctx.beginPath();
+                    // Draw random spikes based on coordinates
+                    for(let i=0; i<3; i++) {
+                        let sx = px + TILE_SIZE/2 + Math.sin(x*y + i + timeOffset)*10;
+                        let sy = py + TILE_SIZE/2 + Math.cos(x*y + i + timeOffset)*10;
+                        ctx.moveTo(px + TILE_SIZE/2, py + TILE_SIZE/2);
+                        ctx.lineTo(sx - 10, sy + 10);
+                        ctx.lineTo(sx + 10, sy + 10);
+                    }
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                else if(cell === CELL_EXIT) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = c.exitPrimary;
+                    ctx.fillStyle = c.exitPrimary;
+                    let pulse = Math.sin(Date.now() * 0.005) * 4;
+                    
+                    ctx.beginPath();
+                    ctx.arc(px+TILE_SIZE/2, py+TILE_SIZE/2, 12 + pulse, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = c.exitSecondary;
+                    ctx.beginPath();
+                    ctx.arc(px+TILE_SIZE/2, py+TILE_SIZE/2, 6, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        // Draw Blocks
+        gameState.blocks.forEach(b => {
+            let px = b.rx * TILE_SIZE;
+            let py = b.ry * TILE_SIZE;
+            
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = c.blockEdge;
+            ctx.fillStyle = c.blockBody;
+            ctx.fillRect(px+4, py+4, TILE_SIZE-8, TILE_SIZE-8);
+            
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.5;
+            ctx.strokeRect(px+8, py+8, TILE_SIZE-16, TILE_SIZE-16);
+            ctx.globalAlpha = 1.0;
+        });
+
+        // Draw Player
+        if(gameState.state !== 'OVER') {
+            let px = gameState.player.rx * TILE_SIZE + TILE_SIZE/2;
+            let py = gameState.player.ry * TILE_SIZE + TILE_SIZE/2;
+
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = c.playerCore;
+            ctx.fillStyle = c.playerCore;
+            ctx.beginPath();
+            ctx.arc(px, py, 10, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Scarf / Skin
+            let skinColor = '#00ffff'; // default cyan
+            if(saveData.currentSkin === 'skin_red') skinColor = '#ff3366';
+            if(saveData.currentSkin === 'skin_gold') skinColor = '#ffd700';
+
+            ctx.shadowColor = skinColor;
+            ctx.strokeStyle = skinColor;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            let wave = Math.sin(Date.now() * 0.01) * 3;
+            // Draw scarf trail
+            ctx.moveTo(px, py - 8);
+            ctx.lineTo(px - 10, py - 12 + wave);
+            ctx.lineTo(px - 15, py - 8 + wave);
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.restore(); // remove grid offset
+
+        // Draw Particles globally
+        drawParticles();
+    }
+};
+
+// --- INPUT HANDLING ---
+const Input = {
+    keys: {},
+    init() {
+        window.addEventListener('keydown', (e) => {
+            if(e.repeat) return;
+            if(gameState.state !== 'PLAYING') return;
+
+            let dx = 0, dy = 0;
+            if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') dy = -1;
+            if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') dy = 1;
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dx = -1;
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dx = 1;
+
+            if(dx !== 0 || dy !== 0) Game.movePlayer(dx, dy);
+        });
+
+        // Swipe logic for touch
+        let touchStartX = 0;
+        let touchStartY = 0;
+        window.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, {passive: false});
+
+        window.addEventListener('touchend', (e) => {
+            if(gameState.state !== 'PLAYING') return;
+            let touchEndX = e.changedTouches[0].screenX;
+            let touchEndY = e.changedTouches[0].screenY;
+            this.handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, {passive: false});
+        
+        // Prevent default scrolling on canvas
+        document.getElementById('gameCanvas').addEventListener('touchmove', e => e.preventDefault(), {passive: false});
+    },
+
+    handleSwipe(startX, startY, endX, endY) {
+        let dx = endX - startX;
+        let dy = endY - startY;
+        if(Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+            if(Math.abs(dx) > Math.abs(dy)) {
+                Game.movePlayer(dx > 0 ? 1 : -1, 0);
+            } else {
+                Game.movePlayer(0, dy > 0 ? 1 : -1);
+            }
+        }
+    },
+    
+    handleTouchDir(dir, e) {
+        e.preventDefault();
+        if(gameState.state !== 'PLAYING') return;
+        if(dir === 'up') Game.movePlayer(0, -1);
+        if(dir === 'down') Game.movePlayer(0, 1);
+        if(dir === 'left') Game.movePlayer(-1, 0);
+        if(dir === 'right') Game.movePlayer(1, 0);
+    }
+};
+
+// --- UI MANAGMENT ---
+const UI = {
+    onDataLoaded() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('mainButtons').style.display = 'block';
+    },
+
+    hideAll() {
+        document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+        document.getElementById('hud').style.display = 'none';
+    },
+
+    showMain() {
+        this.hideAll();
+        document.getElementById('menu-main').classList.add('active');
+        gameState.state = 'MENU';
+    },
+
+    startGame() {
+        this.hideAll();
+        Game.startLevel(1);
+    },
+
+    showHUD() {
+        this.hideAll();
+        document.getElementById('hud').style.display = 'flex';
+    },
+
+    showOver() {
+        this.hideAll();
+        document.getElementById('menu-over').classList.add('active');
+    },
+
+    showShop() {
+        this.hideAll();
+        document.getElementById('menu-shop').classList.add('active');
+        this.renderShop();
+    },
+
+    renderShop() {
+        const container = document.getElementById('shopContainer');
+        container.innerHTML = '';
+
+        SHOP_ITEMS.forEach(item => {
+            let div = document.createElement('div');
+            div.className = 'shop-item';
+            
+            let isOwned = false;
+            let isEquipped = false;
+            let canAfford = true; // In a real app we'd check player balance, but platform handles actual check. We just disable if pending.
+
+            if(item.type === 'skin') {
+                isOwned = saveData.unlockedSkins.includes(item.id);
+                isEquipped = saveData.currentSkin === item.id;
+            } else if(item.type === 'theme') {
+                isOwned = saveData.unlockedThemes.includes(item.id);
+                isEquipped = saveData.currentTheme === item.id;
+            } else if(item.type === 'upgrade') {
+                if(item.id === 'upg_undo') isOwned = saveData.upgrades.undo;
+                if(item.id === 'upg_freeze1') isOwned = saveData.upgrades.freezeDelayLevel >= 1;
+                if(item.id === 'upg_freeze2') isOwned = saveData.upgrades.freezeDelayLevel >= 2;
+            }
+
+            if(isOwned) div.classList.add('owned');
+            if(isEquipped) div.classList.add('equipped');
+
+            let btnHtml = '';
+            if(isEquipped) {
+                btnHtml = `<button disabled>Equipped</button>`;
+            } else if(isOwned) {
+                if(item.type === 'skin' || item.type === 'theme') {
+                    btnHtml = `<button onclick="UI.equipItem('${item.id}', '${item.type}')">Equip</button>`;
+                } else {
+                    btnHtml = `<button disabled>Maxed</button>`;
+                }
+            } else {
+                let reqMet = !item.requires || (
+                    (item.requires === 'upg_freeze1' && saveData.upgrades.freezeDelayLevel >= 1)
+                );
+                
+                if(!reqMet) {
+                    btnHtml = `<button disabled>Locked</button>`;
+                } else {
+                    let btnText = Platform.pendingPurchaseId ? 'Processing...' : `Buy (${item.price} SB)`;
+                    btnHtml = `<button onclick="Platform.purchase('${item.id}', ${item.price})" ${Platform.pendingPurchaseId ? 'disabled' : ''}>${btnText}</button>`;
+                }
+            }
+
+            div.innerHTML = `
+                <div>
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                </div>
+                <div>
+                    ${!isOwned ? `<div class="price">${item.price} SimgaBucks</div>` : '<div class="price">Owned</div>'}
+                    ${btnHtml}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    },
+
+    equipItem(id, type) {
+        if(type === 'skin') saveData.currentSkin = id;
+        if(type === 'theme') saveData.currentTheme = id;
+        Platform.save();
+        this.renderShop();
+    }
+};
+
+// --- BOOTSTRAP ---
+window.onload = () => {
+    Game.init();
+    Input.init();
+    Platform.init();
+};
+
+</script>
+</body>
+</html>

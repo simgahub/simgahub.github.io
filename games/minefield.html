@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minefield Rush</title>
+    <style>
+        :root {
+            --primary: #0ff;
+            --bg-color: #050510;
+            --text-main: #e0f7fa;
+            --danger: #ff003c;
+            --success: #00ff66;
+            --panel-bg: rgba(10, 10, 25, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Vignette overlay for visual depth */
+        .vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .ui-layer.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .ui-layer.active {
+            pointer-events: auto;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1), inset 0 0 20px rgba(0, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 2.5rem;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            color: var(--primary);
+            text-shadow: 0 0 5px var(--primary);
+            margin-bottom: 20px;
+        }
+
+        p { margin: 10px 0; font-size: 1.1rem; }
+
+        .btn {
+            background: linear-gradient(135deg, rgba(0,255,255,0.2), rgba(0,100,255,0.2));
+            border: 1px solid var(--primary);
+            color: #fff;
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--primary);
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--primary);
+            transform: scale(1.05);
+        }
+
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled {
+            background: #333; border-color: #555; color: #777;
+            text-shadow: none; box-shadow: none; cursor: not-allowed; transform: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .hud-stat {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px var(--primary);
+        }
+
+        /* Dash Indicator */
+        #dash-ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .dash-bar-container {
+            width: 150px; height: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--primary);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .dash-bar {
+            height: 100%; width: 100%;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            transition: width 0.1s linear;
+        }
+
+        /* Shop Grid */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        
+        /* Custom Scrollbar for Shop */
+        .shop-grid::-webkit-scrollbar { width: 6px; }
+        .shop-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        .shop-grid::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .shop-item:hover { border-color: var(--primary); box-shadow: 0 0 10px rgba(0,255,255,0.2); }
+        .item-name { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+        .item-desc { font-size: 0.8rem; color: #aaa; margin-bottom: 10px; min-height: 30px; }
+        .item-cost { color: var(--success); font-weight: bold; margin-bottom: 10px; text-shadow: 0 0 5px var(--success); }
+        
+        .buy-btn {
+            padding: 8px 15px; font-size: 0.9rem;
+            width: 100%;
+        }
+
+        /* Notification */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(0, 255, 102, 0.1);
+            border-left: 4px solid var(--success);
+            padding: 10px 20px;
+            border-radius: 4px;
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+            animation: slideIn 0.3s ease-out forwards, fadeOut 0.5s ease-in 2.5s forwards;
+            text-shadow: 0 0 5px var(--success);
+        }
+
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* Virtual Joystick */
+        #joystick-area {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            z-index: 5;
+            display: none; /* Shown only on touch devices */
+            touch-action: none;
+        }
+        #joystick-knob {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 50px; height: 50px;
+            background: rgba(0, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px var(--primary);
+            pointer-events: none;
+            transition: background 0.2s;
+        }
+
+        @media (max-width: 600px) {
+            .shop-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 2rem; }
+            .panel { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <div class="vignette"></div>
+
+    <!-- In-Game HUD -->
+    <div id="hud">
+        <div class="hud-stat" style="color: var(--primary);">Score: <span id="scoreUI">0</span></div>
+        <div class="hud-stat" style="font-size: 1rem; color: #aaa;">High: <span id="highScoreUI">0</span></div>
+        <div class="hud-stat" style="font-size: 1rem; color: #ddd; margin-top: 10px;">Time: <span id="timeUI">0.0</span>s</div>
+    </div>
+
+    <!-- Dash Cooldown UI -->
+    <div id="dash-ui">
+        <div style="font-size:0.9rem; font-weight:bold; color:var(--primary); text-shadow:0 0 5px var(--primary);">DASH (SPACE)</div>
+        <div class="dash-bar-container"><div id="dash-bar" class="dash-bar"></div></div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notification-area"></div>
+
+    <!-- Mobile Joystick -->
+    <div id="joystick-area"><div id="joystick-knob"></div></div>
+
+    <!-- Menus -->
+    <!-- Main Menu -->
+    <div id="menuScreen" class="ui-layer active">
+        <div class="panel">
+            <h1>Minefield Rush</h1>
+            <p>Survive the expanding minefield. Move fast, dash to safety.</p>
+            <p style="color: #aaa; font-size: 0.9rem;">WASD / Arrows / Touch to Move<br>SPACE / Double Tap to Dash</p>
+            <div style="margin-top: 30px;">
+                <button class="btn" onclick="startGame()">Start Game</button>
+                <button class="btn" onclick="showShop()">Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="ui-layer hidden">
+        <div class="panel">
+            <h1 style="color: var(--danger); text-shadow: 0 0 10px var(--danger);">OBLITERATED</h1>
+            <h2>Score: <span id="finalScore"></span></h2>
+            <p>Time Survived: <span id="finalTime"></span>s</p>
+            <p id="newHighScoreMsg" style="color: var(--success); display: none; font-weight: bold; text-shadow: 0 0 5px var(--success);">New High Score!</p>
+            <div style="margin-top: 30px;">
+                <button class="btn" onclick="startGame()">Play Again</button>
+                <button class="btn" onclick="showMenu()">Main Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shopScreen" class="ui-layer hidden">
+        <div class="panel" style="width: 600px; max-width: 95%;">
+            <h2>SimgaShop</h2>
+            <p>Spend SimgaBucks to upgrade your experience.</p>
+            <div class="shop-grid" id="shopContainer">
+                <!-- Shop items injected here via JS -->
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="btn" onclick="showMenu()">Back</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * MINEFIELD RUSH - Browser Mini-Game
+ * Integrated with Parent Platform using postMessage
+ */
+
+// --- CONSTANTS & CONFIG ---
+const GAME_ID = "minefield";
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize by removing canvas alpha
+let width, height;
+
+// --- GAME STATE ---
+let state = 'MENU'; // MENU, PLAYING, GAMEOVER, SHOP
+let lastTime = 0;
+let gameTime = 0;
+let score = 0;
+let timeSurvived = 0;
+let difficultyMultiplier = 1;
+
+// --- PLATFORM DATA (SAVE/LOAD) ---
+let saveData = {
+    highScore: 0,
+    unlockedSkins: ['neon'],
+    unlockedThemes: ['synthwave'],
+    upgrades: { warning: false, dash: false },
+    currentSkin: 'neon',
+    currentTheme: 'synthwave'
+};
+let pendingPurchases = {}; // Track pending transactions
+
+// --- SHOP ITEMS ---
+const SHOP_ITEMS = [
+    { id: 'skin_plasma', type: 'skin', name: 'Plasma Core Skin', desc: 'A blazing bright orange energy core.', cost: 20 },
+    { id: 'skin_quantum', type: 'skin', name: 'Quantum Shape', desc: 'A multi-layered shifting geometry.', cost: 50 },
+    { id: 'theme_matrix', type: 'theme', name: 'Matrix Grid', desc: 'Green digital aesthetic for the grid.', cost: 25 },
+    { id: 'theme_inferno', type: 'theme', name: 'Inferno Grid', desc: 'Deep red, hostile grid environment.', cost: 25 },
+    { id: 'upgrade_warning', type: 'upgrade', name: 'Sensors Upgrade', desc: 'Increases mine warning duration by 0.5s.', cost: 30 },
+    { id: 'upgrade_dash', type: 'upgrade', name: 'Phase Dash', desc: 'Press SPACE to quickly dash through danger.', cost: 40 }
+];
+
+// --- THEME DEFINITIONS ---
+const THEMES = {
+    'synthwave': { bg: '#050510', grid: 'rgba(0, 255, 255, 0.15)', primary: '#0ff', glow: '#0ff' },
+    'matrix': { bg: '#001100', grid: 'rgba(0, 255, 0, 0.2)', primary: '#0f0', glow: '#0f0' },
+    'inferno': { bg: '#1a0505', grid: 'rgba(255, 50, 0, 0.15)', primary: '#ff3300', glow: '#ff3300' }
+};
+
+// --- ENTITIES ---
+let player = {
+    x: 0, y: 0, vx: 0, vy: 0, size: 14, speed: 1200, friction: 0.90,
+    dashReady: true, dashCooldown: 3.0, dashTimer: 0, isDashing: false, dashDuration: 0.2
+};
+let mines = [];
+let particles = [];
+let collectibles = [];
+let scorchMarks = [];
+
+// Input
+let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, " ": false };
+let mouse = { x: 0, y: 0, isDown: false };
+let joystick = { active: false, dx: 0, dy: 0, startX: 0, startY: 0 };
+
+// Screen Shake
+let shakeTimer = 0;
+let shakeIntensity = 0;
+
+// Economy Tracking (Internal session tracking)
+let nextRewardThreshold = 20; // Seconds to survive for next chunk
+let sessionEarned = 0;
+
+// --- INITIALIZATION ---
+
+function init() {
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    // Inputs
+    window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key)) { keys[e.key] = true; e.preventDefault(); } });
+    window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+    
+    // Mouse / Touch (Direct movement towards point)
+    canvas.addEventListener('mousedown', e => { mouse.isDown = true; updateMousePos(e); checkDashClick(e); });
+    canvas.addEventListener('mousemove', e => { if(mouse.isDown) updateMousePos(e); });
+    canvas.addEventListener('mouseup', () => mouse.isDown = false);
+    
+    // Joystick logic
+    const joyArea = document.getElementById('joystick-area');
+    joyArea.addEventListener('touchstart', handleJoystickStart, {passive: false});
+    joyArea.addEventListener('touchmove', handleJoystickMove, {passive: false});
+    joyArea.addEventListener('touchend', handleJoystickEnd);
+    
+    // Detect touch to show joystick
+    window.addEventListener('touchstart', () => {
+        if(state === 'PLAYING') joyArea.style.display = 'block';
+    }, {once: true});
+
+    // Request Load Data
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({ type: "loadData", gameId: GAME_ID, msgId: loadMsgId }, "*");
+
+    // Listen to Platform Messages
+    window.addEventListener("message", handlePlatformMessages);
+
+    // Start Loop
+    requestAnimationFrame(gameLoop);
+}
+
+function resizeCanvas() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    if(state === 'MENU') {
+        player.x = width / 2;
+        player.y = height / 2;
+    }
+}
+
+function updateMousePos(e) {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+}
+
+// Touch Double tap for dash
+let lastTap = 0;
+function checkDashClick(e) {
+    let currentTime = new Date().getTime();
+    let tapLength = currentTime - lastTap;
+    if (tapLength < 300 && tapLength > 0) {
+        attemptDash();
+    }
+    lastTap = currentTime;
+}
+
+// Joystick Handlers
+function handleJoystickStart(e) {
+    e.preventDefault();
+    joystick.active = true;
+    joystick.startX = e.touches[0].clientX;
+    joystick.startY = e.touches[0].clientY;
+    document.getElementById('joystick-knob').style.transition = 'none';
+    handleJoystickMove(e);
+}
+function handleJoystickMove(e) {
+    if(!joystick.active) return;
+    e.preventDefault();
+    let dx = e.touches[0].clientX - joystick.startX;
+    let dy = e.touches[0].clientY - joystick.startY;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    let maxDist = 35;
+    if(dist > maxDist) {
+        dx = (dx/dist) * maxDist;
+        dy = (dy/dist) * maxDist;
+    }
+    joystick.dx = dx / maxDist;
+    joystick.dy = dy / maxDist;
+    document.getElementById('joystick-knob').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+function handleJoystickEnd(e) {
+    e.preventDefault();
+    joystick.active = false;
+    joystick.dx = 0; joystick.dy = 0;
+    const knob = document.getElementById('joystick-knob');
+    knob.style.transition = 'transform 0.2s';
+    knob.style.transform = `translate(-50%, -50%)`;
+    // Double tap dash logic for joystick area
+    checkDashClick();
+}
+
+// --- PLATFORM INTEGRATION ---
+
+function handlePlatformMessages(event) {
+    const data = event.data;
+    if (!data || !data.type) return;
+
+    if (data.type === "loadResponse" && data.gameId === GAME_ID) {
+        if (data.data) {
+            // Merge loaded data with defaults
+            saveData = { ...saveData, ...data.data };
+            // Ensure nested objects exist
+            if(!saveData.upgrades) saveData.upgrades = { warning: false, dash: false };
+            if(!saveData.unlockedSkins) saveData.unlockedSkins = ['neon'];
+            if(!saveData.unlockedThemes) saveData.unlockedThemes = ['synthwave'];
+            
+            document.getElementById('highScoreUI').innerText = saveData.highScore;
+            applyTheme();
+        }
+    }
+
+    if (data.type === "spendResponse") {
+        const pending = pendingPurchases[data.msgId];
+        if (pending) {
+            if (data.success) {
+                unlockItem(pending.itemId, pending.type);
+                showToast("Purchase Successful!", "success");
+            } else {
+                showToast("Not enough SimgaBucks", "danger");
+            }
+            delete pendingPurchases[data.msgId];
+            buildShop(); // Refresh UI
+        }
+    }
+}
+
+function awardSimgaBucks(amount, reason) {
+    window.parent.postMessage({ type: "addSimgaBucks", amount: amount }, "*");
+    showToast(`+${amount} SimgaBucks! (${reason})`, "success");
+    sessionEarned += amount;
+}
+
+function requestPurchase(itemId, type, cost) {
+    const msgId = "buy_" + Math.random().toString(36).substr(2, 9);
+    pendingPurchases[msgId] = { itemId, type, cost };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+    
+    // Disable buttons temporarily
+    const btns = document.querySelectorAll('.buy-btn');
+    btns.forEach(b => b.disabled = true);
+}
+
+function syncSave() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+// --- GAMEPLAY LOGIC ---
+
+function startGame() {
+    document.querySelectorAll('.ui-layer').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.ui-layer').forEach(el => el.classList.add('hidden'));
+    
+    document.getElementById('dash-ui').style.display = saveData.upgrades.dash ? 'flex' : 'none';
+    
+    // Reset State
+    state = 'PLAYING';
+    player.x = width / 2;
+    player.y = height / 2;
+    player.vx = 0; player.vy = 0;
+    player.dashReady = true; player.dashTimer = 0; player.isDashing = false;
+    mines = []; particles = []; collectibles = []; scorchMarks = [];
+    score = 0; timeSurvived = 0; gameTime = 0;
+    difficultyMultiplier = 1;
+    sessionEarned = 0;
+    nextRewardThreshold = 20; // First survival reward at 20s
+    
+    // Force first collectible early for fast reward (5 seconds in)
+    setTimeout(spawnCollectible, 5000);
+    
+    applyTheme();
+}
+
+function gameOver() {
+    state = 'GAMEOVER';
+    createExplosion(player.x, player.y, 100, document.documentElement.style.getPropertyValue('--primary'));
+    shakeScreen(0.5, 20);
+    
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+    document.getElementById('gameOverScreen').classList.add('active');
+    
+    document.getElementById('finalScore').innerText = score;
+    document.getElementById('finalTime').innerText = timeSurvived.toFixed(1);
+    
+    if (score > saveData.highScore) {
+        saveData.highScore = score;
+        document.getElementById('newHighScoreMsg').style.display = 'block';
+        document.getElementById('highScoreUI').innerText = score;
+    } else {
+        document.getElementById('newHighScoreMsg').style.display = 'none';
+    }
+    
+    // Reward for completing a nice run (medium reward)
+    if (timeSurvived >= 30) {
+        awardSimgaBucks(2, "Wave Cleared");
+    }
+    
+    syncSave();
+}
+
+function attemptDash() {
+    if (!saveData.upgrades.dash || !player.dashReady || state !== 'PLAYING') return;
+    
+    player.isDashing = true;
+    player.dashReady = false;
+    player.dashTimer = player.dashCooldown;
+    
+    // Determine dash direction
+    let dx = player.vx;
+    let dy = player.vy;
+    let speed = Math.sqrt(dx*dx + dy*dy);
+    
+    if (speed < 10) {
+        // Dash facing direction if not moving
+        dx = 1; dy = 0; speed = 1;
+    }
+    
+    // Apply massive burst
+    const dashForce = 1500;
+    player.vx = (dx / speed) * dashForce;
+    player.vy = (dy / speed) * dashForce;
+    
+    // Trail effect
+    for(let i=0; i<10; i++) {
+        setTimeout(() => {
+            if(state==='PLAYING') createTrail(player.x, player.y);
+        }, i*20);
+    }
+    
+    shakeScreen(0.1, 5);
+}
+
+// --- UPDATE LOOP ---
+
+function update(dt) {
+    if (state !== 'PLAYING') {
+        updateParticles(dt);
+        return;
+    }
+    
+    gameTime += dt;
+    timeSurvived += dt;
+    difficultyMultiplier = 1 + (timeSurvived / 60); // Increases over time
+    
+    // Update Score & HUD
+    score = Math.floor(timeSurvived * 10);
+    document.getElementById('scoreUI').innerText = score;
+    document.getElementById('timeUI').innerText = timeSurvived.toFixed(1);
+    
+    // --- Reward Logic ---
+    if (timeSurvived >= nextRewardThreshold) {
+        awardSimgaBucks(2, "Survival Bonus");
+        nextRewardThreshold += 20; // Every 20 seconds
+    }
+    
+    // --- Player Movement ---
+    let moveX = 0, moveY = 0;
+    if (keys.w || keys.ArrowUp) moveY -= 1;
+    if (keys.s || keys.ArrowDown) moveY += 1;
+    if (keys.a || keys.ArrowLeft) moveX -= 1;
+    if (keys.d || keys.ArrowRight) moveX += 1;
+    
+    if (joystick.active) {
+        moveX = joystick.dx;
+        moveY = joystick.dy;
+    } else if (mouse.isDown && moveX === 0 && moveY === 0) {
+        // Mouse follow if no keys
+        let dx = mouse.x - player.x;
+        let dy = mouse.y - player.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 10) {
+            moveX = dx / dist;
+            moveY = dy / dist;
+        }
+    }
+    
+    // Dash check
+    if (keys[" "] && !player.isDashing && player.dashReady) {
+        attemptDash();
+    }
+    
+    if (player.isDashing) {
+        player.dashTimer -= dt;
+        // i-frames last for dashDuration
+        if (player.dashCooldown - player.dashTimer >= player.dashDuration) {
+            player.isDashing = false;
+        }
+    } else {
+        // Normal movement
+        if (player.dashTimer > 0) {
+            player.dashTimer -= dt;
+            if (player.dashTimer <= 0) {
+                player.dashReady = true;
+                player.dashTimer = 0;
+            }
+        }
+        
+        // Normalize
+        let length = Math.sqrt(moveX*moveX + moveY*moveY);
+        if (length > 0) {
+            moveX /= length;
+            moveY /= length;
+        }
+        
+        player.vx += moveX * player.speed * dt;
+        player.vy += moveY * player.speed * dt;
+    }
+    
+    player.vx *= player.friction;
+    player.vy *= player.friction;
+    
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    
+    // Bounds
+    const margin = 20;
+    if (player.x < margin) { player.x = margin; player.vx *= -0.5; }
+    if (player.x > width - margin) { player.x = width - margin; player.vx *= -0.5; }
+    if (player.y < margin) { player.y = margin; player.vy *= -0.5; }
+    if (player.y > height - margin) { player.y = height - margin; player.vy *= -0.5; }
+
+    // Update Dash UI
+    if (saveData.upgrades.dash) {
+        const dashBar = document.getElementById('dash-bar');
+        if (player.dashReady) {
+            dashBar.style.width = '100%';
+            dashBar.style.background = '#0ff';
+        } else {
+            let pct = 100 - (player.dashTimer / player.dashCooldown * 100);
+            dashBar.style.width = pct + '%';
+            dashBar.style.background = '#555';
+        }
+    }
+
+    // --- Spawning Logic ---
+    // Spawn Mines
+    let spawnRate = Math.max(0.15, 0.9 - (timeSurvived * 0.015)); // gets faster, harder cap
+    if (Math.random() < dt / spawnRate) {
+        let cluster = Math.floor(Math.random() * difficultyMultiplier) + 1;
+        
+        let baseX, baseY;
+        
+        // 75% chance to target a location near the player
+        if (Math.random() < 0.75) {
+            let angle = Math.random() * Math.PI * 2;
+            let dist = 50 + Math.random() * 250; // Spawns 50 to 300px away
+            baseX = player.x + Math.cos(angle) * dist;
+            baseY = player.y + Math.sin(angle) * dist;
+        } else {
+            // 25% chance for a completely random spawn
+            baseX = Math.random() * width;
+            baseY = Math.random() * height;
+        }
+
+        // Keep inside bounds
+        baseX = Math.max(50, Math.min(width - 50, baseX));
+        baseY = Math.max(50, Math.min(height - 50, baseY));
+
+        for(let i=0; i<cluster; i++) {
+            let offset = cluster > 1 ? (Math.random() * 100 - 50) : 0;
+            spawnMine(baseX + offset, baseY + offset);
+        }
+    }
+    
+    // Spawn Collectibles
+    if (Math.random() < dt / 8.0) { // roughly every 8 seconds
+        spawnCollectible();
+    }
+
+    // --- Entities Update ---
+    updateMines(dt);
+    updateCollectibles(dt);
+    updateParticles(dt);
+    
+    if (shakeTimer > 0) shakeTimer -= dt;
+}
+
+function spawnMine(x, y) {
+    let baseWarning = saveData.upgrades.warning ? 2.0 : 1.5;
+    // slightly randomize warning
+    let warningTime = baseWarning + (Math.random() * 0.5);
+    
+    // Add new explosion types over time
+    let types = ['standard'];
+    if (timeSurvived > 10) types.push('laser');
+    if (timeSurvived > 20) types.push('tracker', 'tracker'); // Higher chance for trackers late game
+    
+    let type = types[Math.floor(Math.random() * types.length)];
+    
+    mines.push({
+        x: x, y: y,
+        state: 'WARNING', // WARNING -> EXPLODING -> DONE
+        timer: warningTime,
+        maxTimer: warningTime,
+        radius: 60 + (Math.random() * 30),
+        expTimer: type === 'laser' ? 0.4 : 0.3, // lasers last slightly longer
+        type: type
+    });
+}
+
+function spawnCollectible() {
+    collectibles.push({
+        x: Math.random() * (width - 100) + 50,
+        y: Math.random() * (height - 100) + 50,
+        life: 10, // disappears after 10s
+        bobOffset: Math.random() * Math.PI * 2
+    });
+}
+
+function updateMines(dt) {
+    for (let i = mines.length - 1; i >= 0; i--) {
+        let m = mines[i];
+        
+        if (m.state === 'WARNING') {
+            m.timer -= dt;
+            
+            // Tracker mines creep toward the player
+            if (m.type === 'tracker') {
+                let dx = player.x - m.x;
+                let dy = player.y - m.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 0) {
+                    let speed = 45; // pixels per second
+                    m.x += (dx/dist) * speed * dt;
+                    m.y += (dy/dist) * speed * dt;
+                }
+            }
+            
+            if (m.timer <= 0) {
+                m.state = 'EXPLODING';
+                let color = 'var(--danger)';
+                if (m.type === 'tracker') color = '#cc00ff';
+                if (m.type === 'laser') color = '#ffcc00';
+                
+                createExplosion(m.x, m.y, m.radius, color);
+                shakeScreen(m.type === 'laser' ? 0.3 : 0.2, m.radius / 10);
+            }
+        } else if (m.state === 'EXPLODING') {
+            m.expTimer -= dt;
+            
+            // Collision check
+            if (!player.isDashing) {
+                if (m.type === 'standard' || m.type === 'tracker') {
+                    let dist = Math.sqrt((player.x - m.x)**2 + (player.y - m.y)**2);
+                    if (dist < m.radius + player.size) {
+                        gameOver();
+                    }
+                } else if (m.type === 'laser') {
+                    let beamWidth = 40; // 20px on each side of the center line
+                    let hitX = Math.abs(player.x - m.x) < (beamWidth/2 + player.size);
+                    let hitY = Math.abs(player.y - m.y) < (beamWidth/2 + player.size);
+                    if (hitX || hitY) {
+                        gameOver();
+                    }
+                }
+            }
+            
+            if (m.expTimer <= 0) {
+                m.state = 'DONE';
+                if (m.type !== 'laser') {
+                    scorchMarks.push({x: m.x, y: m.y, radius: m.radius, life: 5.0, maxLife: 5.0});
+                }
+            }
+        }
+    }
+    mines = mines.filter(m => m.state !== 'DONE');
+    
+    // Scorch marks fade
+    for(let i=scorchMarks.length-1; i>=0; i--) {
+        scorchMarks[i].life -= dt;
+        if(scorchMarks[i].life <= 0) scorchMarks.splice(i, 1);
+    }
+}
+
+function updateCollectibles(dt) {
+    for (let i = collectibles.length - 1; i >= 0; i--) {
+        let c = collectibles[i];
+        c.life -= dt;
+        c.bobOffset += dt * 3;
+        
+        let dist = Math.sqrt((player.x - c.x)**2 + (player.y - c.y)**2);
+        if (dist < player.size + 15) {
+            // Picked up
+            awardSimgaBucks(1, "Data Core");
+            score += 50;
+            createExplosion(c.x, c.y, 30, 'var(--success)');
+            collectibles.splice(i, 1);
+            continue;
+        }
+        
+        if (c.life <= 0) collectibles.splice(i, 1);
+    }
+}
+
+// --- PARTICLES ---
+
+function createExplosion(x, y, radius, colorStr) {
+    let count = radius / 2;
+    for(let i=0; i<count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * (radius * 4);
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.5 + Math.random() * 0.5,
+            maxLife: 1.0,
+            size: 2 + Math.random() * 4,
+            color: colorStr || '#fff'
+        });
+    }
+}
+
+function createTrail(x, y) {
+    particles.push({
+        x: x, y: y, vx: 0, vy: 0,
+        life: 0.3, maxLife: 0.3,
+        size: player.size,
+        color: document.documentElement.style.getPropertyValue('--primary'),
+        isTrail: true
+    });
+}
+
+function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        } else {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.9; p.vy *= 0.9; // friction
+        }
+    }
+}
+
+function shakeScreen(duration, intensity) {
+    shakeTimer = duration;
+    shakeIntensity = intensity;
+}
+
+// --- RENDERING ---
+
+function draw() {
+    // Fill bg
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-color');
+    ctx.fillRect(0, 0, width, height);
+    
+    ctx.save();
+    
+    // Apply Shake
+    if (shakeTimer > 0) {
+        let dx = (Math.random() - 0.5) * shakeIntensity;
+        let dy = (Math.random() - 0.5) * shakeIntensity;
+        ctx.translate(dx, dy);
+    }
+    
+    drawGrid();
+    
+    // Draw Scorch marks
+    scorchMarks.forEach(s => {
+        let alpha = (s.life / s.maxLife) * 0.3;
+        ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI*2);
+        ctx.fill();
+    });
+    
+    drawCollectibles();
+    drawMines();
+    
+    // Draw trail particles under player
+    particles.forEach(p => {
+        if(p.isTrail) {
+            let alpha = p.life / p.maxLife;
+            ctx.globalAlpha = alpha * 0.5;
+            drawPlayerShape(p.x, p.y, p.size, p.color);
+        }
+    });
+    ctx.globalAlpha = 1.0;
+    
+    if (state === 'PLAYING') drawPlayer();
+    
+    drawParticles();
+    
+    ctx.restore();
+}
+
+function drawGrid() {
+    let gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid-color') || 'rgba(0, 255, 255, 0.1)';
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    
+    let gridSize = 50;
+    // Parallax offset
+    let offsetX = (player.x * -0.1) % gridSize;
+    let offsetY = (player.y * -0.1) % gridSize;
+    
+    ctx.beginPath();
+    for (let x = offsetX; x < width; x += gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+    }
+    for (let y = offsetY; y < height; y += gridSize) {
+        ctx.moveTo(0, y); ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+}
+
+function drawPlayer() {
+    let color = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+    
+    // Different skins
+    if (saveData.currentSkin === 'plasma') color = '#ff8800';
+    if (saveData.currentSkin === 'quantum') color = '#cc00ff';
+    
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = color;
+    
+    if (player.isDashing) {
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#fff';
+    }
+    
+    drawPlayerShape(player.x, player.y, player.size, color);
+    ctx.shadowBlur = 0;
+}
+
+function drawPlayerShape(x, y, size, color) {
+    ctx.fillStyle = color;
+    
+    // Base rotation on velocity, or face up if stationary
+    let angle = 0;
+    let speed = Math.sqrt(player.vx*player.vx + player.vy*player.vy);
+    if (speed > 10) {
+        angle = Math.atan2(player.vy, player.vx);
+    } else {
+        angle = -Math.PI/2; // Up
+    }
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    
+    if (saveData.currentSkin === 'quantum') {
+        // Star / Quantum shape
+        ctx.beginPath();
+        for(let i=0; i<8; i++) {
+            let r = i%2===0 ? size*1.5 : size*0.7;
+            let a = (i * Math.PI) / 4;
+            if(i===0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+            else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    } else if (saveData.currentSkin === 'plasma') {
+        // Circle core
+        ctx.beginPath();
+        ctx.arc(0, 0, size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2, 0, Math.PI*2);
+        ctx.fill();
+    } else {
+        // Neon Triangle (Default)
+        ctx.beginPath();
+        ctx.moveTo(size * 1.5, 0);
+        ctx.lineTo(-size, size);
+        ctx.lineTo(-size * 0.5, 0);
+        ctx.lineTo(-size, -size);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+function drawMines() {
+    mines.forEach(m => {
+        if (m.state === 'WARNING') {
+            let pct = m.timer / m.maxTimer; // 1.0 to 0.0
+            
+            let color = '255, 0, 60'; // Red
+            if (m.type === 'tracker') color = '200, 0, 255'; // Purple
+            if (m.type === 'laser') color = '255, 200, 0';   // Yellow
+            
+            ctx.strokeStyle = `rgba(${color}, 0.8)`;
+            ctx.lineWidth = 2;
+            
+            // Outer shrinking circle
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.radius + (pct * 50), 0, Math.PI*2);
+            ctx.stroke();
+            
+            // Inner target area
+            ctx.fillStyle = `rgba(${color}, ${0.1 + (1-pct)*0.3})`;
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.radius, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Crosshair
+            ctx.beginPath();
+            let size = 10;
+            ctx.moveTo(m.x - size, m.y); ctx.lineTo(m.x + size, m.y);
+            ctx.moveTo(m.x, m.y - size); ctx.lineTo(m.x, m.y + size);
+            ctx.stroke();
+            
+            // Draw faint laser warning lines
+            if (m.type === 'laser') {
+                ctx.strokeStyle = `rgba(${color}, ${0.1 + (1-pct)*0.3})`;
+                ctx.beginPath();
+                ctx.moveTo(0, m.y); ctx.lineTo(width, m.y);
+                ctx.moveTo(m.x, 0); ctx.lineTo(m.x, height);
+                ctx.stroke();
+            }
+            
+        } else if (m.state === 'EXPLODING') {
+            let pct = m.expTimer / (m.type === 'laser' ? 0.4 : 0.3); // 1.0 to 0.0
+            
+            if (m.type === 'standard' || m.type === 'tracker') {
+                let r = m.type === 'tracker' ? 200 : 255;
+                let g = m.type === 'tracker' ? 0 : 100;
+                let b = m.type === 'tracker' ? 255 : 0;
+                
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${pct})`;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = `rgb(${r}, 0, ${b})`;
+                ctx.beginPath();
+                // Expanding blast
+                ctx.arc(m.x, m.y, m.radius * (1 + (1-pct)*0.2), 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Bright core
+                ctx.fillStyle = `rgba(255, 255, 255, ${pct})`;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.radius * 0.5, 0, Math.PI*2);
+                ctx.fill();
+            } else if (m.type === 'laser') {
+                let beamWidth = 40 * (1 + (1-pct)*0.2);
+                
+                ctx.fillStyle = `rgba(255, 200, 0, ${pct})`;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffaa00';
+                
+                // Horizontal and Vertical Beams
+                ctx.fillRect(0, m.y - beamWidth/2, width, beamWidth);
+                ctx.fillRect(m.x - beamWidth/2, 0, beamWidth, height);
+                ctx.shadowBlur = 0;
+                
+                // Bright core lines
+                ctx.fillStyle = `rgba(255, 255, 255, ${pct})`;
+                ctx.fillRect(0, m.y - beamWidth/4, width, beamWidth/2);
+                ctx.fillRect(m.x - beamWidth/4, 0, beamWidth/2, height);
+            }
+        }
+    });
+}
+
+function drawCollectibles() {
+    collectibles.forEach(c => {
+        let bobY = Math.sin(c.bobOffset) * 5;
+        let color = getComputedStyle(document.documentElement).getPropertyValue('--success');
+        
+        ctx.shadowBlur = 10 + Math.sin(c.bobOffset)*5;
+        ctx.shadowColor = color;
+        ctx.fillStyle = color;
+        
+        // Draw Diamond
+        ctx.save();
+        ctx.translate(c.x, c.y + bobY);
+        ctx.beginPath();
+        let size = 8;
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size, 0);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Blink if decaying
+        if (c.life < 3) {
+            if (Math.floor(c.life * 10) % 2 === 0) {
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+            }
+        }
+        
+        ctx.restore();
+        ctx.shadowBlur = 0;
+    });
+}
+
+function drawParticles() {
+    particles.forEach(p => {
+        if(p.isTrail) return; // Drawn separately
+        
+        let alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+        
+        // Use string replacement or fallback for color handling
+        let color = p.color;
+        if(color.startsWith('var')) {
+            // resolve var
+            let varName = color.match(/var\(([^)]+)\)/)[1];
+            color = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        }
+        
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+// --- MAIN LOOP ---
+
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    
+    // Cap dt to avoid huge jumps if tab is inactive
+    if (dt > 0.1) dt = 0.1;
+    
+    update(dt);
+    draw();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// --- UI & SHOP ---
+
+function showMenu() {
+    state = 'MENU';
+    document.querySelectorAll('.ui-layer').forEach(el => el.classList.remove('active', 'hidden'));
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('shopScreen').classList.add('hidden');
+    document.getElementById('menuScreen').classList.add('active');
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('dash-ui').style.display = 'none';
+    document.getElementById('joystick-area').style.display = 'none';
+    
+    applyTheme();
+}
+
+function showShop() {
+    document.getElementById('menuScreen').classList.remove('active');
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('shopScreen').classList.remove('hidden');
+    document.getElementById('shopScreen').classList.add('active');
+    buildShop();
+}
+
+function buildShop() {
+    const container = document.getElementById('shopContainer');
+    container.innerHTML = '';
+    
+    SHOP_ITEMS.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        
+        let isUnlocked = false;
+        let isEquipped = false;
+        
+        if (item.type === 'skin') {
+            const skinId = item.id.replace('skin_', '');
+            isUnlocked = saveData.unlockedSkins.includes(skinId);
+            isEquipped = saveData.currentSkin === skinId;
+        } else if (item.type === 'theme') {
+            const themeId = item.id.replace('theme_', '');
+            isUnlocked = saveData.unlockedThemes.includes(themeId);
+            isEquipped = saveData.currentTheme === themeId;
+        } else if (item.type === 'upgrade') {
+            const upgId = item.id.replace('upgrade_', '');
+            isUnlocked = saveData.upgrades[upgId] === true;
+            isEquipped = isUnlocked; // Upgrades are always active once bought
+        }
+        
+        let btnHtml = '';
+        if (isEquipped && item.type !== 'upgrade') {
+            btnHtml = `<button class="btn buy-btn" disabled>Equipped</button>`;
+        } else if (isUnlocked && item.type !== 'upgrade') {
+            btnHtml = `<button class="btn buy-btn" onclick="equipItem('${item.id}', '${item.type}')">Equip</button>`;
+        } else if (isUnlocked && item.type === 'upgrade') {
+            btnHtml = `<button class="btn buy-btn" disabled style="color:var(--success)">Acquired</button>`;
+        } else {
+            btnHtml = `<button class="btn buy-btn" onclick="requestPurchase('${item.id}', '${item.type}', ${item.cost})">Buy - ${item.cost} SB</button>`;
+        }
+        
+        div.innerHTML = `
+            <div>
+                <div class="item-name">${item.name}</div>
+                <div class="item-desc">${item.desc}</div>
+                ${!isUnlocked ? `<div class="item-cost">${item.cost} SimgaBucks</div>` : ''}
+            </div>
+            ${btnHtml}
+        `;
+        container.appendChild(div);
+    });
+}
+
+function unlockItem(id, type) {
+    if (type === 'skin') {
+        const skinId = id.replace('skin_', '');
+        if(!saveData.unlockedSkins.includes(skinId)) saveData.unlockedSkins.push(skinId);
+        saveData.currentSkin = skinId;
+    } else if (type === 'theme') {
+        const themeId = id.replace('theme_', '');
+        if(!saveData.unlockedThemes.includes(themeId)) saveData.unlockedThemes.push(themeId);
+        saveData.currentTheme = themeId;
+    } else if (type === 'upgrade') {
+        const upgId = id.replace('upgrade_', '');
+        saveData.upgrades[upgId] = true;
+    }
+    syncSave();
+    applyTheme();
+}
+
+function equipItem(id, type) {
+    if (type === 'skin') {
+        saveData.currentSkin = id.replace('skin_', '');
+    } else if (type === 'theme') {
+        saveData.currentTheme = id.replace('theme_', '');
+    }
+    syncSave();
+    applyTheme();
+    buildShop();
+}
+
+function applyTheme() {
+    const t = THEMES[saveData.currentTheme] || THEMES['synthwave'];
+    const root = document.documentElement;
+    root.style.setProperty('--bg-color', t.bg);
+    root.style.setProperty('--grid-color', t.grid);
+    root.style.setProperty('--primary', t.primary);
+}
+
+function showToast(msg, type='success') {
+    const area = document.getElementById('notification-area');
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerText = msg;
+    if(type === 'danger') {
+        t.style.borderLeftColor = 'var(--danger)';
+        t.style.boxShadow = '0 0 10px rgba(255, 0, 60, 0.2)';
+        t.style.color = '#ff6b81';
+        t.style.textShadow = '0 0 5px var(--danger)';
+    }
+    area.appendChild(t);
+    setTimeout(() => { if(t.parentNode) t.remove(); }, 3000);
+}
+
+// Start immediately
+window.onload = init;
+
+</script>
+</body>
+</html>

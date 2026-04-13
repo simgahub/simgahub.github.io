@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magnet Runner</title>
+    <style>
+        :root {
+            --primary: #0ff;
+            --secondary: #f0f;
+            --dark: #050510;
+            --panel: rgba(10, 10, 25, 0.85);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--dark);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Screen Overlays */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .title {
+            font-size: 4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(45deg, rgba(0,255,255,0.2), rgba(255,0,255,0.2));
+            border: 2px solid var(--primary);
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            background: linear-gradient(45deg, rgba(0,255,255,0.4), rgba(255,0,255,0.4));
+            box-shadow: 0 0 25px var(--primary);
+        }
+
+        .btn.secondary {
+            border-color: var(--secondary);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+        }
+        
+        .btn.secondary:hover {
+            box-shadow: 0 0 25px var(--secondary);
+        }
+
+        /* Shop UI */
+        .shop-container {
+            background: var(--panel);
+            border: 2px solid var(--secondary);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.2);
+            position: relative;
+        }
+
+        .shop-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shop-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--secondary);
+            text-shadow: 0 0 10px var(--secondary);
+        }
+
+        .shop-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .shop-close:hover {
+            transform: scale(1.2) rotate(90deg);
+            color: var(--secondary);
+        }
+
+        .shop-tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            background: rgba(0,0,0,0.3);
+            transition: background 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tab.active {
+            background: rgba(255, 0, 255, 0.2);
+            border-bottom: 3px solid var(--secondary);
+        }
+
+        .shop-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            align-content: start;
+        }
+
+        /* Custom Scrollbar */
+        .shop-content::-webkit-scrollbar { width: 8px; }
+        .shop-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        .shop-content::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .shop-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+            border-color: var(--primary);
+        }
+
+        .item-name { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; color: var(--primary); }
+        .item-desc { font-size: 0.9rem; color: #aaa; margin-bottom: 15px; flex-grow: 1; }
+        
+        .buy-btn {
+            background: linear-gradient(45deg, #00b09b, #96c93d);
+            border: none;
+            padding: 10px 20px;
+            color: white;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .buy-btn:hover { opacity: 0.9; }
+        .buy-btn:disabled { background: #555; cursor: not-allowed; color: #888; }
+        
+        .equip-btn { background: var(--primary); border: none; padding: 10px 20px; color: black; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; }
+        .equip-btn.equipped { background: #555; color: white; cursor: default; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 0 0 10px #000;
+        }
+
+        .hud-stat {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .score-text { color: var(--primary); text-shadow: 0 0 10px var(--primary); }
+        .coin-text { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+
+        /* Toasts */
+        #toastContainer {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.8);
+            border-left: 4px solid var(--secondary);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            animation: slideDown 0.3s ease-out, fadeOut 0.5s ease-in 2.5s forwards;
+            backdrop-filter: blur(4px);
+        }
+
+        .toast.success { border-color: #0f0; text-shadow: 0 0 5px #0f0; }
+
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* Scanlines for arcade effect */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <div id="hud" style="display: none;">
+        <div class="hud-stat score-text">DIST: <span id="uiScore">0</span></div>
+        <div class="hud-stat coin-text">🪙 <span id="uiCoins">0</span></div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <!-- Main Menu -->
+    <div id="menuScreen" class="screen active">
+        <div class="title">Magnet Runner</div>
+        <button class="btn" onclick="startGame()">Start Run</button>
+        <button class="btn secondary" onclick="openShop()">Shop / Upgrades</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="screen">
+        <div class="title" style="color: #ff3366; text-shadow: 0 0 20px #ff3366;">SYSTEM FAILURE</div>
+        <div style="font-size: 1.5rem; margin-bottom: 10px;">Distance: <span id="goScore" style="color: var(--primary);">0</span></div>
+        <div style="font-size: 1.5rem; margin-bottom: 30px;">Coins Collected: <span id="goCoins" style="color: #ffd700;">0</span></div>
+        <button class="btn" onclick="startGame()">Play Again</button>
+        <button class="btn secondary" onclick="showMenu()">Main Menu</button>
+    </div>
+
+    <!-- Shop Screen -->
+    <div id="shopScreen" class="screen">
+        <div class="shop-container">
+            <div class="shop-header">
+                <div class="shop-title">UPGRADE TERMINAL</div>
+                <button class="shop-close" onclick="closeShop()">×</button>
+            </div>
+            <div class="shop-tabs">
+                <div class="tab active" onclick="switchShopTab('upgrades')" id="tab-upgrades">Upgrades</div>
+                <div class="tab" onclick="switchShopTab('skins')" id="tab-skins">Skins</div>
+                <div class="tab" onclick="switchShopTab('trails')" id="tab-trails">Trails</div>
+            </div>
+            <div class="shop-content" id="shopContent">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+/**
+ * MAGNET RUNNER
+ * A highly polished, lightweight HTML5 Canvas game.
+ */
+
+const GAME_ID = "magnet";
+
+// --- Game State & Save Data ---
+let saveData = {
+    highScore: 0,
+    magnetLevel: 0, // max 3
+    doubleCoinLevel: 0, // max 3
+    skinsUnlocked: ["cyan"],
+    currentSkin: "cyan",
+    trailsUnlocked: ["blue"],
+    currentTrail: "blue"
+};
+
+// --- Shop Data Configuration ---
+const SHOP_ITEMS = {
+    upgrades: [
+        { id: "mag1", type: "magnetLevel", level: 1, name: "Magnet Lvl 1", desc: "Slightly pulls nearby coins.", cost: 15 },
+        { id: "mag2", type: "magnetLevel", level: 2, name: "Magnet Lvl 2", desc: "Stronger, wider coin pull.", cost: 35 },
+        { id: "mag3", type: "magnetLevel", level: 3, name: "Magnet Lvl 3", desc: "Massive magnetic field.", cost: 70 },
+        { id: "dc1", type: "doubleCoinLevel", level: 1, name: "Luck Lvl 1", desc: "10% chance for Double Coins.", cost: 20 },
+        { id: "dc2", type: "doubleCoinLevel", level: 2, name: "Luck Lvl 2", desc: "25% chance for Double Coins.", cost: 45 },
+        { id: "dc3", type: "doubleCoinLevel", level: 3, name: "Luck Lvl 3", desc: "50% chance for Double Coins.", cost: 90 }
+    ],
+    skins: [
+        { id: "cyan", type: "skin", name: "Cyan Glider", desc: "Default sleek ship.", cost: 0, color: "#00ffff", shape: "chevron" },
+        { id: "neon", type: "skin", name: "Neon Striker", desc: "Aggressive pink geometry.", cost: 25, color: "#ff00ff", shape: "sharp" },
+        { id: "plasma", type: "skin", name: "Plasma Orb", desc: "Pulsing energy core.", cost: 60, color: "#00ffaa", shape: "orb" },
+        { id: "void", type: "skin", name: "Void Star", desc: "Dark matter anomaly.", cost: 120, color: "#ffaa00", shape: "star" }
+    ],
+    trails: [
+        { id: "blue", type: "trail", name: "Ion Thruster", desc: "Standard blue exhaust.", cost: 0, colors: ["#00ffff", "#0055ff"] },
+        { id: "fire", type: "trail", name: "Afterburner", desc: "Fiery orange/red trail.", cost: 30, colors: ["#ffaa00", "#ff0000"] },
+        { id: "matrix", type: "trail", name: "Data Stream", desc: "Digital green artifacts.", cost: 60, colors: ["#00ff00", "#005500"] },
+        { id: "rainbow", type: "trail", name: "Prism Core", desc: "Cycles through all colors.", cost: 150, colors: ["rainbow"] }
+    ]
+};
+
+// Map to track pending purchases
+const pendingPurchases = {};
+
+// --- Game Variables (Hoisted to avoid ReferenceErrors) ---
+let width, height;
+let gameState = "menu"; // menu, playing, gameover
+let lastTime = 0;
+let runTime = 0;
+let gameSpeed = 300;
+let distance = 0;
+let coinsCollected = 0;
+let coinsSinceLastReward = 0; // Tracks when to give SimgaBucks
+let backgroundOffset = 0;
+let shakeTime = 0;
+let player = null; // Instantiated later
+let entities = [];
+let particles = [];
+let floatingTexts = [];
+let spawnTimer = 0;
+let hazardSpawnTimer = 0;
+let nextSBRewardTime = 25; // First time reward at 25 seconds
+let currentShopTab = "upgrades";
+
+// --- Audio Synthesizer (Web Audio API) ---
+let audioCtx;
+const initAudio = () => {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+};
+
+const playSound = (type) => {
+    if (!audioCtx) return;
+    try {
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'coin') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, t);
+            osc.frequency.exponentialRampToValueAtTime(1600, t + 0.1);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            osc.start(t);
+            osc.stop(t + 0.1);
+        } else if (type === 'death') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(10, t + 0.5);
+            gain.gain.setValueAtTime(0.3, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+            osc.start(t);
+            osc.stop(t + 0.5);
+        } else if (type === 'buy') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, t);
+            osc.frequency.setValueAtTime(554, t + 0.1); // C#
+            osc.frequency.setValueAtTime(659, t + 0.2); // E
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.4);
+            osc.start(t);
+            osc.stop(t + 0.4);
+        } else if (type === 'click') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(300, t);
+            gain.gain.setValueAtTime(0.05, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            osc.start(t);
+            osc.stop(t + 0.05);
+        }
+    } catch(e) {} // Catch context state errors silently
+};
+
+
+// --- Engine & Canvas Setup ---
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    
+    // Ensure player repositioning if window resizes
+    if (player) {
+        player.y = height - 150;
+        if (player.x > width - 30) player.x = width - 30; // Keep in bounds horizontally
+    }
+}
+window.addEventListener("resize", resize);
+resize();
+
+// --- Input Handling ---
+const keys = {};
+let pointerDown = false;
+let pointerX = width / 2;
+
+window.addEventListener("keydown", (e) => keys[e.code] = true);
+window.addEventListener("keyup", (e) => keys[e.code] = false);
+
+canvas.addEventListener("mousedown", (e) => { pointerDown = true; pointerX = e.clientX; initAudio(); });
+canvas.addEventListener("mousemove", (e) => { if (pointerDown) pointerX = e.clientX; });
+canvas.addEventListener("mouseup", () => pointerDown = false);
+canvas.addEventListener("touchstart", (e) => { pointerDown = true; pointerX = e.touches[0].clientX; initAudio(); }, {passive: false});
+canvas.addEventListener("touchmove", (e) => { pointerDown = true; pointerX = e.touches[0].clientX; }, {passive: false});
+canvas.addEventListener("touchend", () => pointerDown = false);
+
+
+// --- Communication Helpers ---
+function showToast(msg, type="normal") {
+    const container = document.getElementById("toastContainer");
+    const el = document.createElement("div");
+    el.className = `toast ${type}`;
+    el.innerText = msg;
+    container.appendChild(el);
+    setTimeout(() => {
+        if(container.contains(el)) container.removeChild(el);
+    }, 3000);
+}
+
+function saveGame() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function loadGame() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Create a temporary listener for this specific load
+    const loadHandler = (event) => {
+        const data = event.data;
+        if (data.type === "loadResponse" && data.msgId === loadMsgId) {
+            if (data.data) {
+                // Merge loaded data with defaults to prevent missing keys
+                saveData = { ...saveData, ...data.data };
+                console.log("Save loaded!");
+            }
+            window.removeEventListener("message", loadHandler);
+        }
+    };
+    window.addEventListener("message", loadHandler);
+}
+
+function requestPurchase(cost, onSuccessCallback) {
+    playSound('click');
+    const msgId = Math.random().toString(36);
+    pendingPurchases[msgId] = onSuccessCallback;
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+function giveSimgaBucks(amount, reason = "") {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks! ${reason}`, "success");
+}
+
+// Global Message Listener for Platform responses
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (data.type === "spendResponse") {
+        if (data.success && pendingPurchases[data.msgId]) {
+            playSound('buy');
+            pendingPurchases[data.msgId](); // execute unlock logic
+            saveGame();
+            renderShopContent(); // refresh UI
+            showToast("Purchase Successful!", "success");
+        } else if (!data.success) {
+            alert("Not enough SimgaBucks!");
+        }
+        delete pendingPurchases[data.msgId];
+    }
+});
+
+
+// --- Game Classes ---
+
+class Player {
+    constructor() {
+        this.x = width / 2;
+        this.y = height - 150;
+        this.vx = 0;
+        this.radius = 15;
+        this.color = "#00ffff";
+        this.shape = "chevron";
+        this.updateAppearance();
+    }
+
+    updateAppearance() {
+        const skinData = SHOP_ITEMS.skins.find(s => s.id === saveData.currentSkin);
+        if (skinData) {
+            this.color = skinData.color;
+            this.shape = skinData.shape;
+        }
+    }
+
+    update(dt) {
+        // Movement Input
+        let targetVx = 0;
+        const speedMultiplier = 600;
+
+        if (keys["ArrowLeft"] || keys["KeyA"]) targetVx = -speedMultiplier;
+        if (keys["ArrowRight"] || keys["KeyD"]) targetVx = speedMultiplier;
+        
+        if (pointerDown) {
+            const diff = pointerX - this.x;
+            if (Math.abs(diff) > 10) {
+                targetVx = Math.sign(diff) * speedMultiplier;
+            }
+        }
+
+        // Smooth acceleration
+        this.vx += (targetVx - this.vx) * 10 * dt;
+        this.x += this.vx * dt;
+
+        // Boundaries
+        const pad = 30;
+        if (this.x < pad) { this.x = pad; this.vx = 0; }
+        if (this.x > width - pad) { this.x = width - pad; this.vx = 0; }
+
+        // Spawn Trail
+        if (Math.random() < 0.6) {
+            const trailInfo = SHOP_ITEMS.trails.find(t => t.id === saveData.currentTrail) || SHOP_ITEMS.trails[0];
+            let c = trailInfo.colors[Math.floor(Math.random() * trailInfo.colors.length)];
+            if(c === "rainbow") c = `hsl(${Math.random()*360}, 100%, 50%)`;
+            
+            particles.push(new Particle(
+                this.x - this.vx * 0.02 + (Math.random() * 10 - 5),
+                this.y + 15 + (Math.random() * 10),
+                -this.vx * 0.1 + (Math.random() * 20 - 10),
+                200 + Math.random() * 100,
+                c,
+                Math.random() * 4 + 3,
+                0.4
+            ));
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Tilt based on velocity
+        ctx.rotate(this.vx * 0.0005);
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        if (this.shape === "chevron") {
+            ctx.moveTo(0, -20);
+            ctx.lineTo(15, 15);
+            ctx.lineTo(0, 5);
+            ctx.lineTo(-15, 15);
+        } else if (this.shape === "sharp") {
+            ctx.moveTo(0, -25);
+            ctx.lineTo(12, 10);
+            ctx.lineTo(20, 20);
+            ctx.lineTo(0, 10);
+            ctx.lineTo(-20, 20);
+            ctx.lineTo(-12, 10);
+        } else if (this.shape === "orb") {
+            ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        } else if (this.shape === "star") {
+            for(let i=0; i<5; i++) {
+                ctx.lineTo(Math.cos( (18+i*72)/180*Math.PI )*20, -Math.sin( (18+i*72)/180*Math.PI )*20);
+                ctx.lineTo(Math.cos( (54+i*72)/180*Math.PI )*8, -Math.sin( (54+i*72)/180*Math.PI )*8);
+            }
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner core
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = 0.5;
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Entity {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'coin', 'hazard'
+        this.radius = type === 'coin' ? 12 : 20;
+        this.active = true;
+        this.rot = Math.random() * Math.PI * 2;
+        this.magnetized = false;
+        
+        // Varied hazard shapes/sizes
+        if(this.type === 'hazard') {
+            this.radius = 15 + Math.random() * 20;
+            this.rotSpeed = (Math.random() - 0.5) * 5;
+            this.verts = Math.floor(Math.random() * 3) + 3; // 3 to 5 sides
+        }
+    }
+
+    update(dt, speed) {
+        if (!this.active) return;
+        
+        // Base movement
+        let vy = speed;
+        let vx = 0;
+
+        // Magnet Logic for Coins
+        if (this.type === 'coin' && saveData.magnetLevel > 0) {
+            const magRadii = [0, 150, 250, 400]; // Radius per level
+            const range = magRadii[saveData.magnetLevel];
+            const dist = Math.hypot(player.x - this.x, player.y - this.y);
+            
+            if (dist < range) {
+                this.magnetized = true;
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                const pullStrength = 800 * (1 - dist/range); // Stronger closer
+                vx = Math.cos(angle) * pullStrength;
+                vy = Math.sin(angle) * pullStrength + speed*0.5; 
+            } else {
+                this.magnetized = false;
+            }
+        }
+
+        this.y += vy * dt;
+        this.x += vx * dt;
+        
+        if (this.type === 'hazard') {
+            this.rot += this.rotSpeed * dt;
+        } else {
+            this.rot += 3 * dt;
+        }
+
+        // Off screen cleanup
+        if (this.y > height + 50) this.active = false;
+
+        // Collision Check
+        const dist = Math.hypot(player.x - this.x, player.y - this.y);
+        if (dist < player.radius + this.radius - 5) { // -5 for leniency
+            if (this.type === 'coin') {
+                this.collect();
+            } else if (this.type === 'hazard') {
+                triggerGameOver();
+            }
+        }
+    }
+
+    collect() {
+        this.active = false;
+        playSound('coin');
+        
+        // Double coin logic
+        let amount = 1;
+        let isDouble = false;
+        if (saveData.doubleCoinLevel > 0) {
+            const chances = [0, 0.10, 0.25, 0.50];
+            if (Math.random() < chances[saveData.doubleCoinLevel]) {
+                amount = 2;
+                isDouble = true;
+            }
+        }
+
+        coinsCollected += amount;
+        coinsSinceLastReward += amount;
+        
+        // UI Updates
+        document.getElementById("uiCoins").innerText = coinsCollected;
+        
+        // Particles
+        spawnExplosion(this.x, this.y, isDouble ? "#fff" : "#ffd700", isDouble ? 15 : 8);
+        floatingTexts.push(new FloatingText(this.x, this.y, isDouble ? "DOUBLE!" : "+1", isDouble ? "#fff" : "#ffd700"));
+
+        // Reward Logic
+        checkEconomyRewards();
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        if (this.type === 'coin') {
+            // Magnet beam effect
+            if (this.magnetized) {
+                ctx.restore(); // draw in world space
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(player.x, player.y);
+                ctx.strokeStyle = `rgba(0, 255, 255, ${Math.random()*0.5+0.2})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.translate(this.x, this.y);
+            }
+
+            // Coin Draw (spinning diamond/hex)
+            ctx.scale(Math.sin(this.rot), 1);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#ffd700";
+            ctx.fillStyle = "#ffaa00";
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(-2, -this.radius*0.6, 4, this.radius*1.2);
+            
+        } else {
+            // Hazard Draw
+            ctx.rotate(this.rot);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#ff0000";
+            ctx.fillStyle = "rgba(50, 0, 0, 0.8)";
+            ctx.strokeStyle = "#ff0055";
+            ctx.lineWidth = 3;
+            
+            ctx.beginPath();
+            for(let i=0; i<this.verts; i++) {
+                const a = (i/this.verts) * Math.PI*2;
+                const r = i%2===0 ? this.radius : this.radius * 0.5; // spiky
+                ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy, color, size, life) {
+        this.x = x; this.y = y;
+        this.vx = vx; this.vy = vy;
+        this.color = color;
+        this.size = size;
+        this.life = life;
+        this.maxLife = life;
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+    }
+    draw(ctx) {
+        if(this.life <= 0) return;
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x; this.y = y;
+        this.text = text; this.color = color;
+        this.life = 1.0;
+    }
+    update(dt) {
+        this.y -= 50 * dt;
+        this.life -= dt;
+    }
+    draw(ctx) {
+        if(this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+function spawnExplosion(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = Math.random() * 200 + 50;
+        particles.push(new Particle(x, y, Math.cos(a)*s, Math.sin(a)*s, color, Math.random()*4+2, Math.random()*0.5+0.2));
+    }
+}
+
+// --- Spawning Logic ---
+function handleSpawning(dt) {
+    spawnTimer -= dt;
+    hazardSpawnTimer -= dt;
+
+    // Spawn Coin Line/Cluster
+    if (spawnTimer <= 0) {
+        const xBase = 50 + Math.random() * (width - 100);
+        const type = Math.floor(Math.random() * 3); // 0=single, 1=line, 2=arc
+        
+        if (type === 0) {
+            entities.push(new Entity(xBase, -50, 'coin'));
+        } else if (type === 1) {
+            for(let i=0; i<5; i++) entities.push(new Entity(xBase, -50 - i*40, 'coin'));
+        } else {
+            for(let i=0; i<4; i++) {
+                entities.push(new Entity(xBase + Math.sin(i)*50, -50 - i*30, 'coin'));
+            }
+        }
+        
+        // Spawn faster as game speeds up
+        spawnTimer = (0.5 + Math.random() * 0.5) * (300 / gameSpeed); 
+    }
+
+    // Spawn Hazard
+    if (hazardSpawnTimer <= 0) {
+        const count = Math.floor(1 + (gameSpeed - 300)/200); // More hazards later
+        for(let i=0; i<count; i++) {
+            const x = 50 + Math.random() * (width - 100);
+            entities.push(new Entity(x, -100 - Math.random()*200, 'hazard'));
+        }
+        hazardSpawnTimer = (0.8 + Math.random() * 1.2) * (300 / gameSpeed);
+    }
+}
+
+// --- Economy Logic ---
+function checkEconomyRewards() {
+    // 1 SB every 20 coins collected
+    if (coinsSinceLastReward >= 20) {
+        coinsSinceLastReward -= 20;
+        giveSimgaBucks(1, "Coin Collection Bonus!");
+    }
+}
+
+function checkTimeEconomyRewards() {
+    // Reward for surviving milestones
+    if (runTime >= nextSBRewardTime) {
+        if (nextSBRewardTime === 25) {
+            giveSimgaBucks(2, "25s Survival Bonus!");
+            nextSBRewardTime = 60;
+        } else if (nextSBRewardTime === 60) {
+            giveSimgaBucks(4, "60s Survival Bonus!");
+            nextSBRewardTime = 120;
+        } else if (nextSBRewardTime === 120) {
+            giveSimgaBucks(6, "2 Min Survival Master!");
+            nextSBRewardTime = 240;
+        }
+    }
+}
+
+
+// --- Main Game Loop ---
+
+function update(dt) {
+    if (gameState !== "playing") return;
+
+    runTime += dt;
+    gameSpeed += 5 * dt; // Gradually speed up
+    if (gameSpeed > 1500) gameSpeed = 1500;
+    
+    distance += (gameSpeed * dt) / 10;
+    document.getElementById("uiScore").innerText = Math.floor(distance);
+
+    player.update(dt);
+    
+    handleSpawning(dt);
+
+    entities.forEach(e => e.update(dt, gameSpeed));
+    particles.forEach(p => p.update(dt));
+    floatingTexts.forEach(t => t.update(dt));
+
+    // Cleanup arrays
+    entities = entities.filter(e => e.active);
+    particles = particles.filter(p => p.life > 0);
+    floatingTexts = floatingTexts.filter(t => t.life > 0);
+
+    // Grid animation
+    backgroundOffset = (backgroundOffset + gameSpeed * dt) % 100;
+
+    if (shakeTime > 0) shakeTime -= dt;
+
+    checkTimeEconomyRewards();
+}
+
+function drawGrid(ctx) {
+    ctx.strokeStyle = "rgba(0, 255, 255, 0.1)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    // Verticals
+    const gridSize = 100;
+    const center = width/2;
+    for (let x = center % gridSize; x < width; x += gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+    }
+    for (let x = center % gridSize - gridSize; x > 0; x -= gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+    }
+
+    // Horizontals (moving)
+    for (let y = backgroundOffset; y < height; y += gridSize) {
+        ctx.moveTo(0, y); ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+
+    // Side borders glow
+    const gradL = ctx.createLinearGradient(0,0, 50, 0);
+    gradL.addColorStop(0, "rgba(255, 0, 255, 0.2)");
+    gradL.addColorStop(1, "transparent");
+    ctx.fillStyle = gradL;
+    ctx.fillRect(0,0, 50, height);
+
+    const gradR = ctx.createLinearGradient(width,0, width-50, 0);
+    gradR.addColorStop(0, "rgba(255, 0, 255, 0.2)");
+    gradR.addColorStop(1, "transparent");
+    ctx.fillStyle = gradR;
+    ctx.fillRect(width-50,0, 50, height);
+}
+
+function draw() {
+    // Clear with dark trail effect
+    ctx.fillStyle = "rgba(5, 5, 16, 0.8)"; 
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    if (shakeTime > 0) {
+        const mag = shakeTime * 50;
+        ctx.translate((Math.random()-0.5)*mag, (Math.random()-0.5)*mag);
+    }
+
+    drawGrid(ctx);
+
+    particles.forEach(p => p.draw(ctx));
+    entities.forEach(e => e.draw(ctx));
+    
+    // Always draw player so it's visible on Menu & Game Over
+    if (player) {
+        player.draw(ctx);
+    }
+
+    floatingTexts.forEach(t => t.draw(ctx));
+
+    ctx.restore();
+}
+
+function loop(timestamp) {
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    if (dt > 0.1) dt = 0.1; // Cap dt on lag spikes
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(loop);
+}
+
+
+// --- Game Flow Controls ---
+
+function init() {
+    loadGame();
+    player = new Player();
+    requestAnimationFrame(loop);
+}
+
+function startGame() {
+    initAudio();
+    document.getElementById("menuScreen").classList.remove("active");
+    document.getElementById("gameOverScreen").classList.remove("active");
+    document.getElementById("hud").style.display = "flex";
+    
+    gameState = "playing";
+    gameSpeed = 300;
+    distance = 0;
+    coinsCollected = 0;
+    coinsSinceLastReward = 0;
+    runTime = 0;
+    nextSBRewardTime = 25;
+    
+    entities = [];
+    particles = [];
+    floatingTexts = [];
+    
+    // Ensure player is positioned correctly in case of a resize
+    player.x = width/2;
+    player.y = height - 150; 
+    player.vx = 0;
+    player.updateAppearance();
+    
+    document.getElementById("uiScore").innerText = "0";
+    document.getElementById("uiCoins").innerText = "0";
+}
+
+function triggerGameOver() {
+    playSound('death');
+    gameState = "gameover";
+    shakeTime = 0.5;
+    spawnExplosion(player.x, player.y, player.color, 50);
+    spawnExplosion(player.x, player.y, "#ff0055", 50);
+    
+    document.getElementById("hud").style.display = "none";
+    
+    setTimeout(() => {
+        document.getElementById("gameOverScreen").classList.add("active");
+        document.getElementById("goScore").innerText = Math.floor(distance);
+        document.getElementById("goCoins").innerText = coinsCollected;
+        
+        if (distance > saveData.highScore) {
+            saveData.highScore = Math.floor(distance);
+            showToast("New High Score!", "success");
+        }
+        
+        saveGame();
+    }, 1000);
+}
+
+function showMenu() {
+    document.getElementById("gameOverScreen").classList.remove("active");
+    document.getElementById("shopScreen").classList.remove("active");
+    document.getElementById("menuScreen").classList.add("active");
+    gameState = "menu";
+}
+
+// --- Shop UI Logic ---
+
+function openShop() {
+    initAudio();
+    document.getElementById("menuScreen").classList.remove("active");
+    document.getElementById("shopScreen").classList.add("active");
+    switchShopTab('upgrades');
+}
+
+function closeShop() {
+    playSound('click');
+    document.getElementById("shopScreen").classList.remove("active");
+    document.getElementById("menuScreen").classList.add("active");
+    player.updateAppearance();
+}
+
+function switchShopTab(tab) {
+    playSound('click');
+    currentShopTab = tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.getElementById("tab-" + tab).classList.add("active");
+    renderShopContent();
+}
+
+function renderShopContent() {
+    const container = document.getElementById("shopContent");
+    container.innerHTML = "";
+
+    const items = SHOP_ITEMS[currentShopTab];
+
+    items.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "shop-item";
+        
+        let html = `
+            <div class="item-name">${item.name}</div>
+            <div class="item-desc">${item.desc}</div>
+        `;
+
+        // Determine state
+        let isMaxed = false;
+        let isUnlocked = false;
+        let isEquipped = false;
+
+        if (currentShopTab === "upgrades") {
+            const currentLvl = saveData[item.type];
+            if (currentLvl >= item.level) isUnlocked = true;
+            if (currentLvl >= 3 && item.level === 3) isMaxed = true; // Hardcode max 3
+            
+            // Only show next available level
+            if (item.level > currentLvl + 1) return; // Hide future levels
+            if (item.level < currentLvl + 1) return; // Hide past levels
+
+        } else if (currentShopTab === "skins") {
+            isUnlocked = saveData.skinsUnlocked.includes(item.id);
+            isEquipped = saveData.currentSkin === item.id;
+        } else if (currentShopTab === "trails") {
+            isUnlocked = saveData.trailsUnlocked.includes(item.id);
+            isEquipped = saveData.currentTrail === item.id;
+        }
+
+        if (isEquipped) {
+            html += `<button class="equip-btn equipped">Equipped</button>`;
+        } else if (isUnlocked) {
+            if (currentShopTab === "upgrades") {
+                html += `<button class="equip-btn equipped">Maxed</button>`;
+            } else {
+                html += `<button class="equip-btn" onclick="equipItem('${item.type}', '${item.id}')">Equip</button>`;
+            }
+        } else {
+            html += `<button class="buy-btn" onclick="buyItem('${currentShopTab}', '${item.id}', ${item.cost})">
+                        <span>💰 ${item.cost} SB</span>
+                     </button>`;
+        }
+
+        div.innerHTML = html;
+        container.appendChild(div);
+    });
+}
+
+function buyItem(category, id, cost) {
+    requestPurchase(cost, () => {
+        // Success Callback
+        const item = SHOP_ITEMS[category].find(i => i.id === id);
+        if (category === "upgrades") {
+            saveData[item.type] = item.level;
+        } else if (category === "skins") {
+            saveData.skinsUnlocked.push(item.id);
+            saveData.currentSkin = item.id;
+        } else if (category === "trails") {
+            saveData.trailsUnlocked.push(item.id);
+            saveData.currentTrail = item.id;
+        }
+    });
+}
+
+function equipItem(type, id) {
+    playSound('click');
+    if (type === "skin") {
+        saveData.currentSkin = id;
+    } else if (type === "trail") {
+        saveData.currentTrail = id;
+    }
+    saveGame();
+    renderShopContent();
+}
+
+// Start app
+window.onload = init;
+
+</script>
+</body>
+</html>

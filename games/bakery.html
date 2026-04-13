@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bakery Rush</title>
+    <style>
+        :root {
+            --wood-dark: #3E2723;
+            --wood-base: #5D4037;
+            --wood-light: #795548;
+            --gold: #FFD54F;
+            --gold-glow: #FFA000;
+            --text-light: #FFF8E1;
+            --danger: #E53935;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a0f0a;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(30, 15, 10, 0.85);
+            padding: 40px;
+            border-radius: 20px;
+            border: 4px solid var(--wood-light);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            max-width: 90%;
+            max-height: 90%;
+            backdrop-filter: blur(5px);
+            text-align: center;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1, h2, h3 {
+            margin: 0 0 20px 0;
+            color: var(--gold);
+            text-shadow: 0 3px 6px rgba(0,0,0,0.8), 0 0 15px var(--gold-glow);
+            letter-spacing: 2px;
+        }
+
+        h1 { font-size: 48px; text-transform: uppercase; }
+        h2 { font-size: 32px; }
+
+        p {
+            color: var(--text-light);
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, var(--wood-light), var(--wood-base));
+            border: 2px solid var(--wood-dark);
+            border-radius: 12px;
+            color: var(--text-light);
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px 40px;
+            margin: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 var(--wood-dark), 0 10px 15px rgba(0,0,0,0.5);
+            transition: all 0.1s ease;
+            text-shadow: 1px 1px 2px #000;
+            text-transform: uppercase;
+        }
+
+        .btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--wood-dark), 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .btn:disabled {
+            background: #555;
+            border-color: #333;
+            box-shadow: 0 6px 0 #333;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid var(--wood-light);
+            border-radius: 10px;
+            padding: 10px 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .score-display { color: var(--gold); }
+        
+        /* Shop */
+        .shop-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            overflow-y: auto;
+            max-height: 50vh;
+            padding-right: 10px;
+            margin-bottom: 20px;
+        }
+        
+        /* Scrollbar for shop */
+        .shop-container::-webkit-scrollbar { width: 8px; }
+        .shop-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        .shop-container::-webkit-scrollbar-thumb { background: var(--wood-light); border-radius: 4px; }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--wood-base);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            transition: border-color 0.3s;
+        }
+        
+        .shop-item.owned {
+            border-color: var(--gold);
+            background: rgba(255, 213, 79, 0.1);
+        }
+
+        .shop-item h3 { margin: 0 0 10px 0; font-size: 18px; }
+        .shop-item p { font-size: 14px; margin: 0 0 15px 0; min-height: 40px; }
+        
+        .buy-btn {
+            background: linear-gradient(to bottom, #4CAF50, #2E7D32);
+            border: 2px solid #1B5E20;
+            padding: 8px 20px;
+            font-size: 16px;
+            width: 100%;
+        }
+        .buy-btn:active { box-shadow: 0 0 0 #1B5E20; }
+        .buy-btn.equipped { background: #555; border-color: #333; box-shadow: 0 6px 0 #333; }
+
+        /* Messages */
+        #msg-toast {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 0 10px var(--gold-glow);
+        }
+
+        /* Loading */
+        #loading-screen { z-index: 50; }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="hud">
+        <div class="hud-box">Score: <span id="hud-score" class="score-display">0</span></div>
+        <div class="hud-box">Best: <span id="hud-best" class="score-display">0</span></div>
+    </div>
+
+    <div class="ui-layer">
+        
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="spinner"></div>
+            <h2>Warming Ovens...</h2>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen">
+            <h1>Bakery Rush</h1>
+            <p>Bake the dough. Don't let it burn!</p>
+            <p>High Score: <span id="menu-high-score" class="score-display">0</span></p>
+            <button class="btn" id="btn-start">Start Baking</button>
+            <button class="btn" id="btn-shop">Shop</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen">
+            <h2>Bakery Upgrades</h2>
+            <div class="shop-container" id="shop-list">
+                <!-- Populated by JS -->
+            </div>
+            <button class="btn" id="btn-shop-back">Back to Menu</button>
+        </div>
+
+        <!-- Game Over -->
+        <div id="gameover-screen" class="screen">
+            <h1 style="color: var(--danger); text-shadow: 0 0 15px red;">The Bread Burned!</h1>
+            <h2>Score: <span id="go-score" class="score-display">0</span></h2>
+            <p id="go-new-best" style="display:none; color: var(--gold); font-weight: bold; font-size: 24px; animation: pulse 1s infinite;">New High Score!</p>
+            <button class="btn" id="btn-restart">Play Again</button>
+            <button class="btn" id="btn-menu">Main Menu</button>
+        </div>
+    </div>
+    
+    <div id="msg-toast"></div>
+</div>
+
+<script>
+/**
+ * BAKERY RUSH - GAME PLATFORM INTEGRATION
+ */
+const GAME_ID = "bakery";
+
+// --- STATE & DATA ---
+const gameState = {
+    mode: 'loading', // loading, menu, playing, gameover, shop
+    score: 0,
+    loavesThisRun: 0,
+    activeOvens: 3, // Starts with 3, increases during gameplay
+    shakeTime: 0,
+    lastTime: 0
+};
+
+let saveData = {
+    highScore: 0,
+    totalLoaves: 0,
+    upgrades: {
+        timerLevel: 0, // 0 = normal, 1 = slow bake
+        glowUnlocked: false,
+        ovenSkin: 'iron', // iron, brick, magic
+        counterSkin: 'pine' // pine, oak, marble
+    }
+};
+
+const SHOP_ITEMS = [
+    { id: 'timer_1', name: 'Slow Bake', desc: 'Increases the perfect bake window before it burns.', cost: 25, type: 'timer' },
+    { id: 'glow_1', name: 'Bread Glow', desc: 'Adds a magical sparkle when bread is perfectly ready.', cost: 20, type: 'glow' },
+    { id: 'skin_brick', name: 'Brick Oven', desc: 'A cozy classic brick oven texture.', cost: 15, type: 'ovenSkin', val: 'brick' },
+    { id: 'skin_magic', name: 'Magic Oven', desc: 'An enchanted obsidian and purple oven.', cost: 40, type: 'ovenSkin', val: 'magic' },
+    { id: 'counter_oak', name: 'Oak Counter', desc: 'A dark, rich oak wood counter.', cost: 10, type: 'counterSkin', val: 'oak' },
+    { id: 'counter_marble', name: 'Marble Counter', desc: 'A pristine, polished white marble counter.', cost: 30, type: 'counterSkin', val: 'marble' }
+];
+
+let pendingPurchase = null;
+
+// --- PLATFORM COMMUNICATION ---
+function saveProgress() {
+    window.parent.postMessage({
+        type: "saveData",
+        gameId: GAME_ID,
+        data: saveData
+    }, "*");
+}
+
+function giveSimgaBucks(amount) {
+    window.parent.postMessage({
+        type: "addSimgaBucks",
+        amount: amount
+    }, "*");
+    showToast(`+${amount} SimgaBucks!`);
+}
+
+function requestPurchase(itemId, cost) {
+    const msgId = "buy_" + Math.random().toString(36).substring(2);
+    pendingPurchase = { id: itemId, msgId: msgId };
+    
+    window.parent.postMessage({
+        type: "spendSimgaBucks",
+        amount: cost,
+        msgId: msgId
+    }, "*");
+}
+
+// Listen for messages
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === "loadResponse") {
+        if (gameState.mode === 'loading') {
+            if (data.data) {
+                // Merge loaded data with default structure to prevent missing properties
+                saveData = {
+                    highScore: data.data.highScore || 0,
+                    totalLoaves: data.data.totalLoaves || 0,
+                    upgrades: { ...saveData.upgrades, ...(data.data.upgrades || {}) }
+                };
+            }
+            finishLoading();
+        }
+    }
+    else if (data.type === "spendResponse") {
+        if (pendingPurchase && pendingPurchase.msgId === data.msgId) {
+            handlePurchaseResponse(data.success, pendingPurchase.id);
+            pendingPurchase = null;
+        }
+    }
+});
+
+// Request Load on start
+function initGameData() {
+    const loadMsgId = "load_" + Date.now();
+    window.parent.postMessage({
+        type: "loadData",
+        gameId: GAME_ID,
+        msgId: loadMsgId
+    }, "*");
+
+    // Fallback if no response within 2 seconds (running outside platform)
+    setTimeout(() => {
+        if (gameState.mode === 'loading') finishLoading();
+    }, 2000);
+}
+
+function finishLoading() {
+    switchScreen('menu-screen');
+    document.getElementById('menu-high-score').textContent = saveData.highScore;
+    buildShopUI();
+    initCanvas();
+    requestAnimationFrame(gameLoop);
+}
+
+// --- ENGINE & GRAPHICS ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize
+let width = 0, height = 0;
+
+// Entities
+let ovens = [];
+let particles = [];
+let floatTexts = [];
+
+// Constants
+const BAKE_TIME = 4500; 
+const READY_WINDOW_NORMAL = 2000;
+const READY_WINDOW_SLOW = 3500;
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    if (gameState.mode === 'playing') {
+        arrangeOvens();
+    }
+}
+window.addEventListener('resize', resize);
+
+function initCanvas() {
+    resize();
+}
+
+function switchScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('hud').style.display = 'none';
+    if (screenId) {
+        document.getElementById(screenId).classList.add('active');
+        if (screenId === 'menu-screen') {
+            document.getElementById('menu-high-score').textContent = saveData.highScore;
+        }
+    }
+    gameState.mode = screenId === 'gameover-screen' ? 'gameover' : 
+                     screenId === 'menu-screen' ? 'menu' : 
+                     screenId === 'shop-screen' ? 'shop' : 'playing';
+                     
+    if (gameState.mode === 'playing') {
+        document.getElementById('hud').style.display = 'flex';
+    }
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('msg-toast');
+    toast.textContent = msg;
+    toast.style.opacity = 1;
+    setTimeout(() => { toast.style.opacity = 0; }, 2000);
+}
+
+// --- GAME LOGIC ---
+
+class Oven {
+    constructor(x, y, radius) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.state = 0; // 0: empty, 1: baking, 2: ready, 3: burnt
+        this.timer = 0;
+        this.puffScale = 0;
+        this.jiggle = 0;
+    }
+
+    startBaking() {
+        if (this.state !== 0) return;
+        this.state = 1;
+        this.timer = 0;
+        this.puffScale = 0;
+        
+        // Spawn flour dust
+        spawnParticles(this.x, this.y + this.radius/2, 10, 'flour');
+    }
+
+    collect() {
+        if (this.state === 2) {
+            // Success!
+            gameState.score++;
+            gameState.loavesThisRun++;
+            saveData.totalLoaves++;
+            
+            document.getElementById('hud-score').textContent = gameState.score;
+            
+            // Economy rewards
+            if (gameState.loavesThisRun === 1 || gameState.loavesThisRun % 10 === 0) {
+                // First reward fast, then every 10
+                let amt = gameState.loavesThisRun === 1 ? 1 : 2;
+                giveSimgaBucks(amt);
+            }
+            
+            // Difficulty curve (add ovens)
+            if (gameState.score === 15 && gameState.activeOvens < 4) {
+                gameState.activeOvens = 4;
+                arrangeOvens();
+            } else if (gameState.score === 35 && gameState.activeOvens < 5) {
+                gameState.activeOvens = 5;
+                arrangeOvens();
+            } else if (gameState.score === 60 && gameState.activeOvens < 6) {
+                gameState.activeOvens = 6;
+                arrangeOvens();
+            }
+
+            spawnParticles(this.x, this.y, 20, 'sparkle');
+            spawnFloatingText(this.x, this.y - this.radius, "+1", "#4CAF50");
+            
+            this.state = 0;
+            this.timer = 0;
+            return true;
+        } else if (this.state === 1) {
+            // Too early
+            this.jiggle = 10;
+        }
+        return false;
+    }
+
+    update(dt) {
+        if (this.jiggle > 0) this.jiggle -= dt * 0.05;
+        if (this.jiggle < 0) this.jiggle = 0;
+
+        if (this.state === 0) return;
+
+        this.timer += dt;
+        
+        // Animation
+        if (this.state === 1) {
+            // Dough rises
+            this.puffScale = Math.min(1, this.timer / (BAKE_TIME * 0.8));
+        }
+
+        let readyWin = saveData.upgrades.timerLevel > 0 ? READY_WINDOW_SLOW : READY_WINDOW_NORMAL;
+
+        if (this.state === 1 && this.timer >= BAKE_TIME) {
+            this.state = 2; // Ready
+            this.timer = 0;
+            spawnParticles(this.x, this.y, 5, 'steam');
+        } 
+        else if (this.state === 2) {
+            if (this.timer >= readyWin) {
+                this.state = 3; // Burnt!
+                this.timer = 0;
+                endGame();
+            } else {
+                // Glow effect occasionally
+                if (saveData.upgrades.glowUnlocked && Math.random() < 0.05) {
+                    spawnParticles(this.x, this.y, 1, 'glow');
+                }
+                if (Math.random() < 0.02) {
+                    spawnParticles(this.x, this.y - this.radius/2, 1, 'steam');
+                }
+            }
+        }
+        else if (this.state === 3) {
+            // Burnt, smoking
+            if (Math.random() < 0.2) {
+                spawnParticles(this.x, this.y - this.radius/2, 1, 'smoke');
+            }
+        }
+    }
+
+    draw(ctx) {
+        let ox = this.x + Math.sin(this.jiggle) * 5;
+        let oy = this.y;
+        let r = this.radius;
+
+        // Draw Oven Background / Interior
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(ox, oy, r, Math.PI, 0);
+        ctx.lineTo(ox + r, oy + r*0.8);
+        ctx.lineTo(ox - r, oy + r*0.8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Fire glow in background
+        let fireGlow = ctx.createRadialGradient(ox, oy + r*0.5, 0, ox, oy + r*0.5, r);
+        let pulse = Math.sin(Date.now() / 150) * 0.2 + 0.8;
+        if (this.state === 3) pulse = 0.2; // Dim fire when burnt
+        fireGlow.addColorStop(0, `rgba(255, 100, 0, ${pulse * 0.6})`);
+        fireGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = fireGlow;
+        ctx.fill();
+
+        // Draw Bread based on state
+        if (this.state > 0) {
+            ctx.save();
+            ctx.translate(ox, oy + r*0.4);
+            
+            // Jiggle
+            if (this.jiggle > 0) ctx.rotate(Math.sin(this.jiggle) * 0.1);
+
+            let bw = r * 0.6 * (0.8 + this.puffScale * 0.2);
+            let bh = r * 0.4 * (0.8 + this.puffScale * 0.2);
+            
+            // Color mapping
+            let fillCol = '#F5E6D3'; // Dough
+            let strokeCol = '#D7CCC8';
+            let detailCol = '#E0E0E0';
+
+            if (this.state === 1) {
+                // Interpolate from pale to golden
+                let prog = this.timer / BAKE_TIME;
+                if (prog > 0.5) {
+                    let p2 = (prog - 0.5) * 2;
+                    // Blend to golden
+                    let rC = Math.round(245 - p2 * (245 - 230));
+                    let gC = Math.round(230 - p2 * (230 - 160));
+                    let bC = Math.round(211 - p2 * (211 - 60));
+                    fillCol = `rgb(${rC},${gC},${bC})`;
+                    strokeCol = '#A1887F';
+                    detailCol = '#D7CCC8';
+                }
+            } else if (this.state === 2) {
+                fillCol = '#E6A13C'; // Perfect Golden
+                strokeCol = '#8D6E63';
+                detailCol = '#FFE0B2';
+                
+                // Pulsing indicator if ready
+                let readyProg = this.timer / (saveData.upgrades.timerLevel > 0 ? READY_WINDOW_SLOW : READY_WINDOW_NORMAL);
+                if (readyProg > 0.7) {
+                    // Warning flash
+                    if (Math.floor(Date.now() / 100) % 2 === 0) fillCol = '#FF7043';
+                }
+
+                // Add glowing outline if upgraded
+                if (saveData.upgrades.glowUnlocked) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#FFD54F';
+                }
+
+            } else if (this.state === 3) {
+                fillCol = '#212121'; // Burnt
+                strokeCol = '#000000';
+                detailCol = '#424242';
+            }
+
+            // Draw loaf shape
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bw, bh, 0, 0, Math.PI * 2);
+            ctx.fillStyle = fillCol;
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = strokeCol;
+            ctx.stroke();
+
+            // Clear shadow for details
+            ctx.shadowBlur = 0;
+
+            // Details (bread scores)
+            ctx.strokeStyle = detailCol;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-bw*0.4, -bh*0.3); ctx.lineTo(-bw*0.2, bh*0.1);
+            ctx.moveTo(0, -bh*0.4); ctx.lineTo(bw*0.2, bh*0.2);
+            ctx.moveTo(bw*0.4, -bh*0.3); ctx.lineTo(bw*0.6, bh*0.1);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Draw Oven Exterior Frame (Arch)
+        ctx.lineWidth = 15;
+        let skin = saveData.upgrades.ovenSkin;
+        
+        ctx.beginPath();
+        ctx.arc(ox, oy, r, Math.PI, 0);
+        ctx.lineTo(ox + r, oy + r*0.8);
+        
+        if (skin === 'brick') {
+            ctx.strokeStyle = '#B71C1C';
+        } else if (skin === 'magic') {
+            ctx.strokeStyle = '#4A148C';
+            // Magic glow
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#EA80FC';
+        } else {
+            ctx.strokeStyle = '#607D8B'; // Iron
+        }
+        
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset
+
+        // Add some texture lines to oven arch
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath();
+        if (skin === 'brick') {
+             for(let angle = Math.PI; angle <= 0; angle += 0.3) {
+                 ctx.moveTo(ox + Math.cos(angle)*(r-7), oy - Math.sin(angle)*(r-7));
+                 ctx.lineTo(ox + Math.cos(angle)*(r+7), oy - Math.sin(angle)*(r+7));
+             }
+        } else {
+             ctx.arc(ox, oy, r-5, Math.PI, 0);
+        }
+        ctx.stroke();
+    }
+}
+
+class Particle {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.life = 1.0;
+        
+        if (type === 'steam' || type === 'smoke') {
+            this.vx = (Math.random() - 0.5) * 1;
+            this.vy = -Math.random() * 2 - 1;
+            this.size = Math.random() * 10 + 10;
+            this.decay = Math.random() * 0.01 + 0.01;
+        } else if (type === 'sparkle' || type === 'glow') {
+            this.vx = (Math.random() - 0.5) * 4;
+            this.vy = (Math.random() - 0.5) * 4 - 2;
+            this.size = Math.random() * 4 + 2;
+            this.decay = Math.random() * 0.03 + 0.02;
+        } else if (type === 'ember') {
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = -Math.random() * 3;
+            this.size = Math.random() * 3 + 1;
+            this.decay = Math.random() * 0.02 + 0.02;
+        } else if (type === 'flour') {
+            this.vx = (Math.random() - 0.5) * 3;
+            this.vy = (Math.random() - 0.5) * 3 - 1;
+            this.size = Math.random() * 3 + 2;
+            this.decay = 0.05;
+        }
+    }
+
+    update(dt) {
+        this.x += this.vx * (dt/16);
+        this.y += this.vy * (dt/16);
+        this.life -= this.decay * (dt/16);
+        
+        if (this.type === 'steam' || this.type === 'smoke') {
+            this.size += 0.2 * (dt/16);
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        
+        ctx.beginPath();
+        if (this.type === 'steam') {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        } else if (this.type === 'smoke') {
+            ctx.fillStyle = '#424242';
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        } else if (this.type === 'sparkle' || this.type === 'glow') {
+            ctx.fillStyle = '#FFD54F';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#FFD54F';
+            // Star shape
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        } else if (this.type === 'ember') {
+            ctx.fillStyle = '#FF5722';
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        } else if (this.type === 'flour') {
+            ctx.fillStyle = '#F5F5F5';
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+        this.vy = -1.5;
+    }
+    update(dt) {
+        this.y += this.vy * (dt/16);
+        this.life -= 0.02 * (dt/16);
+    }
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 24px sans-serif';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeText(this.text, this.x, this.y);
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+function spawnParticles(x, y, count, type) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(x, y, type));
+    }
+}
+
+function spawnFloatingText(x, y, text, color) {
+    floatTexts.push(new FloatingText(x, y, text, color));
+}
+
+// --- GAME FLOW ---
+
+function startGame() {
+    gameState.score = 0;
+    gameState.loavesThisRun = 0;
+    gameState.activeOvens = 3;
+    gameState.shakeTime = 0;
+    
+    document.getElementById('hud-score').textContent = "0";
+    document.getElementById('hud-best').textContent = saveData.highScore;
+    
+    arrangeOvens();
+    particles = [];
+    floatTexts = [];
+    
+    switchScreen(null); // Playing mode
+}
+
+function arrangeOvens() {
+    ovens = [];
+    let spacing = Math.min(250, width / (gameState.activeOvens + 1));
+    let startX = (width - (spacing * (gameState.activeOvens - 1))) / 2;
+    let yPos = height * 0.6;
+    let radius = Math.min(80, spacing * 0.4);
+
+    for (let i = 0; i < gameState.activeOvens; i++) {
+        ovens.push(new Oven(startX + i * spacing, yPos, radius));
+    }
+}
+
+function endGame() {
+    gameState.mode = 'gameover';
+    gameState.shakeTime = 20; // Screen shake
+    
+    setTimeout(() => {
+        switchScreen('gameover-screen');
+        document.getElementById('go-score').textContent = gameState.score;
+        
+        let newBest = document.getElementById('go-new-best');
+        if (gameState.score > saveData.highScore) {
+            saveData.highScore = gameState.score;
+            newBest.style.display = 'block';
+            giveSimgaBucks(5); // Major reward for high score
+        } else {
+            newBest.style.display = 'none';
+        }
+        
+        saveProgress();
+    }, 1500); // Wait a bit for dramatic effect
+}
+
+function updatePlaying(dt) {
+    // Randomly spawn dough in empty ovens
+    // Spawn rate increases with score
+    let spawnChance = 0.005 + (gameState.score * 0.0002);
+    
+    if (Math.random() < spawnChance) {
+        let emptyOvens = ovens.filter(o => o.state === 0);
+        if (emptyOvens.length > 0) {
+            let rnd = Math.floor(Math.random() * emptyOvens.length);
+            emptyOvens[rnd].startBaking();
+        }
+    }
+
+    // Spawn ambient embers from ovens
+    ovens.forEach(o => {
+        if (Math.random() < 0.05) spawnParticles(o.x + (Math.random()-0.5)*o.radius, o.y + o.radius*0.7, 1, 'ember');
+    });
+}
+
+function drawBackground() {
+    // Brick Wall
+    let grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, '#2b1b17');
+    grad.addColorStop(1, '#4e342e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Subtle atmospheric vignette
+    let vignette = ctx.createRadialGradient(width/2, height/2, height*0.2, width/2, height/2, height);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    // Countertop
+    let counterY = height * 0.6 + 60; // Below ovens
+    
+    // Choose counter colors based on skin
+    let skin = saveData.upgrades.counterSkin;
+    let topC1, topC2, frontC;
+    
+    if (skin === 'oak') {
+        topC1 = '#4E342E'; topC2 = '#3E2723'; frontC = '#261410';
+    } else if (skin === 'marble') {
+        topC1 = '#F5F5F5'; topC2 = '#E0E0E0'; frontC = '#9E9E9E';
+    } else { // Pine (default)
+        topC1 = '#8D6E63'; topC2 = '#795548'; frontC = '#4E342E';
+    }
+
+    let topGrad = ctx.createLinearGradient(0, counterY - 20, 0, counterY + 20);
+    topGrad.addColorStop(0, topC1);
+    topGrad.addColorStop(1, topC2);
+    
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, counterY - 20, width, height - counterY + 20);
+    
+    // Counter edge
+    ctx.fillStyle = frontC;
+    ctx.fillRect(0, counterY + 20, width, height - counterY - 20);
+    
+    // Counter highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(0, counterY - 20, width, 5);
+}
+
+// MAIN LOOP
+function gameLoop(timestamp) {
+    if (!gameState.lastTime) gameState.lastTime = timestamp;
+    let dt = timestamp - gameState.lastTime;
+    gameState.lastTime = timestamp;
+    
+    // Cap dt to prevent huge jumps if tab is inactive
+    if (dt > 100) dt = 100;
+
+    // Update Phase
+    if (gameState.mode === 'playing') {
+        updatePlaying(dt);
+        ovens.forEach(o => o.update(dt));
+    } else if (gameState.mode === 'gameover') {
+        ovens.forEach(o => o.update(dt)); // Keep animating smoke
+    }
+    
+    particles.forEach(p => p.update(dt));
+    particles = particles.filter(p => p.life > 0);
+    
+    floatTexts.forEach(ft => ft.update(dt));
+    floatTexts = floatTexts.filter(ft => ft.life > 0);
+
+    if (gameState.shakeTime > 0) gameState.shakeTime -= dt/16;
+
+    // Draw Phase
+    ctx.save();
+    
+    if (gameState.shakeTime > 0) {
+        let amt = Math.min(10, gameState.shakeTime);
+        ctx.translate((Math.random()-0.5)*amt, (Math.random()-0.5)*amt);
+    }
+
+    drawBackground();
+    
+    ovens.forEach(o => o.draw(ctx));
+    
+    particles.forEach(p => p.draw(ctx));
+    floatTexts.forEach(ft => ft.draw(ctx));
+
+    ctx.restore();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// --- INPUT ---
+canvas.addEventListener('mousedown', handleInput);
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    handleInput(e.touches[0]);
+}, {passive: false});
+
+function handleInput(e) {
+    if (gameState.mode !== 'playing') return;
+
+    let rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    // Check ovens
+    for (let o of ovens) {
+        let dx = x - o.x;
+        let dy = y - (o.y + o.radius*0.4); // center of bread area
+        // Hitbox is slightly larger than bread
+        if (dx*dx + dy*dy < (o.radius * 0.8) * (o.radius * 0.8)) {
+            o.collect();
+            break; // Only click one
+        }
+    }
+}
+
+// --- SHOP SYSTEM ---
+
+function buildShopUI() {
+    const list = document.getElementById('shop-list');
+    list.innerHTML = '';
+    
+    SHOP_ITEMS.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        
+        let isOwned = false;
+        let isEquipped = false;
+        
+        if (item.type === 'timer') {
+            isOwned = saveData.upgrades.timerLevel > 0;
+            isEquipped = isOwned;
+        } else if (item.type === 'glow') {
+            isOwned = saveData.upgrades.glowUnlocked;
+            isEquipped = isOwned;
+        } else if (item.type === 'ovenSkin') {
+            isOwned = (item.val === 'iron' || saveData.upgrades[`owned_oven_${item.val}`]);
+            isEquipped = saveData.upgrades.ovenSkin === item.val;
+        } else if (item.type === 'counterSkin') {
+            isOwned = (item.val === 'pine' || saveData.upgrades[`owned_counter_${item.val}`]);
+            isEquipped = saveData.upgrades.counterSkin === item.val;
+        }
+
+        if (isOwned) div.classList.add('owned');
+
+        let btnHtml = '';
+        if (isEquipped) {
+            btnHtml = `<button class="btn buy-btn equipped" disabled>Equipped</button>`;
+        } else if (isOwned) {
+            btnHtml = `<button class="btn buy-btn" onclick="equipItem('${item.id}')">Equip</button>`;
+        } else {
+            btnHtml = `<button class="btn buy-btn" id="btn-buy-${item.id}" onclick="buyItem('${item.id}', ${item.cost})">Buy (${item.cost} SB)</button>`;
+        }
+
+        div.innerHTML = `
+            <h3>${item.name}</h3>
+            <p>${item.desc}</p>
+            ${btnHtml}
+        `;
+        list.appendChild(div);
+    });
+}
+
+function buyItem(id, cost) {
+    const btn = document.getElementById(`btn-buy-${id}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+    }
+    requestPurchase(id, cost);
+}
+
+function handlePurchaseResponse(success, itemId) {
+    if (success) {
+        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        if (item.type === 'timer') saveData.upgrades.timerLevel = 1;
+        if (item.type === 'glow') saveData.upgrades.glowUnlocked = true;
+        if (item.type === 'ovenSkin') {
+            saveData.upgrades[`owned_oven_${item.val}`] = true;
+            saveData.upgrades.ovenSkin = item.val;
+        }
+        if (item.type === 'counterSkin') {
+            saveData.upgrades[`owned_counter_${item.val}`] = true;
+            saveData.upgrades.counterSkin = item.val;
+        }
+        
+        saveProgress();
+        buildShopUI();
+        showToast("Upgrade unlocked!");
+    } else {
+        showToast("Not enough SimgaBucks!");
+        buildShopUI(); // Reset buttons
+    }
+}
+
+function equipItem(id) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (item.type === 'ovenSkin') saveData.upgrades.ovenSkin = item.val;
+    if (item.type === 'counterSkin') saveData.upgrades.counterSkin = item.val;
+    
+    saveProgress();
+    buildShopUI();
+}
+
+// --- EVENT LISTENERS ---
+document.getElementById('btn-start').addEventListener('click', startGame);
+document.getElementById('btn-restart').addEventListener('click', startGame);
+document.getElementById('btn-menu').addEventListener('click', () => switchScreen('menu-screen'));
+document.getElementById('btn-shop').addEventListener('click', () => {
+    buildShopUI();
+    switchScreen('shop-screen');
+});
+document.getElementById('btn-shop-back').addEventListener('click', () => switchScreen('menu-screen'));
+
+// Start initialization
+window.onload = initGameData;
+
+</script>
+</body>
+</html>
