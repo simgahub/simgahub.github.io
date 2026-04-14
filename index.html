@@ -1803,18 +1803,6 @@
                 // (FAVORITES has no init — pure localStorage reads)
 
                 buildFeed();
-
-                // ---- Deeplink: ?game=<id> (from Share button) ----
-                (function handleDeeplink() {
-                    const param = new URLSearchParams(window.location.search).get('game');
-                    if (!param) return;
-                    const target = document.querySelector(`.game-section[data-game-id="${CSS.escape(param)}"]`);
-                    if (target) {
-                        // Small delay lets scroll-snap settle before we jump
-                        setTimeout(() => target.scrollIntoView({ behavior: 'instant' }), 150);
-                    }
-                })();
-
                 setupMessageListener();
                 attachUIListeners();
                 // Start the global chat engine
@@ -4461,6 +4449,20 @@
                         bikiniEmoji: '🍓',
                         fallbackBg:      'linear-gradient(160deg,#fff1f2,#fda4af,#f43f5e)',
                         fallbackBikini:  'linear-gradient(160deg,#fef2f2,#fca5a5,#ef4444)',
+                    },
+                        {
+                        id: 'yuki',
+                        name: 'Yuki',
+                        type: 'shop',
+                        season: null,
+                        normalPrice: 750,
+                        bikiniPrice: 550,
+                        normalImg:   'waifus/yuki.png',
+                        bikiniImg:   'waifus/yuki_bikini.png',
+                        normalEmoji: '❄️',
+                        bikiniEmoji: '🌊',
+                        fallbackBg:      'linear-gradient(160deg,#e0f2fe,#7dd3fc,#0ea5e9)',
+                        fallbackBikini:  'linear-gradient(160deg,#ecfeff,#a5f3fc,#06b6d4)',
                     },
                 ];
 
